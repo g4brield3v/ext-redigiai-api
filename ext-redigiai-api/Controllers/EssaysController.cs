@@ -5,7 +5,6 @@ namespace ext_redigiai_api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    //[Consumes("application/json")]
     public class EssaysController : ControllerBase
     {
         public EssaysController() { }

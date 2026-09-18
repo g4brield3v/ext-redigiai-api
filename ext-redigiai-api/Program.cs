@@ -5,11 +5,10 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "ext-redigiai-api"));
-}
+
+app.MapOpenApi();
+app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "ext-redigiai-api"));
+
 
 app.UseRouting();
 app.MapControllers();
