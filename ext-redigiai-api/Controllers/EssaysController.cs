@@ -1,25 +1,27 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Application.Interfaces;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ext_redigiai_api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    //[Consumes("application/json")]
     public class EssaysController : ControllerBase
     {
-        public EssaysController() { }
+        public readonly IEssaysService _essaysService;
+
+        public EssaysController(IEssaysService essaysService)
+        {
+            _essaysService = essaysService;
+        }
 
         [HttpPost]
         [Route("upload")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(string))]
         public async Task<IActionResult> UploadEssayImageAsync(IFormFile image)
         {
-            if (image == null || image.Length == 0)
-                return BadRequest("No file uploaded.");
-
-            var msg = string.Format("Image uploaded with sucessfully!");
-            return Ok(msg);
+            var res = await _essaysService.UploadEssayImageAsync(image);
+            return Ok(res);
         }
     }
 }

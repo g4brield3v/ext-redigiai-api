@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Application/Application.csproj" Id="ff6531bd-8797-4b69-a6b1-14d10558d72c" />
+  <Project Path="Contract/Contract.csproj" Id="931b0820-c3e3-4340-a997-77a1929cf273" />
   <Project Path="Data/Data.csproj" Id="a3f37746-8568-4f56-b494-a08c87df99e8" />
   <Project Path="Domain/Domain.csproj" Id="985577d2-355c-4f2b-840a-7b9b13e73784" />
   <Project Path="ext-redigiai-api/ext-redigiai-api.csproj" />
