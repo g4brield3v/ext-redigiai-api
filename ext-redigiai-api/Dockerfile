@@ -1,90 +1,17 @@
-# ============================================================
-# 1. BASE
-# ============================================================
+ARG SYSTEM_VERSION="10.0-alpine" # ARG: Variável interpretada apenas no build da imagem
+ENV PORT=8080 # ENV: Variável interpretada no build e inicialização do container
 
-# Define a imagem base utilizada para executar a aplicação.
-# ASP.NET Runtime 10.0 sobre Alpine Linux.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/sdk:${SYSTEM_VERSION} AS build
+WORKDIR /src
+COPY ["ext-redigiai-api/ext-redigiai-api.csproj", "ext-redigiai-api/"]
+RUN dotnet restore "ext-redigiai-api/ext-redigiai-api.csproj"
+COPY . .
+RUN dotnet publish "ext-redigiai-api/ext-redigiai-api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Define o usuário que executará a aplicação dentro do container.
-USER $APP_UID
-
-# Define o diretório de trabalho dentro do container.
+FROM mcr.microsoft.com/dotnet/aspnet:${SYSTEM_VERSION}
 WORKDIR /app
+COPY --from=build /app/publish .
 
-# Documenta que a aplicação utiliza a porta HTTP 8080.
 EXPOSE 8080
 
-# Documenta que a aplicação utiliza a porta HTTPS 8081.
-EXPOSE 8081
-
-
-# ============================================================
-# 2. BUILD
-# ============================================================
-
-# Define a imagem do SDK .NET utilizada para compilar a aplicação.
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
-
-# Define a configuração de compilação.
-# Caso BUILD_CONFIGURATION não seja informado, utiliza "Release".
-ARG BUILD_CONFIGURATION=Release
-
-# Define o diretório de trabalho utilizado durante o build.
-WORKDIR /src
-
-# Copia apenas o arquivo .csproj para dentro do container.
-COPY ["ext-redigiai-api/ext-redigiai-api.csproj", "ext-redigiai-api/"]
-
-# Restaura as dependências NuGet especificadas no .csproj.
-RUN dotnet restore "./ext-redigiai-api/ext-redigiai-api.csproj"
-
-# Copia o restante dos arquivos do projeto para dentro do container.
-COPY . .
-
-# Define o diretório onde está o projeto.
-WORKDIR "/src/ext-redigiai-api"
-
-# Compila o projeto na configuração especificada.
-# Os arquivos compilados serão colocados em /app/build.
-RUN dotnet build "./ext-redigiai-api.csproj" \
-    -c $BUILD_CONFIGURATION \
-    -o /app/build
-
-
-# ============================================================
-# 3. PUBLISH
-# ============================================================
-
-# Cria uma nova etapa utilizando a imagem resultante da etapa "build".
-FROM build AS publish
-
-# Define a configuração de publicação.
-# Caso não seja informada, utiliza "Release".
-ARG BUILD_CONFIGURATION=Release
-
-# Publica a aplicação .NET.
-# Os arquivos publicados serão colocados em /app/publish.
-# UseAppHost=false evita a criação de um executável nativo da aplicação.
-RUN dotnet publish "./ext-redigiai-api.csproj" \
-    -c $BUILD_CONFIGURATION \
-    -o /app/publish \
-    /p:UseAppHost=false
-
-
-# ============================================================
-# 4. FINAL
-# ============================================================
-
-# Utiliza a imagem "base" como base da imagem final.
-FROM base AS final
-
-# Define o diretório de trabalho da aplicação.
-WORKDIR /app
-
-# Copia os arquivos publicados da etapa "publish"
-# para o diretório /app da imagem final.
-COPY --from=publish /app/publish .
-
-# Define o processo principal executado quando o container iniciar.
 ENTRYPOINT ["dotnet", "ext-redigiai-api.dll"]
