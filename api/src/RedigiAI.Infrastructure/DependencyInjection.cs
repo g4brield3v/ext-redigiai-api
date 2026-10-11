@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RedigiAI.Application.Abstractions;
-using RedigiAI.Application.Catalog;
 using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
+using RedigiAI.Domain.Catalog;
+using RedigiAI.Infrastructure.Clerk;
 using RedigiAI.Infrastructure.Persistence;
+using RedigiAI.Infrastructure.Persistence.Repositories;
 
 namespace RedigiAI.Infrastructure;
 
@@ -18,12 +20,18 @@ public static class DependencyInjection
             .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<ICreditRepository, CreditRepository>();
+        services.AddScoped<IDatabaseAdmin, DatabaseAdmin>();
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IAccessLog, AccessLog>();
-        services.AddScoped<ICatalogQueries, CatalogQueries>();
-        services.AddScoped<CatalogSeeder>();
+
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ICreditRepository, CreditRepository>();
+        services.AddScoped<IExamRepository, ExamRepository>();
+        services.AddScoped<IEssayTypeRepository, EssayTypeRepository>();
+        services.AddScoped<IRubricRepository, RubricRepository>();
+        services.AddScoped<IThemeRepository, ThemeRepository>();
+
+        services.AddScoped<IClerkWebhookVerifier, ClerkWebhookVerifier>();
 
         return services;
     }

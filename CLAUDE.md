@@ -26,7 +26,7 @@ Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente
 api/
   RedigiAI.sln
   src/RedigiAI.Domain/         agregados, entidades, objetos de valor, eventos de domínio, interfaces de repositório (sem dependência alguma)
-  src/RedigiAI.Application/    casos de uso (comandos e consultas), portas para serviços externos; depende só do Domain
+  src/RedigiAI.Application/    serviços de aplicação (um por contexto), DTOs e portas para serviços externos; depende só do Domain
   src/RedigiAI.Infrastructure/ EF Core, migrações, repositórios, fila, Claude, Mercado Pago, Cloudinary, SendGrid, Clerk
   src/RedigiAI.Api/            host: controllers, middleware, modo worker
   tests/RedigiAI.UnitTests/
@@ -43,10 +43,12 @@ Monólito modular em camadas: `Api → Application → Domain` e `Infrastructure
 - **Contextos delimitados**, uma pasta por contexto em cada camada: `Catalog` (vestibular, tema, grade), `Accounts` (usuário, aceite, idade), `Essays` (envio, transcrição, revisão), `Grading` (correção, perfil de correção), `Billing` (créditos, pagamentos, assinatura), `Notifications` (e-mails).
 - **Agregados** guardam as invariantes e expõem as transições como métodos (`Essay.MarkQueued()`); nada de setters públicos. Um agregado referencia outro só pelo id.
 - **Objetos de valor** para conceitos com regra própria: `EssayTitle`, `Score`, `Level`, `BirthDate`, `Money`, `EssayStatus`.
-- **Repositórios:** interface no Domain, uma por agregado; implementação no Infrastructure. Cada caso de uso é uma transação.
+- **Fluxo de uma requisição:** controller → serviço de aplicação → domínio → repositório. O controller só traduz HTTP (token, cabeçalhos, corpo, código de resposta) e chama **um** serviço; nunca usa `AppDbContext`, repositório nem classe do Infrastructure.
+- **Serviços de aplicação:** interface e implementação no Application, na pasta do contexto (`IAccountService`, `ICatalogService`, `ICreditService`…). Orquestram agregados e repositórios, abrem a transação (`IUnitOfWork`) e devolvem DTOs. Regra de negócio fica no agregado, não no serviço.
+- **Repositórios:** interface no Domain, uma por agregado; implementação em `Infrastructure/Persistence/Repositories`. Cada caso de uso é uma transação.
 - **Concorrência:** o agregado decide se a transição é válida; o repositório a grava com o `UPDATE` condicional das regras 10 e 12 e devolve se a linha mudou. O DDD não substitui essas regras.
 - **Eventos de domínio** viram jobs na tabela `jobs`, gravados na mesma transação (regra 11).
-- **Leituras** (painel, listas) podem consultar o banco direto na camada Application/Infrastructure, sem carregar agregados.
+- **Leituras** também passam por serviço e repositório. Uma consulta pesada (painel, listas longas) pode ganhar um método próprio no repositório que devolve só o necessário, em vez de carregar o agregado inteiro.
 
 ## Comandos
 

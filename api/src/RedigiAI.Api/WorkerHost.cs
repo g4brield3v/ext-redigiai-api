@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using RedigiAI.Application;
+using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Catalog;
 using RedigiAI.Infrastructure;
-using RedigiAI.Infrastructure.Persistence;
 
 namespace RedigiAI.Api;
 
@@ -44,7 +44,7 @@ internal static class DatabaseCommands
     {
         using var host = WorkerHost.CreateBuilder(args).Build();
         await using var scope = host.Services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<IDatabaseAdmin>().MigrateAsync(CancellationToken.None);
         return 0;
     }
 
@@ -52,7 +52,7 @@ internal static class DatabaseCommands
     {
         using var host = WorkerHost.CreateBuilder(args).Build();
         await using var scope = host.Services.CreateAsyncScope();
-        var seeded = await scope.ServiceProvider.GetRequiredService<CatalogSeeder>().SeedAsync(CancellationToken.None);
+        var seeded = await scope.ServiceProvider.GetRequiredService<ICatalogSeedService>().SeedAsync(CancellationToken.None);
         scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.Seed")
             .LogInformation(seeded ? "Catalog seeded" : "Catalog already present; nothing to do");
         return 0;

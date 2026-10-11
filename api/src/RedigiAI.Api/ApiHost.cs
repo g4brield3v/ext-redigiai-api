@@ -11,7 +11,6 @@ using RedigiAI.Api.Http;
 using RedigiAI.Application;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
-using RedigiAI.Infrastructure.Persistence;
 
 namespace RedigiAI.Api;
 

@@ -11,6 +11,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using RedigiAI.Application.Catalog;
 using RedigiAI.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -42,7 +43,7 @@ public sealed class ApiFixture : IAsyncLifetime
 
         await using var scope = Factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
-        await scope.ServiceProvider.GetRequiredService<CatalogSeeder>().SeedAsync(CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<ICatalogSeedService>().SeedAsync(CancellationToken.None);
     }
 
     public async Task DisposeAsync()

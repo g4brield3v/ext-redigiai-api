@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using RedigiAI.Infrastructure.Persistence;
+using RedigiAI.Application.Catalog;
 
 namespace RedigiAI.IntegrationTests;
 
@@ -127,7 +127,7 @@ public class CatalogTests(ApiFixture api)
     {
         await using var scope = api.Factory.Services.CreateAsyncScope();
 
-        var seeded = await scope.ServiceProvider.GetRequiredService<CatalogSeeder>().SeedAsync(CancellationToken.None);
+        var seeded = await scope.ServiceProvider.GetRequiredService<ICatalogSeedService>().SeedAsync(CancellationToken.None);
 
         Assert.False(seeded);
         Assert.Equal(3, (await _client.GetFromJsonAsync<JsonElement>("/v1/exams")).GetArrayLength());

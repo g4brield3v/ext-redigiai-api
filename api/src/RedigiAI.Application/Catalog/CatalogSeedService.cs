@@ -1,12 +1,23 @@
-using Microsoft.EntityFrameworkCore;
+using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Catalog;
 
-namespace RedigiAI.Infrastructure.Persistence;
+namespace RedigiAI.Application.Catalog;
 
-/// <summary>
-/// Carga inicial do catálogo (no MVP não há painel administrativo). Idempotente: não faz nada se a Fuvest já existe.
-/// </summary>
-public sealed class CatalogSeeder(AppDbContext db, TimeProvider time)
+/// <summary>Carga inicial do catálogo (no MVP não há painel administrativo).</summary>
+public interface ICatalogSeedService
+{
+    /// <summary>Idempotente: não faz nada se a Fuvest já existe.</summary>
+    /// <returns><c>true</c> se o catálogo foi criado agora.</returns>
+    Task<bool> SeedAsync(CancellationToken ct);
+}
+
+internal sealed class CatalogSeedService(
+    IExamRepository exams,
+    IEssayTypeRepository essayTypes,
+    IRubricRepository rubrics,
+    IThemeRepository themes,
+    IUnitOfWork unitOfWork,
+    TimeProvider time) : ICatalogSeedService
 {
     // TODO(conteúdo): os descritores oficiais de cada nível e o enunciado e a coletânea do tema ainda não
     // foram fornecidos. Os textos entre colchetes são marcadores; substitua-os publicando a grade v2 e o tema real.
@@ -14,7 +25,7 @@ public sealed class CatalogSeeder(AppDbContext db, TimeProvider time)
 
     public async Task<bool> SeedAsync(CancellationToken ct)
     {
-        if (await db.Exams.AnyAsync(e => e.Slug == "fuvest", ct))
+        if (await exams.FindBySlugAsync("fuvest", ct) is not null)
         {
             return false;
         }
@@ -22,14 +33,14 @@ public sealed class CatalogSeeder(AppDbContext db, TimeProvider time)
         var now = time.GetUtcNow();
 
         var fuvest = Exam.Create("fuvest", "Fuvest", ExamStatus.Active, sheetLines: 30, position: 1);
-        db.Exams.AddRange(
-            fuvest,
-            Exam.Create("unicamp", "Unicamp", ExamStatus.ComingSoon, sheetLines: 30, position: 2),
-            Exam.Create("enem", "Enem", ExamStatus.ComingSoon, sheetLines: 30, position: 3));
+        exams.Add(fuvest);
+        exams.Add(Exam.Create("unicamp", "Unicamp", ExamStatus.ComingSoon, sheetLines: 30, position: 2));
+        exams.Add(Exam.Create("enem", "Enem", ExamStatus.ComingSoon, sheetLines: 30, position: 3));
 
         var dissertacao = EssayType.Create(fuvest.Id, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
         var narrativa = EssayType.Create(fuvest.Id, "narrativa", "Narrativa", "Texto narrativo com reflexão");
-        db.EssayTypes.AddRange(dissertacao, narrativa);
+        essayTypes.Add(dissertacao);
+        essayTypes.Add(narrativa);
 
         var rubric = RubricVersion.Publish(
             fuvest.Id,
@@ -49,7 +60,7 @@ public sealed class CatalogSeeder(AppDbContext db, TimeProvider time)
                 new CriterionSpec("Coesão, coerência e progressão", 3, Descriptors(level2: "Boa articulação, com composição adequada.")),
                 new CriterionSpec("Convenções da escrita e vocabulário", 2, Descriptors()),
             ]);
-        db.RubricVersions.Add(rubric);
+        rubrics.Add(rubric);
 
         var theme = Theme.Draft(
             fuvest.Id,
@@ -62,9 +73,9 @@ public sealed class CatalogSeeder(AppDbContext db, TimeProvider time)
         theme.AcceptType(dissertacao, rubric, "[Instrução da proposta para o texto dissertativo-argumentativo.]");
         theme.AcceptType(narrativa, rubric, "[Instrução da proposta para o texto narrativo com reflexão.]");
         theme.Publish(now);
-        db.Themes.Add(theme);
+        themes.Add(theme);
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
         return true;
     }
 

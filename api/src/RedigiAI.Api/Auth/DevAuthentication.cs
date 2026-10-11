@@ -1,14 +1,12 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RedigiAI.Api.Http;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Accounts;
-using RedigiAI.Domain.Billing;
+using RedigiAI.Application.Catalog;
 using RedigiAI.Domain.Common;
-using RedigiAI.Infrastructure.Persistence;
 
 namespace RedigiAI.Api.Auth;
 
@@ -87,41 +85,22 @@ internal sealed class DevAuthHandler(
 /// Deixa o banco local pronto ao subir a API em modo de desenvolvimento: migrações, catálogo e os alunos
 /// de teste já cadastrados (a "Conta Nova" fica de fora, para testar o primeiro acesso).
 /// </summary>
-internal sealed class DevEnvironmentSetup(IServiceScopeFactory scopes, TimeProvider time, ILogger<DevEnvironmentSetup> logger)
-    : IHostedService
+internal sealed class DevEnvironmentSetup(IServiceScopeFactory scopes, ILogger<DevEnvironmentSetup> logger) : IHostedService
 {
-    private static readonly RequestOrigin Origin = new("127.0.0.1", "dev-setup", null);
-
     public async Task StartAsync(CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
-        var db = services.GetRequiredService<AppDbContext>();
 
-        await db.Database.MigrateAsync(ct);
-        await services.GetRequiredService<CatalogSeeder>().SeedAsync(ct);
+        await services.GetRequiredService<IDatabaseAdmin>().MigrateAsync(ct);
+        await services.GetRequiredService<ICatalogSeedService>().SeedAsync(ct);
 
-        var today = BrasiliaTime.DateOf(time.GetUtcNow());
+        var accounts = services.GetRequiredService<ITestAccountService>();
         foreach (var user in DevUser.All)
         {
-            if (user.Age is not { } age)
+            if (user.Age is { } age)
             {
-                continue;
-            }
-
-            // Cem dias depois do aniversário: a idade não muda de um dia para o outro durante os testes.
-            var birthDate = today.AddYears(-age).AddDays(-100);
-            var result = await services.GetRequiredService<RegisterUserHandler>().HandleAsync(
-                new RegisterUserCommand(user.ClerkUserId, user.Email, user.Name, birthDate, TermsAccepted: true, Origin), ct);
-
-            if (result.Created && user.ExtraCredits > 0)
-            {
-                var now = time.GetUtcNow();
-                var bucket = CreditBucket.Grant(result.Profile.Id, CreditSource.Single, user.ExtraCredits, expiresAt: null, now);
-                services.GetRequiredService<ICreditRepository>().AddGrant(bucket, CreditLedgerEntry.ForGrant(bucket, now));
-                services.GetRequiredService<IAuditLog>().Record(
-                    "dev-setup", "credit.granted", "credit_bucket", bucket.Id, new { source = "single", delta = bucket.Granted });
-                await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync(ct);
+                await accounts.EnsureAsync(new TestAccount(user.ClerkUserId, user.Email, user.Name, age, user.ExtraCredits), ct);
             }
         }
 

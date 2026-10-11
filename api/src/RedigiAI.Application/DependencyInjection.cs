@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using RedigiAI.Application.Accounts;
+using RedigiAI.Application.Billing;
+using RedigiAI.Application.Catalog;
 
 namespace RedigiAI.Application;
 
@@ -10,10 +12,12 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddOptions<LegalOptions>();
 
-        services.AddScoped<RegisterUserHandler>();
-        services.AddScoped<GetProfileHandler>();
-        services.AddScoped<UpdateProfileHandler>();
-        services.AddScoped<SyncClerkEmailHandler>();
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<IClerkWebhookService, ClerkWebhookService>();
+        services.AddScoped<ITestAccountService, TestAccountService>();
+        services.AddScoped<ICreditService, CreditService>();
+        services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<ICatalogSeedService, CatalogSeedService>();
 
         return services;
     }
