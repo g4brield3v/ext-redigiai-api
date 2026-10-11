@@ -368,3 +368,4 @@ FodyWeavers.xsd
 web/dist/
 web/playwright-report/
 web/test-results/
+web/design-diff/
