@@ -1,5 +1,3 @@
-using RedigiAI.Domain.Common;
-
 namespace RedigiAI.Domain.Catalog;
 
 public sealed record ZeroRule(string Code, string Description);
@@ -7,7 +5,7 @@ public sealed record ZeroRule(string Code, string Description);
 public sealed record CriterionSpec(string Name, int Weight, IReadOnlyDictionary<int, string> LevelDescriptors);
 
 /// <summary>Grade de correção. Imutável depois de publicada: editar é publicar uma versão nova.</summary>
-public sealed class RubricVersion : AggregateRoot
+public sealed class RubricVersion
 {
     public const int MinLevel = 1;
     public const int MaxLevel = 3;

@@ -1,5 +1,3 @@
-using RedigiAI.Domain.Common;
-
 namespace RedigiAI.Domain.Catalog;
 
 public enum ThemeStatus
@@ -16,7 +14,7 @@ public enum ThemeTextKind
 }
 
 /// <summary>Tema da proposta, com a coletânea e os tipos de redação aceitos. Sem ano no título.</summary>
-public sealed class Theme : AggregateRoot
+public sealed class Theme
 {
     private readonly List<ThemeText> _texts = [];
     private readonly List<ThemeEssayType> _acceptedTypes = [];

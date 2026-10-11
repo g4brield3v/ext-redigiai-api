@@ -11,7 +11,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.ToTable("users");
-        builder.Ignore(u => u.DomainEvents);
         builder.Property(u => u.ClerkUserId).HasMaxLength(64);
         builder.Property(u => u.Email).HasMaxLength(320);
         builder.Property(u => u.Name).HasMaxLength(User.MaxNameLength);

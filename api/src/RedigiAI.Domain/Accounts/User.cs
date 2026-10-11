@@ -8,7 +8,7 @@ public sealed record EmailPreferences(bool CorrectionReady, bool IllegibleRemind
 }
 
 /// <summary>Usuário local, ligado à conta do Clerk por <see cref="ClerkUserId"/>.</summary>
-public sealed class User : AggregateRoot
+public sealed class User
 {
     public const int MaxNameLength = 120;
 

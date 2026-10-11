@@ -9,7 +9,6 @@ internal sealed class ExamConfiguration : IEntityTypeConfiguration<Exam>
     public void Configure(EntityTypeBuilder<Exam> builder)
     {
         builder.ToTable("exams");
-        builder.Ignore(e => e.DomainEvents);
         builder.Property(e => e.Slug).HasMaxLength(40);
         builder.Property(e => e.Name).HasMaxLength(80);
         builder.Property(e => e.Status).HasMaxLength(20);
@@ -35,7 +34,6 @@ internal sealed class RubricVersionConfiguration : IEntityTypeConfiguration<Rubr
     public void Configure(EntityTypeBuilder<RubricVersion> builder)
     {
         builder.ToTable("rubric_versions");
-        builder.Ignore(r => r.DomainEvents);
         builder.Property(r => r.ZeroRules)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<ZeroRule>>, JsonComparer<IReadOnlyList<ZeroRule>>>();
@@ -64,7 +62,6 @@ internal sealed class ThemeConfiguration : IEntityTypeConfiguration<Theme>
     public void Configure(EntityTypeBuilder<Theme> builder)
     {
         builder.ToTable("themes");
-        builder.Ignore(t => t.DomainEvents);
         builder.Property(t => t.Title).HasMaxLength(200);
         builder.Property(t => t.Status).HasMaxLength(20);
         builder.HasOne<Exam>().WithMany().HasForeignKey(t => t.ExamId).OnDelete(DeleteBehavior.Restrict);

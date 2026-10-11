@@ -1,5 +1,3 @@
-using RedigiAI.Domain.Common;
-
 namespace RedigiAI.Domain.Catalog;
 
 public enum ExamStatus
@@ -8,7 +6,7 @@ public enum ExamStatus
     ComingSoon,
 }
 
-public sealed class Exam : AggregateRoot
+public sealed class Exam
 {
     private Exam() { }
 
