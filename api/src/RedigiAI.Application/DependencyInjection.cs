@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RedigiAI.Application.Accounts;
 using RedigiAI.Application.Billing;
 using RedigiAI.Application.Catalog;
+using RedigiAI.Application.Essays;
 
 namespace RedigiAI.Application;
 
@@ -18,6 +19,8 @@ public static class DependencyInjection
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
+        services.AddScoped<IUploadService, UploadService>();
+        services.AddScoped<IEssayService, EssayService>();
 
         return services;
     }

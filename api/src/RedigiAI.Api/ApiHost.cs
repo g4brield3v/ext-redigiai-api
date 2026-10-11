@@ -11,6 +11,7 @@ using RedigiAI.Api.Http;
 using RedigiAI.Application;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
+using RedigiAI.Infrastructure.Cloudinary;
 
 namespace RedigiAI.Api;
 
@@ -29,6 +30,7 @@ internal static class ApiHost
         services.AddApplication();
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
+        services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
         services.AddClerkAuthentication(builder.Configuration, devAccess);
         if (devAccess)
@@ -158,17 +160,31 @@ internal static class ApiHost
         });
     }
 
-    /// <summary>30 requisições por minuto por aluno; quem não está logado é limitado por IP.</summary>
+    public const string EssayBatchLimit = "essay-batch";
+
+    /// <summary>
+    /// 30 requisições por minuto por aluno; quem não está logado é limitado por IP.
+    /// O envio de redações tem ainda o seu limite: 10 por hora por aluno.
+    /// </summary>
     private static void AddRateLimiting(IServiceCollection services, IConfiguration configuration)
     {
         var perUser = configuration.GetValue("RateLimit:PerUserPerMinute", 30);
         var perIp = configuration.GetValue("RateLimit:PerIpPerMinute", 120);
+        var batchesPerHour = configuration.GetValue("RateLimit:EssayBatchPerHour", 10);
 
         services.AddRateLimiter(limiter =>
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             limiter.OnRejected = async (context, _) =>
                 await ErrorWriter.WriteAsync(context.HttpContext, Errors.RateLimited());
+            limiter.AddPolicy(EssayBatchLimit, http => RateLimitPartition.GetFixedWindowLimiter(
+                $"batch:{http.User.FindFirst("sub")?.Value ?? http.Connection.RemoteIpAddress?.ToString()}",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = batchesPerHour,
+                    Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0,
+                }));
             limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
             {
                 var userId = http.User.FindFirst("sub")?.Value;

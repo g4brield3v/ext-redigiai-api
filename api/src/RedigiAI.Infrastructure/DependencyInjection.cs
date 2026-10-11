@@ -5,7 +5,9 @@ using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
+using RedigiAI.Domain.Essays;
 using RedigiAI.Infrastructure.Clerk;
+using RedigiAI.Infrastructure.Cloudinary;
 using RedigiAI.Infrastructure.Persistence;
 using RedigiAI.Infrastructure.Persistence.Repositories;
 
@@ -31,7 +33,14 @@ public static class DependencyInjection
         services.AddScoped<IRubricRepository, RubricRepository>();
         services.AddScoped<IThemeRepository, ThemeRepository>();
 
+        services.AddScoped<IEssayRepository, EssayRepository>();
+        services.AddScoped<IEssayBatchRepository, EssayBatchRepository>();
+        services.AddScoped<IAssetRepository, AssetRepository>();
+        services.AddScoped<IJobQueue, JobQueue>();
+
         services.AddScoped<IClerkWebhookVerifier, ClerkWebhookVerifier>();
+
+        services.AddSingleton<IPhotoStorage, CloudinaryPhotoStorage>();
 
         return services;
     }

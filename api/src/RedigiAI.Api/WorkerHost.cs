@@ -2,6 +2,7 @@ using RedigiAI.Application;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
 using RedigiAI.Infrastructure;
+using RedigiAI.Infrastructure.Cloudinary;
 
 namespace RedigiAI.Api;
 
@@ -23,6 +24,7 @@ internal static class WorkerHost
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure();
         builder.Services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
+        builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         return builder;
     }
 

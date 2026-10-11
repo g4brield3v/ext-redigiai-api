@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Auditing;
 using RedigiAI.Domain.Billing;
+using RedigiAI.Domain.Essays;
 
 namespace RedigiAI.Infrastructure.Persistence.Configurations;
 
@@ -54,6 +55,7 @@ internal sealed class CreditLedgerEntryConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.Source).HasMaxLength(20);
         builder.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CreditBucket>().WithMany().HasForeignKey(e => e.BucketId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Essay>().WithMany().HasForeignKey(e => e.EssayId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => e.UserId);
     }
 }

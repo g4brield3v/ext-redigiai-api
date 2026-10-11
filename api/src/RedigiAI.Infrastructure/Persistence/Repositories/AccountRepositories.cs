@@ -30,6 +30,13 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         db.CreditLedger.Add(entry);
     }
 
+    public void AddEntry(CreditLedgerEntry entry) => db.CreditLedger.Add(entry);
+
+    public async Task<bool> TryDebitAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct) =>
+        await db.CreditBuckets
+            .Where(b => b.Id == bucketId && b.Remaining >= 1 && (b.ExpiresAt == null || b.ExpiresAt > now))
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, x => x.Remaining - 1), ct) == 1;
+
     public async Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(
         Guid userId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets

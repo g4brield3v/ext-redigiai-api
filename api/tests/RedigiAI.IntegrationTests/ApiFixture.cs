@@ -11,6 +11,8 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using System.Collections.Concurrent;
+using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
 using RedigiAI.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -33,6 +35,9 @@ public sealed class ApiFixture : IAsyncLifetime
     private readonly RsaSecurityKey _signingKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
     public byte[] WebhookKey { get; } = RandomNumberGenerator.GetBytes(24);
+
+    /// <summary>Faz o papel do Cloudinary: o que o teste "enviou" e a assinatura devolvida ao navegador.</summary>
+    public FakePhotoStorage Photos { get; } = new();
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
@@ -65,16 +70,20 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("Legal:TermsVersion", "1");
             builder.UseSetting("RateLimit:PerUserPerMinute", "10000");
             builder.UseSetting("RateLimit:PerIpPerMinute", "10000");
+            builder.UseSetting("RateLimit:EssayBatchPerHour", "10000");
             builder.UseSetting("Proxy:TrustForwardedHeaders", "false");
             configure?.Invoke(builder);
 
             builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IPhotoStorage>(Photos);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
                     configuration.SigningKeys.Add(_signingKey);
                     jwt.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
-                }));
+                });
+            });
         });
 
     public HttpClient CreateClient(string? token = null) => CreateClient(Factory, token);
@@ -152,4 +161,19 @@ public sealed class ApiFixture : IAsyncLifetime
         await using var scope = Factory.Services.CreateAsyncScope();
         return await query(scope.ServiceProvider.GetRequiredService<AppDbContext>());
     }
+}
+
+public sealed class FakePhotoStorage : IPhotoStorage
+{
+    public ConcurrentDictionary<string, StoredPhoto> Stored { get; } = new();
+
+    public SignedUpload SignUpload(string publicId, DateTimeOffset now) =>
+        new("https://api.cloudinary.com/v1_1/test/image/upload", new Dictionary<string, string>
+        {
+            ["public_id"] = publicId,
+            ["signature"] = "test-signature",
+        });
+
+    public Task<StoredPhoto?> FindAsync(string publicId, CancellationToken ct) =>
+        Task.FromResult(Stored.TryGetValue(publicId, out var photo) ? photo : null);
 }

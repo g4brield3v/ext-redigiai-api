@@ -1,0 +1,64 @@
+using RedigiAI.Application.Abstractions;
+using RedigiAI.Domain.Essays;
+
+namespace RedigiAI.Application.Essays;
+
+/// <param name="Fields">Campos que o navegador envia ao provedor junto com o arquivo.</param>
+public sealed record UploadSignatureDto(Guid AssetId, string UploadUrl, IReadOnlyDictionary<string, string> Fields);
+
+public sealed record BatchEssayItem(Guid ThemeId, Guid EssayTypeId, Guid AssetId, Guid? ParentEssayId);
+
+public sealed record SubmitEssaysCommand(
+    string ClerkUserId,
+    string? IdempotencyKey,
+    IReadOnlyList<BatchEssayItem>? Essays,
+    bool AiNoticeAccepted,
+    RequestOrigin Origin);
+
+public sealed record BatchEssayResponseDto(IReadOnlyList<Guid> EssayIds);
+
+/// <param name="Title">"Vestibular – Tipo – Tema", gerado pelo backend.</param>
+/// <param name="HasVersions">A redação é uma reescrita ou já foi reescrita.</param>
+/// <param name="FailureCode">Código do erro quando o status é <c>failed</c> ou <c>cancelled</c>.</param>
+public sealed record EssaySummaryDto(
+    Guid Id,
+    string Title,
+    Guid ThemeId,
+    Guid EssayTypeId,
+    EssayStatus Status,
+    int Version,
+    bool HasVersions,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ReviewDeadlineAt,
+    int IllegibleCount,
+    int? Score,
+    int? MaxScore,
+    string? FailureCode);
+
+/// <param name="NextCursor">Passe em <c>cursor</c> para a página seguinte; nulo na última.</param>
+public sealed record EssayListDto(IReadOnlyList<EssaySummaryDto> Items, string? NextCursor);
+
+public sealed record TranscriptionLineDto(int Number, string Text, bool Indent);
+
+/// <param name="Start">Posição do trecho ilegível no texto da linha.</param>
+/// <param name="ContextBefore">Trecho ao redor, para o aluno localizar a palavra.</param>
+public sealed record IllegibleWordDto(
+    Guid Id, int LineNumber, int Start, int End, string ContextBefore, string ContextAfter);
+
+public sealed record EssayDetailDto(
+    Guid Id,
+    string Title,
+    Guid ThemeId,
+    Guid EssayTypeId,
+    EssayStatus Status,
+    int Version,
+    bool HasVersions,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ReviewDeadlineAt,
+    int IllegibleCount,
+    int? Score,
+    int? MaxScore,
+    string? FailureCode,
+    int SheetLines,
+    IReadOnlyList<TranscriptionLineDto> Lines,
+    IReadOnlyList<IllegibleWordDto> IllegibleWords);

@@ -3,6 +3,8 @@ using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Auditing;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
+using RedigiAI.Domain.Essays;
+using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Infrastructure.Persistence;
 
@@ -15,6 +17,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<CreditBucket> CreditBuckets => Set<CreditBucket>();
     public DbSet<CreditLedgerEntry> CreditLedger => Set<CreditLedgerEntry>();
+    public DbSet<Essay> Essays => Set<Essay>();
+    public DbSet<EssayBatch> EssayBatches => Set<EssayBatch>();
+    public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<AccessLogEntry> AccessLogs => Set<AccessLogEntry>();
 
@@ -24,6 +30,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<ThemeStatus>().HaveConversion<SnakeCaseEnumConverter<ThemeStatus>>();
         configuration.Properties<ThemeTextKind>().HaveConversion<SnakeCaseEnumConverter<ThemeTextKind>>();
         configuration.Properties<CreditSource>().HaveConversion<SnakeCaseEnumConverter<CreditSource>>();
+        configuration.Properties<EssayStatus>().HaveConversion<SnakeCaseEnumConverter<EssayStatus>>();
+        configuration.Properties<JobStatus>().HaveConversion<SnakeCaseEnumConverter<JobStatus>>();
         configuration.Properties<BirthDate>().HaveConversion<BirthDateConverter>();
     }
 
