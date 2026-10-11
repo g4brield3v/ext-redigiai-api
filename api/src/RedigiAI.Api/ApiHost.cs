@@ -30,7 +30,12 @@ internal static class ApiHost
         services.AddApplication();
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
-        services.AddClerkAuthentication(builder.Configuration);
+        var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
+        services.AddClerkAuthentication(builder.Configuration, devAccess);
+        if (devAccess)
+        {
+            services.AddHostedService<DevEnvironmentSetup>();
+        }
         AddControllers(services);
         AddOpenApiDocument(services);
 
@@ -38,7 +43,7 @@ internal static class ApiHost
         services.AddCors(cors => cors.AddPolicy(CorsPolicy, policy => policy
             .WithOrigins([.. CorsOrigins.From(builder.Configuration)])
             .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
-            .WithHeaders("Authorization", "Content-Type", "Idempotency-Key")
+            .WithHeaders(["Authorization", "Content-Type", "Idempotency-Key", .. devAccess ? new[] { DevAuthentication.Header } : []])
             .WithExposedHeaders("X-Trace-Id")));
 
         AddRateLimiting(services, builder.Configuration);

@@ -59,6 +59,8 @@ dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
 dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker
+# Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
+# carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova).
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 ```
 

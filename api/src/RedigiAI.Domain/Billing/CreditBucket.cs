@@ -23,6 +23,21 @@ public sealed class CreditBucket
     public DateTimeOffset? ExpiresAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    public static CreditBucket Grant(Guid userId, CreditSource source, int amount, DateTimeOffset? expiresAt, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(amount, 1);
+        return new CreditBucket
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            Source = source,
+            Granted = amount,
+            Remaining = amount,
+            ExpiresAt = expiresAt,
+            CreatedAt = now,
+        };
+    }
+
     /// <summary>Teste grátis: 1 correção por conta, sem vencimento.</summary>
     public static CreditBucket GrantTrial(Guid userId, DateTimeOffset now) =>
         new()
