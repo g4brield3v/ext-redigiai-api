@@ -72,7 +72,7 @@ cd web && npm ci && npm run dev             # http://localhost:5173
 cd web && npm run dev:mock                   # front com dados simulados (MSW) e sessão simulada, sem backend nem Clerk
 cd web && npm run gen:api                   # regenera o cliente a partir do openapi.json
 cd web && npm test && npm run typecheck && npm run lint
-cd web && npx playwright test               # comportamento e regressão visual, sobre o build com dados simulados (http://localhost:4173)
+cd web && npx playwright test               # comportamento e regressão visual, sobre um build de teste com dados simulados (web/dist-e2e, http://localhost:4173)
 cd web && npm run e2e:design                # compara cada tela com docs/telas/png; resultado em web/design-diff/
 cd web && npx playwright test visual --update-snapshots   # aceita uma mudança visual intencional
 ```
