@@ -57,17 +57,22 @@ Monólito modular em camadas: `Api → Application → Domain` e `Infrastructure
 ## Comandos
 
 ```bash
-docker compose up -d db                     # PostgreSQL local
-dotnet build api/RedigiAI.sln
-dotnet test api/RedigiAI.sln
+docker compose up -d db                     # PostgreSQL local (DB_PORT muda a porta, se a 5432 estiver ocupada)
+dotnet tool restore                         # dotnet-ef na versão do projeto
+dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
+dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
+dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
+dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker
-dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api
+dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 cd web && npm ci && npm run dev             # http://localhost:5173
 cd web && npm run gen:api                   # regenera o cliente a partir do openapi.json
 cd web && npm test && npm run typecheck && npm run lint
-cd web && npx playwright test
+cd web && npx playwright test               # sobe o build de produção em http://localhost:4173
 ```
+
+A configuração local vem do arquivo `.env` na raiz (copie de `.env.example`); o back-end e o Vite leem o mesmo arquivo.
 
 Atualize esta seção sempre que um comando mudar.
 
