@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Início</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2346C9}a:hover{color:#16308F}
+*{box-sizing:border-box}
+.pg{background:#F6F8FC;color:#0E1B33;font-family:'Schibsted Grotesk',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.55}
+.in{max-width:1180px;margin:0 auto;padding-left:32px;padding-right:32px}
+.nav{position:sticky;top:0;z-index:5;background:rgba(246,248,252,.94);border-bottom:1px solid #E1E6F0}
+.nav .in{display:flex;align-items:center;justify-content:space-between;gap:20px;height:72px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:#0E1B33;text-decoration:none;letter-spacing:-.01em}
+.links{display:flex;gap:28px;font-size:15px;font-weight:500}
+.links a{color:#46536B;text-decoration:none}.links a:hover{color:#0E1B33}
+.serif{font-family:Newsreader,Georgia,serif;font-weight:500;letter-spacing:-.015em}
+.h1{font-size:60px;line-height:1.03;margin:0;text-wrap:balance}
+.h2{font-size:42px;line-height:1.08;margin:0;text-wrap:balance}
+.h3{font-size:19px;font-weight:600;margin:0;line-height:1.3}
+.mut{color:#56627A}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#2346C9}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 24px;border-radius:999px;font:inherit;font-weight:600;font-size:16px;text-decoration:none;cursor:pointer;border:1px solid transparent;white-space:nowrap}
+.pri{background:#2346C9;color:#FFFFFF}.pri:hover{background:#1A37A6;color:#FFFFFF}
+.ghost{background:#FFFFFF;color:#0E1B33;border-color:#D3DBEA}.ghost:hover{border-color:#0E1B33;color:#0E1B33}
+.win{background:#FFFFFF;border:1px solid #DCE3EF;border-radius:18px;box-shadow:0 1px 0 #E9EEF6,0 30px 60px -30px rgba(14,27,51,.28);overflow:hidden}
+.sheet{display:grid;grid-template-columns:34px minmax(0,1fr) 150px;background:#FFFFFF}
+.sheet .n,.sheet .t,.sheet .m{height:36px;border-bottom:1px solid #D5DEEC;display:flex;align-items:flex-end}
+.sheet .n{justify-content:flex-end;padding:0 8px 7px 0;font-size:11px;color:#9AA6BC;border-right:1px solid #F0C9C4}
+.sheet .t{padding:0 10px 4px 12px;font-family:Caveat,'Segoe Print',cursive;font-size:22px;line-height:1;color:#1C2F6E;white-space:nowrap;overflow:hidden}
+.sheet .m{padding:0 10px 5px;border-left:1px dashed #E3E8F1;font-family:Caveat,cursive;font-size:19px;line-height:1;color:#C8372D;white-space:nowrap}
+.ind{padding-left:34px}
+.circ{border:2px solid #C8372D;border-radius:50% 45% 52% 48%;padding:0 4px;margin:0 -2px}
+.wav{text-decoration:underline wavy #C8372D;text-decoration-thickness:1.5px;text-underline-offset:5px}
+.tag{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid #C8372D;font-family:'Schibsted Grotesk',sans-serif;font-size:11px;font-weight:700;color:#C8372D;margin-left:6px;line-height:1}
+.dots{display:flex;gap:4px}.dots span{width:10px;height:10px;border-radius:50%;border:1.5px solid #2346C9}.dots span.f{background:#2346C9}
+.crow{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #EDF1F7}
+.crow > div{padding:14px 16px;display:flex;flex-direction:column;gap:6px;border-left:1px solid #EDF1F7;font-size:13.5px}
+.crow > div:first-child{border-left:0}
+.four{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.price{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+.card{background:#FFFFFF;border:1px solid #E1E6F0;border-radius:20px}
+.mock{height:210px;padding:18px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border:1px solid #E1E6F0;border-radius:10px;font-size:13.5px}
+.opt.on{border:1.5px solid #2346C9;background:#F1F5FF;font-weight:600}
+.opt .r{width:14px;height:14px;border-radius:50%;border:1.5px solid #B9C4D8;flex-shrink:0}
+.opt.on .r{border:4.5px solid #2346C9}
+.soon{font-size:11px;font-weight:600;color:#7A869C}
+.stepn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#0E1B33;color:#FFFFFF;font-weight:700;font-size:13px}
+.tick{display:flex;gap:10px;align-items:flex-start;font-size:15px}
+.tick svg{flex-shrink:0;margin-top:4px}
+.calc{width:100%;border-collapse:collapse;font-size:15.5px}
+.calc th{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#56627A;text-align:left;padding:0 0 12px;border-bottom:1px solid #D3DBEA}
+.calc td{padding:14px 0;border-bottom:1px solid #E6EBF3;vertical-align:middle}
+.calc .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.calc tfoot td{border-bottom:0;font-weight:700;padding-top:16px}
+details.q{border-top:1px solid #DCE3EF;padding:20px 0}
+details.q summary{cursor:pointer;font-weight:600;font-size:18px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+details.q summary::-webkit-details-marker{display:none}
+details.q[open] summary .pl{transform:rotate(45deg)}
+.pl{transition:transform .2s;color:#2346C9;font-size:24px;line-height:1}
+:focus-visible{outline:3px solid #2346C9;outline-offset:3px}
+@media (prefers-reduced-motion:reduce){.pl{transition:none}}
+@media (max-width:1060px){.four{grid-template-columns:1fr 1fr}}
+@media (max-width:980px){.split,.hero{grid-template-columns:1fr !important}.price{grid-template-columns:1fr}.h1{font-size:42px}.h2{font-size:32px}.in{padding-left:16px;padding-right:16px}.links{display:none}.crow{grid-template-columns:1fr 1fr}.crow > div:nth-child(3){border-left:0}}
+@media (max-width:620px){.four{grid-template-columns:1fr}.sheet{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
+</style>
+</helmet>
+<div class="pg" style="min-height: 5000px">
+
+<header class="nav">
+<div class="in">
+<a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a>
+<nav class="links" aria-label="Principal"><a href="#como">Como funciona</a><a href="#carta">A correção</a><a href="#nota">Como é a nota</a><a href="#precos">Preços</a><a href="#duvidas">Dúvidas</a></nav>
+<div style="display: flex; align-items: center; gap: 18px"><a href="Login.dc.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a><a class="btn pri" href="Propostas.dc.html" style="min-height: 42px; padding: 0 18px; font-size: 15px">Corrigir redação</a></div>
+</div>
+</header>
+
+<section class="in hero" style="display: grid; grid-template-columns: .85fr 1.15fr; gap: 56px; align-items: center; padding-top: 80px; padding-bottom: 104px">
+<div style="display: flex; flex-direction: column; gap: 26px">
+<span class="eyebrow">Correção de redação para vestibular</span>
+<h1 class="serif h1">Uma correção que mostra <em style="color: #2346C9">onde</em> e <em style="color: #2346C9">como</em> melhorar.</h1>
+<p class="mut" style="margin: 0; font-size: 19px; max-width: 30em">Escolha o vestibular, um dos nossos temas e o tipo de redação. Escreva à mão, envie a foto da folha e receba a nota de cada critério, com as linhas que pesaram e o que corrigir.</p>
+<div style="display: flex; gap: 12px; flex-wrap: wrap"><a class="btn pri" href="Propostas.dc.html">Ver os temas</a><a class="btn ghost" href="#nota">Como a nota é calculada</a></div>
+<p class="mut" style="margin: 0; font-size: 14px">Você só cria conta na hora de enviar.</p>
+</div>
+
+<figure class="win" style="margin: 0" aria-label="Exemplo de redação corrigida">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #EDF1F7">
+<span style="font-weight: 600; font-size: 14.5px">Fuvest – Dissertação – Algoritmos e o debate público</span>
+<span style="font-size: 13px; color: #1F7A4C; font-weight: 600; display: flex; align-items: center; gap: 6px; white-space: nowrap"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1F9D5C"></span>Corrigida</span>
+</div>
+<div class="sheet" role="img" aria-label="Linhas 8 a 16 da redação com marcações do corretor">
+<span class="n">08</span><span class="t ind">Os algoritmos das plataformas decidem o que</span><span class="m"></span>
+<span class="n">09</span><span class="t">cada usuário vê, priorizando sempre o conteúdo</span><span class="m"></span>
+<span class="n">10</span><span class="t">que gera mais engajamento e tempo de tela.</span><span class="m"></span>
+<span class="n">11</span><span class="t ind"><span class="wav">Além disso, os algoritmos também escolhem</span></span><span class="m">repete o § anterior<span class="tag">3</span></span>
+<span class="n">12</span><span class="t"><span class="wav">o que as pessoas veem, e cada uma recebe</span></span><span class="m">sem dado novo</span>
+<span class="n">13</span><span class="t"><span class="wav">só aquilo que gera mais engajamento.</span></span><span class="m"></span>
+<span class="n">14</span><span class="t ind"><span class="circ">À partir</span> desse controle, cabe perguntar</span><span class="m">"A partir", sem crase<span class="tag">4</span></span>
+<span class="n">15</span><span class="t">quem deve regular esse filtro invisível e</span><span class="m"></span>
+<span class="n">16</span><span class="t">com quais critérios.</span><span class="m"></span>
+</div>
+<div class="crow">
+<div><span class="mut">1 · Tema e autoria</span><span class="dots" aria-label="Nível 3 de 3"><span class="f"></span><span class="f"></span><span class="f"></span></span><span style="font-weight: 600">9 / 9</span></div>
+<div><span class="mut">2 · Gênero</span><span class="dots" aria-label="Nível 2 de 3"><span class="f"></span><span class="f"></span><span></span></span><span style="font-weight: 600">4 / 6</span></div>
+<div style="background: #FFF6F4"><span style="color: #A3271E; font-weight: 600">3 · Progressão</span><span class="dots" aria-label="Nível 2 de 3"><span class="f"></span><span class="f"></span><span></span></span><span style="font-weight: 600">6 / 9</span></div>
+<div style="background: #FFF6F4"><span style="color: #A3271E; font-weight: 600">4 · Escrita</span><span class="dots" aria-label="Nível 2 de 3"><span class="f"></span><span class="f"></span><span></span></span><span style="font-weight: 600">4 / 6</span></div>
+</div>
+<figcaption style="display: flex; justify-content: space-between; gap: 20px; align-items: center; padding: 16px 20px; background: #F1F5FF; border-top: 1px solid #E1E8F8; font-size: 14.5px; flex-wrap: wrap">
+<span style="flex: 1 1 300px"><strong style="color: #2346C9">O que corrigir primeiro:</strong> substitua o parágrafo das linhas 11 a 13 por um argumento novo, apoiado em um dado da coletânea.</span>
+<span style="white-space: nowrap"><span class="serif" style="font-size: 34px; line-height: 1">23</span><span class="mut"> / 30</span></span>
+</figcaption>
+</figure>
+</section>
+
+<section id="como" style="background: #FFFFFF; border-top: 1px solid #E1E6F0; border-bottom: 1px solid #E1E6F0; padding-top: 104px; padding-bottom: 104px">
+<div class="in" style="display: flex; flex-direction: column; gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 660px">
+<span class="eyebrow">Como funciona</span>
+<h2 class="serif h2">Quatro escolhas e a sua redação está na fila de correção.</h2>
+</div>
+<div class="four">
+<article style="display: flex; flex-direction: column; gap: 16px">
+<div class="card mock" aria-hidden="true" style="background: #F6F8FC">
+<div class="opt on"><span>Fuvest</span><span class="r"></span></div>
+<div class="opt"><span>Unicamp</span><span class="soon">em breve</span></div>
+<div class="opt"><span>Enem</span><span class="soon">em breve</span></div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span class="stepn">1</span><h3 class="h3">Escolha o vestibular</h3></div>
+<p class="mut" style="margin: 0">Cada vestibular tem sua própria grade de correção, critérios e pesos.</p>
+</article>
+<article style="display: flex; flex-direction: column; gap: 16px">
+<div class="card mock" aria-hidden="true" style="background: #F6F8FC">
+<span style="font-size: 12px; font-weight: 600" class="mut">TEMAS DA FUVEST</span>
+<div class="opt on"><span>Algoritmos e o debate público</span><span class="r"></span></div>
+<div class="opt"><span>[Tema]</span><span class="r"></span></div>
+<div class="opt"><span>[Tema]</span><span class="r"></span></div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span class="stepn">2</span><h3 class="h3">Escolha o tema</h3></div>
+<p class="mut" style="margin: 0">Leia o enunciado e a coletânea do tema antes de escrever.</p>
+</article>
+<article style="display: flex; flex-direction: column; gap: 16px">
+<div class="card mock" aria-hidden="true" style="background: #F6F8FC">
+<span style="font-size: 12px; font-weight: 600" class="mut">TIPO DE REDAÇÃO</span>
+<div class="opt on" style="flex-direction: column; align-items: flex-start; gap: 2px"><span>Dissertação</span><span class="mut" style="font-weight: 400; font-size: 12.5px">Dissertativo-argumentativo</span></div>
+<div class="opt" style="flex-direction: column; align-items: flex-start; gap: 2px"><span>Narrativa</span><span class="mut" style="font-size: 12.5px">Narrativo com reflexão</span></div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span class="stepn">3</span><h3 class="h3">Escolha o tipo</h3></div>
+<p class="mut" style="margin: 0">Mostramos só os tipos que o tema aceita. A correção avalia o gênero escolhido.</p>
+</article>
+<article style="display: flex; flex-direction: column; gap: 16px">
+<div class="card mock" aria-hidden="true" style="background: #F6F8FC">
+<span style="font-size: 12px; font-weight: 600" class="mut">FOTO DA FOLHA</span>
+<div style="flex: 1; border: 1.5px dashed #B9C4D8; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px; text-align: center; padding: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+<span>Tire a foto ou arraste o arquivo</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span class="stepn">4</span><h3 class="h3">Envie a redação</h3></div>
+<p class="mut" style="margin: 0">Fotografe a folha escrita à mão e confirme o envio. Se uma palavra ficar ilegível, pedimos só aquela palavra.</p>
+</article>
+</div>
+</div>
+</section>
+
+<section id="carta" style="padding-top: 112px; padding-bottom: 112px">
+<div class="in split">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<span class="eyebrow">A correção</span>
+<h2 class="serif h2">No seu texto, linha por linha, como um bom professor corrigiria.</h2>
+<p class="mut" style="margin: 0; font-size: 18px">Cada marca na redação leva ao critério que ela afeta. Você vê o que funcionou, o que tirou pontos e o que corrigir primeiro.</p>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
+<li class="tick"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg><span><strong>Nível de 1 a 3 em cada critério</strong>, com o descritor oficial e a justificativa.</span></li>
+<li class="tick"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg><span><strong>Orientação direta do que corrigir</strong>, apontando as linhas.</span></li>
+<li class="tick"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg><span><strong>Erros de escrita agrupados pela regra</strong>, para você aprender a regra e não só a palavra.</span></li>
+</ul>
+<a href="Carta.dc.html" style="font-weight: 600">Abrir uma correção completa →</a>
+</div>
+
+<div class="win" style="padding: 26px; display: flex; flex-direction: column; gap: 16px">
+<span class="mut" style="font-size: 13px">Fuvest – Dissertação – Algoritmos e o debate público</span>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<span style="display: flex; align-items: center; gap: 10px"><span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: #FFF0EC; color: #A3271E; font-weight: 700; font-size: 14px">3</span><span class="h3" style="font-size: 17px">Coesão, coerência e progressão</span></span>
+<span style="font-weight: 600; white-space: nowrap">6 <span class="mut" style="font-weight: 400">/ 9</span></span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span class="dots"><span class="f"></span><span class="f"></span><span></span></span><span class="mut" style="font-size: 14px">Nível 2 de 3 · peso 3</span></div>
+<p class="mut" style="margin: 0; font-style: italic; font-family: Newsreader, Georgia, serif; font-size: 17px">“Boa articulação, com composição adequada.”</p>
+<p style="margin: 0">Os conectivos funcionam, mas o parágrafo das linhas 11 a 13 repete a ideia das linhas 8 a 10: os dois dizem que os algoritmos escolhem o conteúdo pelo engajamento.</p>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: #F1F5FF; border-radius: 12px">
+<span style="font-size: 13px; font-weight: 700; color: #2346C9">Para chegar ao nível 3</span>
+<span>Troque o parágrafo das linhas 11 a 13 por uma consequência que ainda não apareceu, como o efeito dessa seleção sobre o voto, sustentada pelo dado do texto 2 da coletânea.</span>
+</div>
+</div>
+</div>
+</section>
+
+<section id="nota" style="background: #0E1B33; color: #FFFFFF; padding-top: 112px; padding-bottom: 112px">
+<div class="in" style="display: flex; flex-direction: column; gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 700px">
+<span class="eyebrow" style="color: #9DB4FF">Como a nota é calculada</span>
+<h2 class="serif h2" style="color: #FFFFFF">A mesma conta da grade da Fuvest, à vista em toda correção.</h2>
+<p style="margin: 0; font-size: 18px; color: #B7C2D8">Cada critério recebe um nível de 1 a 3. O nível é multiplicado pelo peso do critério, e os resultados são somados.</p>
+</div>
+<div class="split" style="align-items: start; gap: 48px">
+<div style="background: #FFFFFF; color: #0E1B33; border-radius: 20px; padding: 28px; overflow-x: auto">
+<table class="calc" aria-label="Cálculo da nota do exemplo">
+<thead><tr><th scope="col">Critério</th><th scope="col" class="num">Nível</th><th scope="col" class="num">Peso</th><th scope="col" class="num">Pontos</th></tr></thead>
+<tbody>
+<tr><td>1 · Tema, coletânea e autoria</td><td class="num">3</td><td class="num">× 3</td><td class="num">9 <span class="mut">/ 9</span></td></tr>
+<tr><td>2 · Gênero e tipo de texto</td><td class="num">2</td><td class="num">× 2</td><td class="num">4 <span class="mut">/ 6</span></td></tr>
+<tr><td>3 · Coesão, coerência e progressão</td><td class="num">2</td><td class="num">× 3</td><td class="num">6 <span class="mut">/ 9</span></td></tr>
+<tr><td>4 · Convenções da escrita e vocabulário</td><td class="num">2</td><td class="num">× 2</td><td class="num">4 <span class="mut">/ 6</span></td></tr>
+</tbody>
+<tfoot><tr><td colspan="3">Nota da grade</td><td class="num" style="font-size: 20px">23 <span class="mut" style="font-weight: 400">/ 30</span></td></tr></tfoot>
+</table>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px">
+<div style="border: 1px solid #2B3B5C; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+<h3 class="h3" style="color: #FFFFFF">Quando a nota é zero</h3>
+<p style="margin: 0; color: #B7C2D8">Antes dos critérios, verificamos as situações que zeram a redação: tema não desenvolvido, tipo de texto não atendido, cópia integral da coletânea ou identificação do candidato, como nome ou assinatura na folha.</p>
+</div>
+<div style="border: 1px solid #2B3B5C; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+<h3 class="h3" style="color: #FFFFFF">Se a grade mudar</h3>
+<p style="margin: 0; color: #B7C2D8">Atualizamos critérios e pesos quando a Fuvest publicar mudanças. Cada correção informa a versão da grade usada.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="precos" style="padding-top: 112px; padding-bottom: 112px">
+<div class="in" style="display: flex; flex-direction: column; gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center">
+<span class="eyebrow">Preços</span>
+<h2 class="serif h2">Comece com uma correção grátis.</h2>
+<p class="mut" style="margin: 0; font-size: 18px; max-width: 36em">O plano é cobrado no cartão de crédito. Correções avulsas aceitam Pix ou cartão. Se a correção falhar, o crédito volta para a sua conta.</p>
+</div>
+<div class="price">
+<article class="card" style="padding: 30px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px"><h3 class="h3">Teste grátis</h3><span class="mut" style="font-size: 15px">Para conhecer a correção.</span></div>
+<span class="serif" style="font-size: 44px; line-height: 1">R$ 0</span>
+<span class="mut" style="font-size: 14px">1 correção, uma vez por conta</span>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px"><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Correção completa nos 4 critérios</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Redação marcada linha a linha</li></ul>
+<a class="btn ghost" href="Propostas.dc.html" style="margin-top: auto">Fazer o teste</a>
+</article>
+<article style="padding: 30px; display: flex; flex-direction: column; gap: 20px; background: #2346C9; color: #FFFFFF; border-radius: 20px; position: relative">
+<span style="position: absolute; top: -13px; left: 30px; background: #0E1B33; color: #FFFFFF; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px">Para quem treina toda semana</span>
+<div style="display: flex; flex-direction: column; gap: 6px"><h3 class="h3">Plano semanal</h3><span style="font-size: 15px; color: #D5DEFF">Escreva, corrija e reescreva com frequência.</span></div>
+<span><span class="serif" style="font-size: 44px; line-height: 1">R$ 39,90</span><span style="color: #D5DEFF"> /mês</span></span>
+<span style="font-size: 14px; color: #D5DEFF">3 correções por semana · cartão de crédito</span>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px"><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Evolução da nota entre versões</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Envio de várias redações de uma vez</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Correções não usadas acumulam até o fim do mês</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Reescritas contam como correção</li></ul>
+<a class="btn" href="Propostas.dc.html" style="margin-top: auto; background: #FFFFFF; color: #0E1B33">Assinar o plano semanal</a>
+</article>
+<article class="card" style="padding: 30px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px"><h3 class="h3">Correção avulsa</h3><span class="mut" style="font-size: 15px">Para corrigir além do plano.</span></div>
+<span class="serif" style="font-size: 44px; line-height: 1">R$ 16</span>
+<span class="mut" style="font-size: 14px">por correção · Pix ou cartão</span>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px"><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Mesma correção do plano</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Compre só quando precisar</li></ul>
+<a class="btn ghost" href="Propostas.dc.html" style="margin-top: auto">Comprar avulsa</a>
+</article>
+</div>
+</div>
+</section>
+
+<section id="duvidas" style="background: #FFFFFF; border-top: 1px solid #E1E6F0; padding-top: 104px; padding-bottom: 96px">
+<div class="in split" style="align-items: start; grid-template-columns: .8fr 1.2fr; gap: 56px">
+<div style="display: flex; flex-direction: column; gap: 14px"><span class="eyebrow">Dúvidas</span><h2 class="serif h2">Perguntas frequentes</h2></div>
+<div style="border-bottom: 1px solid #DCE3EF">
+<details class="q" open=""><summary>A correção substitui um professor?<span class="pl" aria-hidden="true">+</span></summary><p class="mut" style="margin: 12px 0 0">Não. Ela segue os critérios públicos da Fuvest e ajuda você a praticar com mais frequência, mas não substitui a banca nem o acompanhamento de um professor.</p></details>
+<details class="q"><summary>Como envio a minha redação?<span class="pl" aria-hidden="true">+</span></summary><p class="mut" style="margin: 12px 0 0">Escreva à mão, como na prova, e envie a foto da folha. Transcrevemos exatamente o que está escrito, sem corrigir nada antes da nota. Se uma palavra ficar ilegível, pedimos que você a digite.</p></details>
+<details class="q"><summary>Quanto tempo leva?<span class="pl" aria-hidden="true">+</span></summary><p class="mut" style="margin: 12px 0 0">Normalmente poucos minutos. Avisamos por e-mail quando a correção fica pronta, e ela aparece na sua conta.</p></details>
+<details class="q"><summary>O que acontece com a minha redação?<span class="pl" aria-hidden="true">+</span></summary><p class="mut" style="margin: 12px 0 0">Ela fica na sua conta e só você vê. Você pode baixar seus dados ou excluir a conta quando quiser.</p></details>
+</div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; padding-bottom: 96px">
+<div class="in">
+<div style="background: #2346C9; color: #FFFFFF; border-radius: 28px; padding: 64px 48px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 22px">
+<h2 class="serif h2" style="color: #FFFFFF; max-width: 16em">Escolha um tema e escreva a sua próxima redação.</h2>
+<p style="margin: 0; font-size: 18px; color: #D5DEFF; max-width: 32em">Cada tema traz o enunciado e a coletânea de textos, no formato da prova.</p>
+<a class="btn" href="Propostas.dc.html" style="background: #FFFFFF; color: #0E1B33">Ver os temas</a>
+</div>
+</div>
+</section>
+
+<footer style="border-top: 1px solid #E1E6F0; background: #F6F8FC">
+<div class="in" style="display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 28px; padding-bottom: 28px; font-size: 14px">
+<span class="mut">Correções feitas por IA com base nos critérios públicos da Fuvest. Não é afiliado à Fuvest.</span>
+<nav style="display: flex; gap: 22px" aria-label="Rodapé"><a href="#">Termos de uso</a><a href="#">Privacidade</a><a href="#">Contato</a></nav>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":5000}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

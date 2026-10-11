@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Tema, tipo e envio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2346C9}a:hover{color:#16308F}
+*{box-sizing:border-box}
+.pg{background:#F6F8FC;color:#0E1B33;font-family:'Schibsted Grotesk',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.55}
+.in{max-width:1180px;margin:0 auto;padding-left:32px;padding-right:32px}
+.nav{background:#FFFFFF;border-bottom:1px solid #E1E6F0}
+.nav .in{display:flex;align-items:center;justify-content:space-between;gap:20px;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:#0E1B33;text-decoration:none;letter-spacing:-.01em}
+.links{display:flex;gap:28px;font-size:15px;font-weight:500}
+.links a{color:#46536B;text-decoration:none;padding:6px 0}.links a:hover{color:#0E1B33}
+.links a.on{color:#0E1B33;font-weight:600;box-shadow:inset 0 -2px 0 #2346C9}
+.av{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#2346C9;color:#FFFFFF;font-weight:700;text-decoration:none}
+.serif{font-family:Newsreader,Georgia,serif;font-weight:500;letter-spacing:-.015em}
+.h1{font-size:44px;line-height:1.06;margin:0;text-wrap:balance}
+.h2{font-size:28px;line-height:1.15;margin:0;text-wrap:balance}
+.h3{font-size:18px;font-weight:600;margin:0;line-height:1.3}
+.mut{color:#56627A}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#2346C9}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border-radius:999px;font:inherit;font-weight:600;font-size:15.5px;text-decoration:none;cursor:pointer;border:1px solid transparent;white-space:nowrap}
+.pri{background:#2346C9;color:#FFFFFF}.pri:hover{background:#1A37A6;color:#FFFFFF}
+.pri:disabled{background:#C5CEDF;color:#4A5670;cursor:not-allowed}
+.ghost{background:#FFFFFF;color:#0E1B33;border-color:#D3DBEA}.ghost:hover{border-color:#0E1B33;color:#0E1B33}
+.card{background:#FFFFFF;border:1px solid #E1E6F0;border-radius:18px}
+.win{background:#FFFFFF;border:1px solid #DCE3EF;border-radius:18px;box-shadow:0 1px 0 #E9EEF6,0 24px 48px -28px rgba(14,27,51,.25);overflow:hidden}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.s-ok{background:#E5F5EC;color:#17603B}.s-rev{background:#FFF1D6;color:#6B4300}.s-run{background:#E8EEFF;color:#1A37A6}.s-q{background:#EEF1F6;color:#3B4559}.s-err{background:#FDECEA;color:#9A2A20}.s-tag{background:#EEF1F6;color:#3B4559}
+.dots{display:inline-flex;gap:4px}.dots span{width:10px;height:10px;border-radius:50%;border:1.5px solid #2346C9}.dots span.f{background:#2346C9}
+.tick{display:flex;gap:10px;align-items:flex-start;font-size:15px}.tick svg{flex-shrink:0;margin-top:4px}
+.sheet{display:grid;grid-template-columns:36px minmax(0,1fr);background:#FFFFFF}
+.sheet.wm{grid-template-columns:36px minmax(0,1fr) 170px}
+.sheet .n,.sheet .t,.sheet .m{height:36px;border-bottom:1px solid #D5DEEC;display:flex;align-items:flex-end}
+.sheet .n{justify-content:flex-end;padding:0 8px 7px 0;font-size:11px;color:#9AA6BC;border-right:1px solid #F0C9C4;font-variant-numeric:tabular-nums}
+.sheet .t{padding:0 10px 4px 12px;font-family:Caveat,'Segoe Print',cursive;font-size:22px;line-height:1;color:#1C2F6E;white-space:nowrap;overflow:hidden}
+.sheet .m{padding:0 10px 5px;border-left:1px dashed #E3E8F1;font-family:Caveat,cursive;font-size:19px;line-height:1;color:#C8372D;white-space:nowrap}
+.ind{padding-left:36px !important}
+.circ{border:2px solid #C8372D;border-radius:50% 45% 52% 48%;padding:0 4px;margin:0 -2px}
+.wav{text-decoration:underline wavy #C8372D;text-decoration-thickness:1.5px;text-underline-offset:5px}
+.ok1{background:#E4F4EC;border-radius:3px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.tag{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid #C8372D;font-family:'Schibsted Grotesk',sans-serif;font-size:11px;font-weight:700;color:#C8372D;margin-left:6px;line-height:1}
+.tag.g{border-color:#1F7A4C;color:#1F7A4C}
+.blur{filter:blur(2px);background:#FFF3C4;border-radius:3px;padding:0 3px}
+.f{display:flex;flex-direction:column;gap:6px}
+.f label,.lab{font-size:14px;font-weight:600}
+.inp{height:48px;border:1px solid #D3DBEA;border-radius:12px;padding:0 14px;font:inherit;color:#0E1B33;background:#FFFFFF;width:100%}
+.inp:focus{border-color:#2346C9}
+:focus-visible{outline:3px solid #2346C9;outline-offset:3px}
+@media (max-width:980px){.in{padding-left:16px;padding-right:16px}.links{display:none}.h1{font-size:34px}.stack{grid-template-columns:1fr !important}}
+@media (max-width:620px){.sheet.wm{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
+
+</style>
+</helmet>
+<div class="pg" style="min-height: 1500px">
+<header class="nav"><div class="in"><a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="Propostas.dc.html" class="on" aria-current="page">Temas</a><a href="Main.dc.html">Como a nota é calculada</a></nav><a href="Login.dc.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a></div></header>
+<main class="in" style="padding-top: 36px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<nav aria-label="Você está em" style="font-size: 14px; font-weight: 500"><a href="Propostas.dc.html">Fuvest</a> <span class="mut">/ Temas</span></nav>
+<h1 class="serif h1">Algoritmos e o debate público</h1>
+</div>
+<div class="stack" style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; align-items: start">
+<article class="card" style="padding: 32px; display: flex; flex-direction: column; gap: 26px">
+<section style="display: flex; flex-direction: column; gap: 10px">
+<span class="eyebrow">Proposta</span>
+<p style="margin: 0; font-size: 17.5px; line-height: 1.7">[Enunciado da proposta: o que o candidato deve discutir sobre o tema, como usar a coletânea e as instruções de cada tipo de redação aceito.]</p>
+</section>
+<section style="display: flex; flex-direction: column; gap: 4px">
+<span class="eyebrow" style="margin-bottom: 8px">Coletânea</span>
+<details open="" style="border-top: 1px solid #E1E6F0; padding: 16px 0"><summary style="cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; gap: 12px"><span>Texto 1 · [Título]</span><span class="mut" style="font-weight: 400; font-size: 14px">[Fonte]</span></summary><p style="margin: 12px 0 0; line-height: 1.7">[Trecho do texto 1.]</p></details>
+<details style="border-top: 1px solid #E1E6F0; padding: 16px 0"><summary style="cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; gap: 12px"><span>Texto 2 · [Título]</span><span class="mut" style="font-weight: 400; font-size: 14px">[Fonte]</span></summary><p style="margin: 12px 0 0">[Trecho do texto 2.]</p></details>
+<details style="border-top: 1px solid #E1E6F0; padding: 16px 0"><summary style="cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; gap: 12px"><span>Texto 3 · [Gráfico ou charge]</span><span class="mut" style="font-weight: 400; font-size: 14px">[Fonte]</span></summary><div class="mut" style="margin-top: 12px; height: 180px; border-radius: 12px; background: #EEF1F6; display: flex; align-items: center; justify-content: center">[Imagem]</div></details>
+<details style="border-top: 1px solid #E1E6F0; border-bottom: 1px solid #E1E6F0; padding: 16px 0"><summary style="cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; gap: 12px"><span>Texto 4 · [Título]</span><span class="mut" style="font-weight: 400; font-size: 14px">[Fonte]</span></summary><p style="margin: 12px 0 0">[Trecho do texto 4.]</p></details>
+</section>
+<a href="#" style="display: flex; align-items: center; gap: 8px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Baixar a folha pautada (PDF, 30 linhas)</a>
+</article>
+
+<aside class="card" aria-label="Sua redação" style="padding: 28px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: 20px">
+<fieldset style="border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px">
+<legend class="h3" style="padding: 0; margin-bottom: 12px">3. Tipo de redação</legend>
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1.5px solid #2346C9; background: #F1F5FF; border-radius: 14px; cursor: pointer"><input type="radio" name="tipo" checked="" style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: #2346C9"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Dissertação</span><span class="mut" style="font-size: 14px">Texto dissertativo-argumentativo</span></span></label>
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid #D3DBEA; border-radius: 14px; cursor: pointer"><input type="radio" name="tipo" style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: #2346C9"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Narrativa</span><span class="mut" style="font-size: 14px">Texto narrativo com reflexão</span></span></label>
+</fieldset>
+
+<section style="display: flex; flex-direction: column; gap: 12px">
+<h2 class="h3">4. Envie a foto da folha</h2>
+
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px; border: 1px solid #D3DBEA; border-radius: 14px">
+<div aria-hidden="true" style="width: 64px; height: 84px; flex-shrink: 0; border-radius: 4px; border: 1px solid #D5DEEC; transform: rotate(-2deg); background: repeating-linear-gradient(#FFFFFF 0 7px,#D5DEEC 7px 8px)"></div>
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-weight: 600">foto-redacao.jpg</span><span class="mut" style="font-size: 14px">Folha inteira, 2,4 MB</span><button type="button" style="align-self: flex-start; background: none; border: 0; padding: 4px 0; font: inherit; font-weight: 600; color: #2346C9; cursor: pointer">Trocar foto</button></div>
+</div>
+<ul style="margin: 0; padding: 14px 16px; list-style: none; display: flex; flex-direction: column; gap: 8px; background: #F6F8FC; border-radius: 12px; font-size: 14.5px">
+<li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Folha inteira, reta e com boa luz</li>
+<li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Uma face da folha por envio</li>
+<li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5530B" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg><span>Não escreva seu nome na folha: na Fuvest, identificação zera a redação.</span></li>
+</ul>
+</section>
+
+<div style="border-top: 1px solid #E1E6F0; padding-top: 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px"><span class="mut" style="font-size: 13px">Você vai enviar</span><span style="font-weight: 600">Fuvest – Dissertação – Algoritmos e o debate público</span></div>
+<a class="btn pri" href="Confirmar.dc.html" style="width: 100%">Enviar para correção</a>
+<span class="mut" style="font-size: 13.5px; text-align: center">Você confere tudo antes de confirmar. Se ainda não entrou, pedimos o login nesse momento.</span>
+</div>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
