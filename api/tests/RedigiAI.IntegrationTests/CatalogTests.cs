@@ -77,6 +77,9 @@ public class CatalogTests(ApiFixture api)
         Assert.Equal(
             ["dissertacao", "narrativa"],
             theme.GetProperty("essayTypes").EnumerateArray().Select(t => t.GetProperty("slug").GetString()));
+        Assert.All(
+            theme.GetProperty("essayTypes").EnumerateArray(),
+            type => Assert.False(string.IsNullOrWhiteSpace(type.GetProperty("instruction").GetString())));
     }
 
     [Fact]

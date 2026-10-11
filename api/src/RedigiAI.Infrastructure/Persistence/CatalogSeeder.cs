@@ -54,13 +54,13 @@ public sealed class CatalogSeeder(AppDbContext db, TimeProvider time)
         var theme = Theme.Draft(
             fuvest.Id,
             "Algoritmos e o debate público",
-            "[Enunciado da proposta: o que o candidato deve discutir sobre o tema, como usar a coletânea e as instruções de cada tipo de redação aceito.]");
-        theme.AddText(ThemeTextKind.Text, "[Título]", "[Fonte]", "[Trecho do texto 1.]");
-        theme.AddText(ThemeTextKind.Text, "[Título]", "[Fonte]", "[Trecho do texto 2.]");
-        theme.AddText(ThemeTextKind.Image, "[Gráfico ou charge]", "[Fonte]", null);
-        theme.AddText(ThemeTextKind.Text, "[Título]", "[Fonte]", "[Trecho do texto 4.]");
-        theme.AcceptType(dissertacao, rubric);
-        theme.AcceptType(narrativa, rubric);
+            "[Enunciado da proposta: o que o candidato deve discutir sobre o tema e como usar a coletânea.]");
+        theme.AddText(ThemeTextKind.Text, "[Título do texto 1]", "[Fonte do texto 1]", "[Trecho do texto 1, como aparece na proposta da prova.]");
+        theme.AddText(ThemeTextKind.Text, "[Título do texto 2]", "[Fonte do texto 2]", "[Trecho do texto 2.]");
+        theme.AddText(ThemeTextKind.Image, "[Gráfico ou charge]", "[Fonte do texto 3]", null);
+        theme.AddText(ThemeTextKind.Text, "[Título do texto 4]", "[Fonte do texto 4]", "[Trecho do texto 4.]");
+        theme.AcceptType(dissertacao, rubric, "[Instrução da proposta para o texto dissertativo-argumentativo.]");
+        theme.AcceptType(narrativa, rubric, "[Instrução da proposta para o texto narrativo com reflexão.]");
         theme.Publish(now);
         db.Themes.Add(theme);
 

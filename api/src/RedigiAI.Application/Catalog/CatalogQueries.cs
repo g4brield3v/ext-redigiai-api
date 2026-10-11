@@ -19,7 +19,9 @@ public interface ICatalogQueries
 /// <param name="CurrentRubricVersionId">Grade publicada mais recente; nula em vestibulares "em breve".</param>
 public sealed record ExamDto(string Slug, string Name, ExamStatus Status, int SheetLines, Guid? CurrentRubricVersionId);
 
-public sealed record EssayTypeDto(Guid Id, string Slug, string Name, string Description, Guid RubricVersionId);
+/// <param name="Instruction">O que a proposta do tema pede para esse tipo de texto.</param>
+public sealed record EssayTypeDto(
+    Guid Id, string Slug, string Name, string Description, Guid RubricVersionId, string Instruction);
 
 public sealed record ThemeSummaryDto(
     Guid Id, string Title, string ExamSlug, string ExamName, IReadOnlyList<EssayTypeDto> EssayTypes, int TextCount);

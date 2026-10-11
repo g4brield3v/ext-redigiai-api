@@ -37,12 +37,12 @@ public class CatalogTests
         Assert.Throws<InvalidOperationException>(() => theme.Publish(Now));
 
         var type = EssayType.Create(examId, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
-        theme.AcceptType(type, FuvestRubric(examId));
-        theme.AcceptType(type, FuvestRubric(examId));
+        theme.AcceptType(type, FuvestRubric(examId), "Defenda um ponto de vista.");
+        theme.AcceptType(type, FuvestRubric(examId), "Defenda um ponto de vista.");
         theme.Publish(Now);
 
         Assert.Equal(ThemeStatus.Active, theme.Status);
-        Assert.Single(theme.AcceptedTypes);
+        Assert.Equal("Defenda um ponto de vista.", Assert.Single(theme.AcceptedTypes).Instruction);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class CatalogTests
         var theme = Theme.Draft(examId, "Tema", "Enunciado");
         var foreignType = EssayType.Create(Guid.CreateVersion7(), "carta", "Carta", "Carta argumentativa");
 
-        Assert.Throws<InvalidOperationException>(() => theme.AcceptType(foreignType, FuvestRubric(examId)));
+        Assert.Throws<InvalidOperationException>(() => theme.AcceptType(foreignType, FuvestRubric(examId), "Instrução"));
     }
 
     [Fact]

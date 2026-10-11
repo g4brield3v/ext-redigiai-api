@@ -547,7 +547,8 @@
           "slug",
           "name",
           "description",
-          "rubricVersionId"
+          "rubricVersionId",
+          "instruction"
         ],
         "type": "object",
         "properties": {
@@ -567,6 +568,9 @@
           "rubricVersionId": {
             "type": "string",
             "format": "uuid"
+          },
+          "instruction": {
+            "type": "string"
           }
         }
       },

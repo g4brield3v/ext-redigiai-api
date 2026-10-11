@@ -89,6 +89,7 @@ internal sealed class ThemeEssayTypeConfiguration : IEntityTypeConfiguration<The
     {
         builder.ToTable("theme_essay_types");
         builder.HasKey(t => new { t.ThemeId, t.EssayTypeId });
+        builder.Property(t => t.Instruction).HasMaxLength(2000).HasDefaultValue("");
         builder.HasOne<EssayType>().WithMany().HasForeignKey(t => t.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RubricVersion>().WithMany().HasForeignKey(t => t.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
     }

@@ -46,7 +46,7 @@ internal sealed class CatalogQueries(AppDbContext db) : ICatalogQueries
                 t.Id,
                 t.Title,
                 TextCount = t.Texts.Count,
-                Accepted = t.AcceptedTypes.Select(a => new { a.EssayTypeId, a.RubricVersionId }).ToList(),
+                Accepted = t.AcceptedTypes.Select(a => new { a.EssayTypeId, a.RubricVersionId, a.Instruction }).ToList(),
             })
             .ToListAsync(ct);
 
@@ -58,7 +58,7 @@ internal sealed class CatalogQueries(AppDbContext db) : ICatalogQueries
                 t.Title,
                 exam.Slug,
                 exam.Name,
-                [.. t.Accepted.Select(a => ToDto(types[a.EssayTypeId], a.RubricVersionId)).OrderBy(e => e.Name)],
+                [.. t.Accepted.Select(a => ToDto(types[a.EssayTypeId], a.RubricVersionId, a.Instruction)).OrderBy(e => e.Name)],
                 t.TextCount))
             .ToList();
     }
@@ -93,7 +93,7 @@ internal sealed class CatalogQueries(AppDbContext db) : ICatalogQueries
             exam.Name,
             exam.SheetLines,
             [.. theme.Texts.OrderBy(t => t.Position).Select(t => new ThemeTextDto(t.Position, t.Kind, t.Title, t.Source, t.Body))],
-            [.. theme.AcceptedTypes.Select(a => ToDto(types[a.EssayTypeId], a.RubricVersionId)).OrderBy(e => e.Name)]);
+            [.. theme.AcceptedTypes.Select(a => ToDto(types[a.EssayTypeId], a.RubricVersionId, a.Instruction)).OrderBy(e => e.Name)]);
     }
 
     public async Task<RubricDto?> GetRubricAsync(Guid rubricVersionId, CancellationToken ct)
@@ -128,8 +128,8 @@ internal sealed class CatalogQueries(AppDbContext db) : ICatalogQueries
         System.Linq.Expressions.Expression<Func<Exam, bool>> predicate, CancellationToken ct) =>
         db.Exams.AsNoTracking().Where(e => e.Status == ExamStatus.Active).FirstOrDefaultAsync(predicate, ct);
 
-    private static EssayTypeDto ToDto(EssayType type, Guid rubricVersionId) =>
-        new(type.Id, type.Slug, type.Name, type.Description, rubricVersionId);
+    private static EssayTypeDto ToDto(EssayType type, Guid rubricVersionId, string instruction) =>
+        new(type.Id, type.Slug, type.Name, type.Description, rubricVersionId, instruction);
 
     private static string EscapeLike(string value) =>
         value.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");

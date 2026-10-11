@@ -506,6 +506,14 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("essay_type_id");
 
+                    b.Property<string>("Instruction")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasDefaultValue("")
+                        .HasColumnName("instruction");
+
                     b.Property<Guid>("RubricVersionId")
                         .HasColumnType("uuid")
                         .HasColumnName("rubric_version_id");
