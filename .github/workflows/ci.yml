@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Back-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build api/RedigiAI.sln --configuration Release
+      - name: openapi.json atualizado
+        run: git diff --exit-code -- api/openapi.json
+      - name: Testes (unitários e integração com PostgreSQL real)
+        run: dotnet test api/RedigiAI.sln --configuration Release --no-build
+      - name: Dependências sem vulnerabilidade conhecida
+        run: |
+          dotnet list api/RedigiAI.sln package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -qE "has the following vulnerable packages|tem os seguintes pacotes vulneráveis" vulnerable.txt
+      - name: Imagem Docker
+        run: docker build ./api
+
+  web:
+    name: Front-end
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Cliente da API atualizado
+        run: npm run gen:api && git diff --exit-code -- src/api
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: Testes de tela (360 px e 1440 px)
+        run: npm run e2e
+      - name: Dependências sem vulnerabilidade conhecida
+        run: npm audit --omit=dev
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 7
+
+  secrets:
+    name: Segredos no repositório
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
