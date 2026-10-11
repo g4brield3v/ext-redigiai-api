@@ -34,7 +34,8 @@ api/
   tests/RedigiAI.IntegrationTests/   Testcontainers + PostgreSQL real
   Dockerfile
 web/
-  src/api/        cliente gerado (não editar à mão)
+  src/api/        cliente gerado (não editar à mão) e mock-types.ts (tipos provisórios dos endpoints ainda sem backend)
+  src/mocks/      dados simulados (MSW) com o conteúdo das telas aprovadas
   src/components/ componentes do design system
   src/features/   uma pasta por área (temas, envio, revisao, correcao, painel, perfil, checkout)
   src/routes/
@@ -68,9 +69,12 @@ dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 cd web && npm ci && npm run dev             # http://localhost:5173
+cd web && npm run dev:mock                   # front com dados simulados (MSW) e sessão simulada, sem backend nem Clerk
 cd web && npm run gen:api                   # regenera o cliente a partir do openapi.json
 cd web && npm test && npm run typecheck && npm run lint
-cd web && npx playwright test               # sobe o build de produção em http://localhost:4173
+cd web && npx playwright test               # comportamento e regressão visual, sobre o build com dados simulados (http://localhost:4173)
+cd web && npm run e2e:design                # compara cada tela com docs/telas/png; resultado em web/design-diff/
+cd web && npx playwright test visual --update-snapshots   # aceita uma mudança visual intencional
 ```
 
 A configuração local vem do arquivo `.env` na raiz (copie de `.env.example`); o back-end e o Vite leem o mesmo arquivo.
