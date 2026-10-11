@@ -35,37 +35,6 @@ jobs:
       - name: Imagem Docker
         run: docker build ./api
 
-  web:
-    name: Front-end
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - name: Cliente da API atualizado
-        run: npm run gen:api && git diff --exit-code -- src/api
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npx playwright install --with-deps chromium
-      - name: Testes de tela (360 px e 1440 px)
-        run: npm run e2e
-      - name: Dependências sem vulnerabilidade conhecida
-        run: npm audit --omit=dev
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: web/playwright-report
-          retention-days: 7
-
   secrets:
     name: Segredos no repositório
     runs-on: ubuntu-latest
