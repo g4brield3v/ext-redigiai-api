@@ -15,7 +15,7 @@ Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente
 
 ## Stack
 
-- **Back-end:** .NET 10, ASP.NET Core (API mínima ou controllers), EF Core + Npgsql, PostgreSQL 16+. Um executável com dois modos: `api` e `worker`.
+- **Back-end:** .NET 10, ASP.NET Core com controllers (um por contexto, em `RedigiAI.Api/Controllers`), documentados no Swagger, EF Core + Npgsql, PostgreSQL 16+. Um executável com dois modos: `api` e `worker`.
 - **Front-end:** React + Vite + TypeScript (strict), React Router, TanStack Query, cliente gerado do `openapi.json`.
 - **Serviços:** Clerk (login), Mercado Pago (pagamentos), Cloudinary (fotos privadas), SendGrid (e-mail), API do Claude (transcrição e correção), Sentry.
 - **Hospedagem:** Railway (api, worker, PostgreSQL) e Vercel (web). CI no GitHub Actions.
@@ -28,7 +28,7 @@ api/
   src/RedigiAI.Domain/         agregados, entidades, objetos de valor, eventos de domínio, interfaces de repositório (sem dependência alguma)
   src/RedigiAI.Application/    casos de uso (comandos e consultas), portas para serviços externos; depende só do Domain
   src/RedigiAI.Infrastructure/ EF Core, migrações, repositórios, fila, Claude, Mercado Pago, Cloudinary, SendGrid, Clerk
-  src/RedigiAI.Api/            host: endpoints, middleware, modo worker
+  src/RedigiAI.Api/            host: controllers, middleware, modo worker
   tests/RedigiAI.UnitTests/
   tests/RedigiAI.IntegrationTests/   Testcontainers + PostgreSQL real
   Dockerfile
@@ -63,7 +63,7 @@ dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
 dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
 dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
 dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
-dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080
+dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 cd web && npm ci && npm run dev             # http://localhost:5173

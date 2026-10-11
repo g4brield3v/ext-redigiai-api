@@ -65,11 +65,15 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
     public Task InvokeAsync(HttpContext context)
     {
         var headers = context.Response.Headers;
+        var isSwagger = context.Request.Path.StartsWithSegments("/swagger");
         headers.XContentTypeOptions = "nosniff";
         headers.XFrameOptions = "DENY";
         headers["Referrer-Policy"] = "no-referrer";
         // A API só devolve JSON e PDF: nada aqui deve carregar recursos nem ser embutido.
-        headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
+        // A página do Swagger (só em desenvolvimento) precisa carregar os próprios scripts e estilos.
+        headers.ContentSecurityPolicy = isSwagger
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
+            : "default-src 'none'; frame-ancestors 'none'";
         return next(context);
     }
 }

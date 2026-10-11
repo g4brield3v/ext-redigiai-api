@@ -1,15 +1,210 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "RedigiAI.Api | v1",
+    "title": "RedigiAI API",
     "version": "1.0.0"
   },
   "paths": {
+    "/v1/me": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Primeiro acesso: cria o usuário a partir do token, grava a data de nascimento (recusa menores de 16)\r\ne concede o crédito grátis uma única vez. Repetido, devolve o perfil que já existe.",
+        "operationId": "registerMe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Perfil, saldo de correções por origem e preferências de e-mail.",
+        "operationId": "getMe",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Altera o nome e as preferências de e-mail.",
+        "operationId": "updateMe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/v1/exams": {
       "get": {
         "tags": [
           "Catalog"
         ],
+        "summary": "Vestibulares e status (ativo ou em breve).",
         "operationId": "listExams",
         "responses": {
           "200": {
@@ -33,6 +228,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Temas ativos do vestibular, com os tipos aceitos e o número de textos da coletânea.",
         "operationId": "listThemes",
         "parameters": [
           {
@@ -83,6 +279,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Enunciado, coletânea e tipos de redação aceitos pelo tema.",
         "operationId": "getTheme",
         "parameters": [
           {
@@ -124,6 +321,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Critérios, pesos e descritores de uma versão da grade.",
         "operationId": "getRubric",
         "parameters": [
           {
@@ -160,57 +358,31 @@
         }
       }
     },
-    "/v1/me": {
+    "/v1/webhooks/clerk": {
       "post": {
         "tags": [
-          "Account"
+          "Webhooks"
         ],
-        "operationId": "registerMe",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
-              }
-            }
-          },
-          "required": true
-        },
+        "summary": "Recebe um evento do Clerk (cabeçalhos `svix-id`, `svix-timestamp` e `svix-signature`).",
+        "operationId": "receiveClerkWebhook",
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileDto"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileDto"
-                }
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
+              },
+              "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
@@ -218,97 +390,53 @@
             }
           }
         }
-      },
+      }
+    },
+    "/health": {
       "get": {
         "tags": [
-          "Account"
+          "Health"
         ],
-        "operationId": "getMe",
+        "summary": "O processo está de pé.",
+        "operationId": "health",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProfileDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
           }
         }
-      },
-      "patch": {
+      }
+    },
+    "/ready": {
+      "get": {
         "tags": [
-          "Account"
+          "Health"
         ],
-        "operationId": "updateMe",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateProfileRequest"
-              }
-            }
-          },
-          "required": true
-        },
+        "summary": "O banco está acessível.",
+        "operationId": "ready",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProfileDto"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
           },
-          "401": {
-            "description": "Unauthorized",
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -410,7 +538,8 @@
           "traceId": {
             "type": "string"
           }
-        }
+        },
+        "description": "Formato único de erro da API (especificação, seção 12)."
       },
       "EssayTypeDto": {
         "required": [
@@ -478,6 +607,17 @@
           "active",
           "coming_soon"
         ]
+      },
+      "HealthResponse": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
       },
       "ProfileDto": {
         "required": [
@@ -818,14 +958,28 @@
           }
         }
       }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Token de sessão do Clerk.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
   },
   "tags": [
     {
+      "name": "Account"
+    },
+    {
       "name": "Catalog"
     },
     {
-      "name": "Account"
+      "name": "Webhooks"
+    },
+    {
+      "name": "Health"
     }
   ]
 }

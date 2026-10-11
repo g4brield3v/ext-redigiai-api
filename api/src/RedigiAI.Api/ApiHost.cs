@@ -4,7 +4,9 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using RedigiAI.Api.Auth;
-using RedigiAI.Api.Endpoints;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi;
 using RedigiAI.Api.Http;
 using RedigiAI.Application;
 using RedigiAI.Domain.Common;
@@ -29,16 +31,9 @@ internal static class ApiHost
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         services.AddClerkAuthentication(builder.Configuration);
-        services.AddOpenApi();
-        // Corpo ilegível vira exceção e sai no formato de erro, em qualquer ambiente.
-        services.Configure<RouteHandlerOptions>(routes => routes.ThrowOnBadRequest = true);
+        AddControllers(services);
+        AddOpenApiDocument(services);
 
-        services.ConfigureHttpJsonOptions(json =>
-        {
-            json.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
-            // Números só como números: o contrato publicado no openapi.json fica com tipos exatos.
-            json.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
-        });
 
         services.AddCors(cors => cors.AddPolicy(CorsPolicy, policy => policy
             .WithOrigins([.. CorsOrigins.From(builder.Configuration)])
@@ -74,31 +69,89 @@ internal static class ApiHost
             app.UseHsts();
         }
 
+        if (app.Environment.IsDevelopment())
+        {
+            // Documentação navegável em /swagger, só em desenvolvimento.
+            app.MapOpenApi().DisableRateLimiting();
+            app.UseSwaggerUI(swagger =>
+            {
+                swagger.SwaggerEndpoint("/openapi/v1.json", "RedigiAI API v1");
+                swagger.DocumentTitle = "RedigiAI API";
+            });
+        }
+
         app.UseCors(CorsPolicy);
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();
 
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi().DisableRateLimiting();
-        }
-
-        app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
-            .AllowAnonymous().DisableRateLimiting().ExcludeFromDescription();
-        app.MapGet("/ready", async (AppDbContext db, CancellationToken ct) =>
-                await db.Database.CanConnectAsync(ct)
-                    ? Results.Ok(new { status = "ready" })
-                    : Results.Json(new { status = "unavailable" }, statusCode: 503))
-            .AllowAnonymous().DisableRateLimiting().ExcludeFromDescription();
-
-        app.MapCatalogEndpoints();
-        app.MapAccountEndpoints();
-        app.MapClerkWebhook();
+        app.MapControllers();
         app.MapFallback(() => { throw Errors.NotFound(); }).AllowAnonymous();
 
         await app.RunAsync();
         return 0;
+    }
+
+    private static void AddControllers(IServiceCollection services)
+    {
+        services.AddControllers()
+            .AddJsonOptions(json => ConfigureJson(json.JsonSerializerOptions))
+            .ConfigureApiBehaviorOptions(behavior =>
+            {
+                // Corpo ilegível ou inválido sai no formato de erro da API, não como ProblemDetails.
+                behavior.SuppressMapClientErrors = true;
+                behavior.InvalidModelStateResponseFactory = _ =>
+                    throw Errors.Validation("Não foi possível ler os dados enviados.");
+            });
+
+        // O documento OpenAPI lê as opções de JSON das APIs mínimas: as duas precisam ser iguais.
+        services.ConfigureHttpJsonOptions(json => ConfigureJson(json.SerializerOptions));
+    }
+
+    private static void ConfigureJson(JsonSerializerOptions options)
+    {
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+        // Números só como números: o contrato publicado no openapi.json fica com tipos exatos.
+        options.NumberHandling = JsonNumberHandling.Strict;
+    }
+
+    /// <summary>Documento em /openapi/v1.json, com o esquema Bearer nas rotas que exigem login.</summary>
+    private static void AddOpenApiDocument(IServiceCollection services)
+    {
+        const string scheme = "Bearer";
+
+        services.AddOpenApi(openApi =>
+        {
+            openApi.AddDocumentTransformer((document, _, _) =>
+            {
+                document.Info.Title = "RedigiAI API";
+                document.Components ??= new OpenApiComponents();
+                document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+                document.Components.SecuritySchemes[scheme] = new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Token de sessão do Clerk.",
+                };
+                return Task.CompletedTask;
+            });
+
+            openApi.AddOperationTransformer((operation, context, _) =>
+            {
+                var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+                if (metadata.OfType<IAuthorizeData>().Any() && !metadata.OfType<IAllowAnonymous>().Any())
+                {
+                    operation.Security ??= [];
+                    operation.Security.Add(new OpenApiSecurityRequirement
+                    {
+                        [new OpenApiSecuritySchemeReference(scheme, context.Document)] = [],
+                    });
+                }
+
+                return Task.CompletedTask;
+            });
+        });
     }
 
     /// <summary>30 requisições por minuto por aluno; quem não está logado é limitado por IP.</summary>
