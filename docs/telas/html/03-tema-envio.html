@@ -2,12 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tema, tipo e envio</title>
-<script src="./support.js"></script>
-</head>
-<body>
-<x-dc>
-<helmet>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
@@ -60,12 +56,13 @@ a{color:#2346C9}a:hover{color:#16308F}
 @media (max-width:620px){.sheet.wm{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
 
 </style>
-</helmet>
+</head>
+<body>
 <div class="pg" style="min-height: 1500px">
-<header class="nav"><div class="in"><a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="Propostas.dc.html" class="on" aria-current="page">Temas</a><a href="Main.dc.html">Como a nota é calculada</a></nav><a href="Login.dc.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a></div></header>
+<header class="nav"><div class="in"><a class="logo" href="01-inicio.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="02-temas.html" class="on" aria-current="page">Temas</a><a href="01-inicio.html">Como a nota é calculada</a></nav><a href="04-login.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a></div></header>
 <main class="in" style="padding-top: 36px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 28px">
 <div style="display: flex; flex-direction: column; gap: 8px">
-<nav aria-label="Você está em" style="font-size: 14px; font-weight: 500"><a href="Propostas.dc.html">Fuvest</a> <span class="mut">/ Temas</span></nav>
+<nav aria-label="Você está em" style="font-size: 14px; font-weight: 500"><a href="02-temas.html">Fuvest</a> <span class="mut">/ Temas</span></nav>
 <h1 class="serif h1">Algoritmos e o debate público</h1>
 </div>
 <div class="stack" style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; align-items: start">
@@ -107,20 +104,12 @@ a{color:#2346C9}a:hover{color:#16308F}
 
 <div style="border-top: 1px solid #E1E6F0; padding-top: 20px; display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; flex-direction: column; gap: 2px"><span class="mut" style="font-size: 13px">Você vai enviar</span><span style="font-weight: 600">Fuvest – Dissertação – Algoritmos e o debate público</span></div>
-<a class="btn pri" href="Confirmar.dc.html" style="width: 100%">Enviar para correção</a>
+<a class="btn pri" href="03b-modal-confirmar-envio.html" style="width: 100%">Enviar para correção</a>
 <span class="mut" style="font-size: 13.5px; text-align: center">Você confere tudo antes de confirmar. Se ainda não entrou, pedimos o login nesse momento.</span>
 </div>
 </aside>
 </div>
 </main>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
-class Component extends DCLogic {
-renderVals() {
-return {};
-}
-}
-</script>
 </body>
 </html>

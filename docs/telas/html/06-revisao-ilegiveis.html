@@ -2,12 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Palavras ilegíveis</title>
-<script src="./support.js"></script>
-</head>
-<body>
-<x-dc>
-<helmet>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
@@ -60,11 +56,12 @@ a{color:#2346C9}a:hover{color:#16308F}
 @media (max-width:620px){.sheet.wm{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
 
 </style>
-</helmet>
+</head>
+<body>
 <div class="pg" style="min-height: 1150px">
-<header class="nav"><div class="in"><a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="Propostas.dc.html">Temas</a><a href="Painel.dc.html" class="on" aria-current="page">Minhas correções</a></nav><a class="av" href="Perfil.dc.html" aria-label="Meu perfil">A</a></div></header>
+<header class="nav"><div class="in"><a class="logo" href="01-inicio.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="02-temas.html">Temas</a><a href="08-painel.html" class="on" aria-current="page">Minhas correções</a></nav><a class="av" href="10-perfil.html" aria-label="Meu perfil">A</a></div></header>
 <main class="in" style="padding-top: 36px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 26px">
-<a href="Painel.dc.html" style="font-weight: 600; font-size: 15px; text-decoration: none">← Minhas correções</a>
+<a href="08-painel.html" style="font-weight: 600; font-size: 15px; text-decoration: none">← Minhas correções</a>
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap">
 <div style="display: flex; flex-direction: column; gap: 8px; max-width: 660px">
 <span class="mut" style="font-size: 14px; font-weight: 500">Fuvest – Dissertação – Algoritmos e o debate público</span>
@@ -90,19 +87,11 @@ a{color:#2346C9}a:hover{color:#16308F}
 <p class="mut" style="margin: 0">…o que as pessoas veem, e cada uma <mark style="background: #FFF3C4; color: #0E1B33; padding: 0 4px; border-radius: 3px">recebe</mark></p>
 <div class="f"><label for="p2">O que está escrito</label><input id="p2" class="inp" type="text" value="recebe"></div>
 </section>
-<a class="btn pri" href="RevisaoConfirmar.dc.html" style="width: 100%">Enviar para correção</a>
+<a class="btn pri" href="Revisao03b-modal-confirmar-envio.html" style="width: 100%">Enviar para correção</a>
 <p class="mut" style="margin: -6px 0 0; font-size: 14px; text-align: center">O botão é liberado quando todas as palavras estiverem preenchidas.</p>
 </div>
 </div>
 </main>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150}}'>
-class Component extends DCLogic {
-renderVals() {
-return {};
-}
-}
-</script>
 </body>
 </html>

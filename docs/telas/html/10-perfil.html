@@ -2,12 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meu perfil</title>
-<script src="./support.js"></script>
-</head>
-<body>
-<x-dc>
-<helmet>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
@@ -60,9 +56,10 @@ a{color:#2346C9}a:hover{color:#16308F}
 @media (max-width:620px){.sheet.wm{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
 
 </style>
-</helmet>
+</head>
+<body>
 <div class="pg" style="min-height: 1450px">
-<header class="nav"><div class="in"><a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="Propostas.dc.html">Temas</a><a href="Painel.dc.html">Minhas correções</a></nav><a class="av" href="Perfil.dc.html" aria-label="Meu perfil">A</a></div></header>
+<header class="nav"><div class="in"><a class="logo" href="01-inicio.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="02-temas.html">Temas</a><a href="08-painel.html">Minhas correções</a></nav><a class="av" href="10-perfil.html" aria-label="Meu perfil">A</a></div></header>
 <main class="in" style="padding-top: 44px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 28px">
 <h1 class="serif h1">Meu perfil</h1>
 <div class="stack" style="display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start">
@@ -83,7 +80,7 @@ a{color:#2346C9}a:hover{color:#16308F}
 <button type="button" class="btn pri" style="align-self: flex-start">Salvar alterações</button>
 </section>
 <section id="creditos" class="card" style="padding: 28px; display: flex; flex-direction: column; gap: 16px">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap"><div style="display: flex; flex-direction: column; gap: 2px"><h2 class="serif h2">Correções e compras</h2><span><strong>3</strong> <span class="mut">correções disponíveis</span></span></div><a class="btn pri" href="Main.dc.html#precos">Comprar correções</a></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap"><div style="display: flex; flex-direction: column; gap: 2px"><h2 class="serif h2">Correções e compras</h2><span><strong>3</strong> <span class="mut">correções disponíveis</span></span></div><a class="btn pri" href="01-inicio.html#precos">Comprar correções</a></div>
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 18px; background: #F1F5FF; border-radius: 14px"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">Plano semanal · ativo</span><span class="mut" style="font-size: 14px">3 correções por semana. As não usadas vencem no dia 1º de cada mês. Próxima cobrança em 01/11.</span></span><button type="button" class="btn ghost">Gerenciar assinatura</button></div>
 <table aria-label="Histórico de compras" style="width: 100%; border-collapse: collapse; font-size: 15px">
 <tbody>
@@ -107,13 +104,5 @@ a{color:#2346C9}a:hover{color:#16308F}
 </div>
 </main>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1450}}'>
-class Component extends DCLogic {
-renderVals() {
-return {};
-}
-}
-</script>
 </body>
 </html>

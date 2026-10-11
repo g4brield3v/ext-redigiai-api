@@ -2,12 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Início</title>
-<script src="./support.js"></script>
-</head>
-<body>
-<x-dc>
-<helmet>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
@@ -72,14 +68,15 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 @media (max-width:980px){.split,.hero{grid-template-columns:1fr !important}.price{grid-template-columns:1fr}.h1{font-size:42px}.h2{font-size:32px}.in{padding-left:16px;padding-right:16px}.links{display:none}.crow{grid-template-columns:1fr 1fr}.crow > div:nth-child(3){border-left:0}}
 @media (max-width:620px){.four{grid-template-columns:1fr}.sheet{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
 </style>
-</helmet>
+</head>
+<body>
 <div class="pg" style="min-height: 5000px">
 
 <header class="nav">
 <div class="in">
-<a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a>
+<a class="logo" href="01-inicio.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a>
 <nav class="links" aria-label="Principal"><a href="#como">Como funciona</a><a href="#carta">A correção</a><a href="#nota">Como é a nota</a><a href="#precos">Preços</a><a href="#duvidas">Dúvidas</a></nav>
-<div style="display: flex; align-items: center; gap: 18px"><a href="Login.dc.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a><a class="btn pri" href="Propostas.dc.html" style="min-height: 42px; padding: 0 18px; font-size: 15px">Corrigir redação</a></div>
+<div style="display: flex; align-items: center; gap: 18px"><a href="04-login.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a><a class="btn pri" href="02-temas.html" style="min-height: 42px; padding: 0 18px; font-size: 15px">Corrigir redação</a></div>
 </div>
 </header>
 
@@ -88,7 +85,7 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 <span class="eyebrow">Correção de redação para vestibular</span>
 <h1 class="serif h1">Uma correção que mostra <em style="color: #2346C9">onde</em> e <em style="color: #2346C9">como</em> melhorar.</h1>
 <p class="mut" style="margin: 0; font-size: 19px; max-width: 30em">Escolha o vestibular, um dos nossos temas e o tipo de redação. Escreva à mão, envie a foto da folha e receba a nota de cada critério, com as linhas que pesaram e o que corrigir.</p>
-<div style="display: flex; gap: 12px; flex-wrap: wrap"><a class="btn pri" href="Propostas.dc.html">Ver os temas</a><a class="btn ghost" href="#nota">Como a nota é calculada</a></div>
+<div style="display: flex; gap: 12px; flex-wrap: wrap"><a class="btn pri" href="02-temas.html">Ver os temas</a><a class="btn ghost" href="#nota">Como a nota é calculada</a></div>
 <p class="mut" style="margin: 0; font-size: 14px">Você só cria conta na hora de enviar.</p>
 </div>
 
@@ -182,7 +179,7 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 <li class="tick"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg><span><strong>Orientação direta do que corrigir</strong>, apontando as linhas.</span></li>
 <li class="tick"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg><span><strong>Erros de escrita agrupados pela regra</strong>, para você aprender a regra e não só a palavra.</span></li>
 </ul>
-<a href="Carta.dc.html" style="font-weight: 600">Abrir uma correção completa →</a>
+<a href="09-correcao.html" style="font-weight: 600">Abrir uma correção completa →</a>
 </div>
 
 <div class="win" style="padding: 26px; display: flex; flex-direction: column; gap: 16px">
@@ -249,7 +246,7 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 <span class="serif" style="font-size: 44px; line-height: 1">R$ 0</span>
 <span class="mut" style="font-size: 14px">1 correção, uma vez por conta</span>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px"><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Correção completa nos 4 critérios</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Redação marcada linha a linha</li></ul>
-<a class="btn ghost" href="Propostas.dc.html" style="margin-top: auto">Fazer o teste</a>
+<a class="btn ghost" href="02-temas.html" style="margin-top: auto">Fazer o teste</a>
 </article>
 <article style="padding: 30px; display: flex; flex-direction: column; gap: 20px; background: #2346C9; color: #FFFFFF; border-radius: 20px; position: relative">
 <span style="position: absolute; top: -13px; left: 30px; background: #0E1B33; color: #FFFFFF; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px">Para quem treina toda semana</span>
@@ -257,14 +254,14 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 <span><span class="serif" style="font-size: 44px; line-height: 1">R$ 39,90</span><span style="color: #D5DEFF"> /mês</span></span>
 <span style="font-size: 14px; color: #D5DEFF">3 correções por semana · cartão de crédito</span>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px"><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Evolução da nota entre versões</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Envio de várias redações de uma vez</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Correções não usadas acumulam até o fim do mês</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Reescritas contam como correção</li></ul>
-<a class="btn" href="Propostas.dc.html" style="margin-top: auto; background: #FFFFFF; color: #0E1B33">Assinar o plano semanal</a>
+<a class="btn" href="02-temas.html" style="margin-top: auto; background: #FFFFFF; color: #0E1B33">Assinar o plano semanal</a>
 </article>
 <article class="card" style="padding: 30px; display: flex; flex-direction: column; gap: 20px">
 <div style="display: flex; flex-direction: column; gap: 6px"><h3 class="h3">Correção avulsa</h3><span class="mut" style="font-size: 15px">Para corrigir além do plano.</span></div>
 <span class="serif" style="font-size: 44px; line-height: 1">R$ 16</span>
 <span class="mut" style="font-size: 14px">por correção · Pix ou cartão</span>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px"><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Mesma correção do plano</li><li class="tick"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2346C9" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>Compre só quando precisar</li></ul>
-<a class="btn ghost" href="Propostas.dc.html" style="margin-top: auto">Comprar avulsa</a>
+<a class="btn ghost" href="02-temas.html" style="margin-top: auto">Comprar avulsa</a>
 </article>
 </div>
 </div>
@@ -287,7 +284,7 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 <div style="background: #2346C9; color: #FFFFFF; border-radius: 28px; padding: 64px 48px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 22px">
 <h2 class="serif h2" style="color: #FFFFFF; max-width: 16em">Escolha um tema e escreva a sua próxima redação.</h2>
 <p style="margin: 0; font-size: 18px; color: #D5DEFF; max-width: 32em">Cada tema traz o enunciado e a coletânea de textos, no formato da prova.</p>
-<a class="btn" href="Propostas.dc.html" style="background: #FFFFFF; color: #0E1B33">Ver os temas</a>
+<a class="btn" href="02-temas.html" style="background: #FFFFFF; color: #0E1B33">Ver os temas</a>
 </div>
 </div>
 </section>
@@ -299,13 +296,5 @@ details.q[open] summary .pl{transform:rotate(45deg)}
 </div>
 </footer>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":5000}}'>
-class Component extends DCLogic {
-renderVals() {
-return {};
-}
-}
-</script>
 </body>
 </html>

@@ -8,8 +8,9 @@ SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestib
 |---|---|
 | `docs/01-especificacao-tecnica.md` | **Fonte da verdade:** regras de negócio, estados, modelo de dados, API, fila, IA, pagamentos, e-mails, segurança, erros |
 | `docs/02-frontend.md` | Design system, rotas e o comportamento de cada tela |
+| `docs/04-construir-front.md` | Como construir todas as telas idênticas às aprovadas, com dados simulados e comparação visual |
 | `docs/03-plano-de-implementacao.md` | Etapas, critérios de aceite e checklist de segurança |
-| `docs/design/*.dc.html` | Telas aprovadas (referência visual: medidas, cores, textos) |
+| `docs/telas/html/` e `docs/telas/png/` | Telas aprovadas: HTML que abre no navegador e imagem de cada tela (computador e celular). **O front-end tem que ficar idêntico a elas.** |
 
 Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente regra de negócio. Se a especificação não cobre um caso, proponha a solução mais simples, implemente só depois de aprovada e registre a decisão em `docs/decisoes.md` (data, contexto, decisão).
 
@@ -106,7 +107,7 @@ Atualize esta seção sempre que um comando mudar.
 21. Erros conhecidos como `AppError(code, httpStatus, userMessage, retryable)`; o front decide pelo `code`.
 
 **Front-end**
-22. Siga `docs/02-frontend.md` e os arquivos em `docs/design/`. Copie os textos das telas; não reescreva.
+22. Siga `docs/02-frontend.md` e os arquivos em `docs/telas/`. Copie os textos das telas; não reescreva.
 23. Nunca escreva tipos da API à mão: regenere o cliente quando o backend mudar.
 24. Sem bibliotecas de componentes prontas (MUI, Chakra etc.). Sem emojis, gradientes ou ícones de "IA".
 

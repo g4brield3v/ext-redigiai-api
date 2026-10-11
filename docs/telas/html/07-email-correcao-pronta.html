@@ -2,12 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Entrar para enviar</title>
-<script src="./support.js"></script>
-</head>
-<body>
-<x-dc>
-<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-mail de correção pronta</title>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=Caveat:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
@@ -60,39 +56,22 @@ a{color:#2346C9}a:hover{color:#16308F}
 @media (max-width:620px){.sheet.wm{grid-template-columns:30px minmax(0,1fr)}.sheet .m{display:none}}
 
 </style>
-</helmet>
-<div class="pg" style="min-height: 900px; position: relative">
-<div aria-hidden="true"><header class="nav"><div class="in"><a class="logo" href="Main.dc.html"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a><nav class="links" aria-label="Principal"><a href="Propostas.dc.html" class="on" aria-current="page">Temas</a><a href="Main.dc.html">Como a nota é calculada</a></nav><a href="Login.dc.html" style="font-weight: 600; color: #0E1B33; text-decoration: none">Entrar</a></div></header>
-<div class="in" style="padding-top: 36px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px"><div style="height: 720px; border-radius: 18px; background: #E8ECF3"></div><div style="height: 600px; border-radius: 18px; background: #E8ECF3"></div></div></div>
-<div style="position: absolute; inset: 0; background: rgba(14,27,51,.5); display: flex; align-items: center; justify-content: center; padding: 16px">
-<div role="dialog" aria-modal="true" aria-labelledby="dlg" style="width: 100%; max-width: 448px; background: #FFFFFF; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
-<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
-<h2 id="dlg" class="serif" style="margin: 0; font-size: 30px; line-height: 1.1">Entre para enviar sua redação</h2>
-<a href="Envio.dc.html" aria-label="Fechar" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: #0E1B33; flex-shrink: 0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
-</div>
-<div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: #F1F5FF; border-radius: 14px">
-<span aria-hidden="true" style="width: 38px; height: 50px; flex-shrink: 0; border-radius: 3px; border: 1px solid #D5DEEC; transform: rotate(-2deg); background: repeating-linear-gradient(#FFFFFF 0 5px,#D5DEEC 5px 6px)"></span>
-<span style="display: flex; flex-direction: column; font-size: 14px"><span style="font-weight: 600">Fuvest – Dissertação – Algoritmos e o debate público</span><span class="mut">A foto está guardada. O envio continua depois de entrar.</span></span>
-</div>
-<a class="btn ghost" href="Confirmar.dc.html" style="width: 100%"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z" fill="#4285F4"></path><path d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z" fill="#34A853"></path><path d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2z" fill="#FBBC05"></path><path d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10c.8-2.4 3-4.1 5.6-4.1z" fill="#EA4335"></path></svg>Continuar com Google</a>
-<div class="mut" style="display: flex; align-items: center; gap: 12px; font-size: 14px"><span style="flex: 1; height: 1px; background: #E1E6F0"></span>ou<span style="flex: 1; height: 1px; background: #E1E6F0"></span></div>
-<form style="display: flex; flex-direction: column; gap: 10px">
-<div class="f"><label for="email">Seu e-mail</label><input id="email" class="inp" type="email" autocomplete="email" placeholder="voce@email.com"></div>
-<div class="f"><label for="nasc">Data de nascimento</label><input class="inp" id="nasc" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" required=""><span class="mut" style="font-size: 13px">A plataforma é para quem tem 16 anos ou mais.</span></div>
-<button type="submit" class="btn pri" style="width: 100%">Receber link de acesso</button>
-<p class="mut" style="margin: 0; font-size: 13.5px">Sem senha. O link vale por 15 minutos.</p>
-</form>
-<p class="mut" style="margin: 0; font-size: 13px; line-height: 1.5; border-top: 1px solid #E1E6F0; padding-top: 16px">Ao continuar, você aceita os <a href="#">Termos de uso</a> e a <a href="#">Política de privacidade</a>, inclusive o envio do texto a um serviço de IA para correção.</p>
+</head>
+<body>
+<div style="width: 600px; height: 640px; background: #EEF1F6; color: #0E1B33; font-family: 'Schibsted Grotesk', Arial, sans-serif; padding: 28px 32px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: #56627A"><span>Assunto: <strong style="color: #0E1B33">Sua correção está pronta</strong></span><span>Pré-visualização: Fuvest – Dissertação – Algoritmos e o debate público</span></div>
+<div style="background: #FFFFFF; border-radius: 16px; overflow: hidden">
+<div style="height: 6px; background: #2346C9"></div>
+<div style="padding: 32px; display: flex; flex-direction: column; gap: 18px">
+<a class="logo" href="01-inicio.html" style="font-size: 16px"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#2346C9"></rect><path d="M8 11h14M8 15.5h14M8 20h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><path d="M18.5 21.5c1.6-1.2 3.2-3 4.2-5" stroke="#FFB4A8" stroke-width="2" fill="none" stroke-linecap="round"></path></svg>RedigiAI</a>
+<h1 style="margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 32px; line-height: 1.12">Ana, sua redação foi corrigida</h1>
+<div style="padding: 14px 16px; background: #F6F8FC; border-radius: 12px; font-size: 15px"><strong>Fuvest – Dissertação – Algoritmos e o debate público</strong><br><span style="color: #56627A">Enviada em 10/10, às 21:40</span></div>
+<p style="margin: 0; font-size: 16px; line-height: 1.6">A nota de cada critério, as linhas que tiraram pontos e o que corrigir primeiro estão na plataforma.</p>
+<a href="09-correcao.html" style="align-self: flex-start; display: inline-block; padding: 15px 28px; border-radius: 999px; background: #2346C9; color: #FFFFFF; font-weight: 600; font-size: 16px; text-decoration: none">Ver minha correção</a>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #56627A">Se o botão não abrir, copie este endereço no navegador:<br>[link da correção]</p>
 </div>
 </div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #56627A">Você recebeu este e-mail porque enviou uma redação para correção. <a href="10-perfil.html">Ajustar avisos por e-mail</a> · [Endereço da empresa]</p>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
-class Component extends DCLogic {
-renderVals() {
-return {};
-}
-}
-</script>
 </body>
 </html>

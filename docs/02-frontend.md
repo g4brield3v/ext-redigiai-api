@@ -1,6 +1,6 @@
 # RedigiAI — Especificação do front-end
 
-Complementa `01-especificacao-tecnica.md`. As telas foram desenhadas e aprovadas; os arquivos de referência estão em `docs/design/` (HTML estático, abra no navegador ou leia o markup para copiar medidas, cores e textos). Os textos das telas são definitivos: copie-os, não reescreva.
+Complementa `01-especificacao-tecnica.md`. As telas foram desenhadas e aprovadas; os arquivos de referência estão em `docs/telas/html/` (HTML estático que abre no navegador; copie markup, medidas, cores e textos) e `docs/telas/png/` (imagem de cada tela em 1440 px e 390 px). Os textos das telas são definitivos: copie-os, não reescreva.
 
 ## 1. Princípios de interface
 
@@ -48,7 +48,9 @@ Chips de status:
 | Na fila (`queued`) | `#EEF1F6` | `#3B4559` |
 | Não corrigida / Cancelada (`failed`, `cancelled`) | `#FDECEA` | `#9A2A20` |
 
-### Tipografia (Google Fonts)
+### Tipografia
+
+Fontes hospedadas no próprio site com `@fontsource/newsreader`, `@fontsource/schibsted-grotesk` e `@fontsource/caveat` (não carregar do Google Fonts: evita enviar o IP do aluno a terceiros). Os HTML de `docs/telas/html/` usam o Google Fonts só para pré-visualização.
 
 - **Schibsted Grotesk** (400, 500, 600, 700): interface e texto. Base 16 px, `line-height: 1.55`.
 - **Newsreader** (500, 600, itálico 500): títulos. `letter-spacing: -0.015em`. H1 44 px (34 px no celular), H2 28 px.
@@ -63,7 +65,7 @@ Chips de status:
 - **Janela/destaque:** como cartão, com sombra `0 1px 0 #E9EEF6, 0 24px 48px -28px rgba(14,27,51,.25)`.
 - **Campo:** altura 48 px, raio 12 px, borda `--border-input`, foco com borda `--blue`.
 - **Navegação:** branca, altura 68 px, borda inferior. Logo à esquerda; links ao centro (deslogado: Como funciona, A correção, Como é a nota, Preços, Dúvidas; logado: Temas, Minhas correções); à direita "Entrar" + "Corrigir redação" ou o avatar com a inicial. Link da página atual sublinhado em azul.
-- **Logo:** quadrado azul de 30 px com raio 8, três linhas brancas (pautas) e um traço curvo `#FFB4A8` (caneta), seguido de "RedigiAI" em 700. SVG em `docs/design/Main.dc.html`.
+- **Logo:** quadrado azul de 30 px com raio 8, três linhas brancas (pautas) e um traço curvo `#FFB4A8` (caneta), seguido de "RedigiAI" em 700. SVG em `docs/telas/html/01-inicio.html`.
 - **Folha (componente `EssaySheet`)**, o elemento mais importante do produto:
   - Grade: coluna de número da linha (36 px, números 11 px `#9AA6BC`, borda direita `--margin-red`), coluna do texto, coluna opcional de comentários (170 px, borda esquerda tracejada).
   - Cada linha tem 36 px de altura e borda inferior `--line`. **O texto fica sentado na pauta** (alinhado embaixo).
@@ -88,18 +90,18 @@ Chips de status:
 
 | Rota | Tela (arquivo de design) | Acesso |
 |---|---|---|
-| `/` | 1 · Início (`Main.dc.html`) | Público |
-| `/temas` | 2 · Vestibular e tema (`Propostas.dc.html`) | Público |
-| `/temas/:themeId` | 3 · Tipo de redação e envio (`Envio.dc.html`), modal 3b (`Confirmar.dc.html`) | Público até enviar |
-| `/entrar` | 4 · Login (`Login.dc.html`) | Público |
-| `/enviar/foto` | 5 · Câmera no celular (`EnvioCelular.dc.html`) | Público |
-| `/painel` | 8 · Minhas correções (`Painel.dc.html`) | Logado |
-| `/redacoes/:id/revisao` | 6 · Palavras ilegíveis (`Revisao.dc.html`), modal 6b (`RevisaoConfirmar.dc.html`) | Logado |
-| `/redacoes/:id` | 9 · Correção (`Carta.dc.html`) | Logado |
-| `/perfil` | 10 · Meu perfil (`Perfil.dc.html`) | Logado |
+| `/` | 1 · Início (`01-inicio.html`) | Público |
+| `/temas` | 2 · Vestibular e tema (`02-temas.html`) | Público |
+| `/temas/:themeId` | 3 · Tipo de redação e envio (`03-tema-envio.html`), modal 3b (`03b-modal-confirmar-envio.html`) | Público até enviar |
+| `/entrar` | 4 · Login (`04-login.html`) | Público |
+| `/enviar/foto` | 5 · Câmera no celular (`05-camera-celular.html`) | Público |
+| `/painel` | 8 · Minhas correções (`08-painel.html`) | Logado |
+| `/redacoes/:id/revisao` | 6 · Palavras ilegíveis (`06-revisao-ilegiveis.html`), modal 6b (`06b-modal-confirmar-palavras.html`) | Logado |
+| `/redacoes/:id` | 9 · Correção (`09-correcao.html`) | Logado |
+| `/perfil` | 10 · Meu perfil (`10-perfil.html`) | Logado |
 | `/comprar` | Checkout (sem design; seguir o design system) | Logado |
 | `/termos`, `/privacidade` | Textos legais (conteúdo virá do jurídico) | Público |
-| — | 7 · E-mail (`Email.dc.html`), modelo para o SendGrid | — |
+| — | 7 · E-mail (`07-email-correcao-pronta.html`), modelo para o SendGrid | — |
 
 Rota logada sem sessão → `/entrar?next=<rota>`. Depois do login, `POST /v1/me` se o usuário ainda não existir localmente (data de nascimento) e volta para `next`.
 
