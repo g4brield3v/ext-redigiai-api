@@ -1,0 +1,55 @@
+# Desenvolvimento local. `docker compose up -d db` sobe só o PostgreSQL;
+# `docker compose up` sobe o banco, a API e o worker. As chaves vêm do arquivo .env (veja .env.example).
+x-backend: &backend
+  build: ./api
+  env_file:
+    - path: .env
+      required: false
+  environment: &backend-env
+    ASPNETCORE_ENVIRONMENT: Development
+    DOTNET_ENVIRONMENT: Development
+    ConnectionStrings__Default: Host=db;Port=5432;Database=redigiai;Username=redigiai;Password=redigiai
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: redigiai
+      POSTGRES_USER: redigiai
+      POSTGRES_PASSWORD: redigiai
+    ports:
+      # Se a 5432 já estiver em uso na sua máquina, defina DB_PORT (e ajuste ConnectionStrings__Default no .env).
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redigiai -d redigiai"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    command: ["migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    command: ["api"]
+    ports:
+      - "5080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:

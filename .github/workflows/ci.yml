@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Back-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build api/RedigiAI.sln --configuration Release
+      - name: openapi.json atualizado
+        run: git diff --exit-code -- api/openapi.json
+      - name: Testes (unitários e integração com PostgreSQL real)
+        run: dotnet test api/RedigiAI.sln --configuration Release --no-build
+      - name: Dependências sem vulnerabilidade conhecida
+        shell: bash # com pipefail: se o dotnet list falhar, o passo falha
+        run: |
+          dotnet list api/RedigiAI.sln package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -qE "has the following vulnerable packages|tem os seguintes pacotes vulneráveis" vulnerable.txt
+      - name: Imagem Docker
+        run: docker build ./api
+
+  secrets:
+    name: Segredos no repositório
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

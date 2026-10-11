@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# RedigiAI
+.env
+.env.*
+!.env.example
+web/dist/
+web/playwright-report/
+web/test-results/
+web/design-diff/
+web/dist-e2e/

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/appsettings.Production.json)",
+      "Bash(git push --force:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin master:*)",
+      "Bash(railway up:*)",
+      "Bash(vercel --prod:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(dotnet ef database update:*)"
+    ]
+  }
+}
