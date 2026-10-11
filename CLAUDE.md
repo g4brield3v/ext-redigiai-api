@@ -2,7 +2,7 @@
 
 SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestibular → tema → tipo, envia a foto da folha e recebe na plataforma a nota de cada critério, com as linhas que pesaram e o que corrigir. Domínio: redigiai.com.br. Público: estudantes a partir de 16 anos.
 
-Este repositório tem a API, o worker e a especificação do produto. O front-end fica em outro repositório (`ext-redigiai-web`), que consome o contrato publicado em `api/openapi.json`.
+Este repositório tem a API, o worker e a especificação do produto. O front-end fica em outro repositório (`ext-redigiai-front`), que consome o contrato publicado em `api/openapi.json`.
 
 ## Documentos (leia antes de qualquer tarefa)
 
@@ -16,7 +16,7 @@ Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente
 ## Stack
 
 - **Back-end:** .NET 10, ASP.NET Core com controllers (um por contexto, em `RedigiAI.Api/Controllers`), documentados no Swagger, EF Core + Npgsql, PostgreSQL 16+. Um executável com dois modos: `api` e `worker`.
-- **Front-end:** em outro repositório (`ext-redigiai-web`): React + Vite + TypeScript, com o cliente gerado do `api/openapi.json` daqui.
+- **Front-end:** em outro repositório (`ext-redigiai-front`): React + Vite + TypeScript, com o cliente gerado do `api/openapi.json` daqui.
 - **Serviços:** Clerk (login), Mercado Pago (pagamentos), Cloudinary (fotos privadas), SendGrid (e-mail), API do Claude (transcrição e correção), Sentry.
 - **Hospedagem:** Railway (api, worker, PostgreSQL e o front). CI no GitHub Actions.
 
