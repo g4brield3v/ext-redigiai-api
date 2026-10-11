@@ -43,6 +43,7 @@ public class CatalogTests(ApiFixture api)
     [InlineData("clima", 0)]
     [InlineData("%", 0)]
     [InlineData("_lgoritmos", 0)]
+    [InlineData("algo\u0000ritmos", 1)] // caractere de controle é descartado, não derruba a consulta
     public async Task Theme_search_matches_the_title_literally(string search, int expected)
     {
         var themes = await _client.GetFromJsonAsync<JsonElement>($"/v1/exams/fuvest/themes?q={Uri.EscapeDataString(search)}");

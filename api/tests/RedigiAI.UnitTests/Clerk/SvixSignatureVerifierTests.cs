@@ -67,6 +67,28 @@ public class SvixSignatureVerifierTests
         Assert.False(SvixSignatureVerifier.IsValid(Secret, "msg_1", timestamp, signatures, Body, Now));
     }
 
+    [Theory]
+    [InlineData("99999999999999")] // além do que uma data comporta
+    [InlineData("-1")]
+    [InlineData("abc")]
+    public void Rejects_an_absurd_timestamp_without_throwing(string timestamp)
+    {
+        Assert.False(SvixSignatureVerifier.IsValid(Secret, "msg_1", timestamp, Sign("msg_1", timestamp, Body), Body, Now));
+    }
+
+    [Theory]
+    [InlineData("whsec_")]
+    [InlineData("whsec_AAAA")]
+    public void Rejects_a_secret_too_short_to_be_a_key(string secret)
+    {
+        var timestamp = Now.ToUnixTimeSeconds().ToString();
+        var content = Encoding.UTF8.GetBytes($"msg_1.{timestamp}.").Concat(Body).ToArray();
+        var keyBytes = Convert.FromBase64String(secret["whsec_".Length..]);
+        var forged = "v1," + Convert.ToBase64String(HMACSHA256.HashData(keyBytes, content));
+
+        Assert.False(SvixSignatureVerifier.IsValid(secret, "msg_1", timestamp, forged, Body, Now));
+    }
+
     [Fact]
     public void Rejects_when_the_secret_is_not_configured()
     {

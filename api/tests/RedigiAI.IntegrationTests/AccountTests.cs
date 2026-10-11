@@ -35,6 +35,7 @@ public class AccountTests(ApiFixture api)
     [InlineData("wrong-issuer")]
     [InlineData("wrong-key")]
     [InlineData("wrong-origin")]
+    [InlineData("no-origin")]
     [InlineData("garbage")]
     public async Task Invalid_token_is_refused(string kind)
     {
@@ -45,6 +46,7 @@ public class AccountTests(ApiFixture api)
             "wrong-issuer" => api.CreateToken(userId, issuer: "https://clerk.evil.test"),
             "wrong-key" => api.CreateToken(userId, signingKey: new RsaSecurityKey(RSA.Create(2048)) { KeyId = "test-key" }),
             "wrong-origin" => api.CreateToken(userId, authorizedParty: "https://evil.test"),
+            "no-origin" => api.CreateToken(userId, authorizedParty: null),
             _ => "not-a-jwt",
         };
 
@@ -193,9 +195,11 @@ public class AccountTests(ApiFixture api)
         var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
         await client.PostAsJsonAsync("/v1/me", Adult);
 
-        var response = await client.PatchAsJsonAsync("/v1/me", new { name = new string('a', 121) });
+        var tooLong = await client.PatchAsJsonAsync("/v1/me", new { name = new string('a', 121) });
+        var controlCharacter = await client.PatchAsJsonAsync("/v1/me", new { name = "Ana\u0000Souza" });
 
-        await AssertErrorAsync(response, HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        await AssertErrorAsync(tooLong, HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        await AssertErrorAsync(controlCharacter, HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
     }
 
     [Fact]

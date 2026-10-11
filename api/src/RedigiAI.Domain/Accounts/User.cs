@@ -79,6 +79,12 @@ public sealed class User : AggregateRoot
             return null;
         }
 
+        // O PostgreSQL recusa NUL; nenhum caractere de controle faz sentido num nome.
+        if (trimmed.Any(char.IsControl))
+        {
+            throw Errors.Validation("O nome tem caracteres inválidos.");
+        }
+
         if (trimmed.Length > MaxNameLength)
         {
             throw Errors.Validation($"O nome pode ter até {MaxNameLength} caracteres.");

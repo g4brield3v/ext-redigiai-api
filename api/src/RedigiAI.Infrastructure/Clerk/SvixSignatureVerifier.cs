@@ -10,6 +10,7 @@ namespace RedigiAI.Infrastructure.Clerk;
 public static class SvixSignatureVerifier
 {
     private const string SecretPrefix = "whsec_";
+    private const int MinimumKeyBytes = 16;
     private static readonly TimeSpan Tolerance = TimeSpan.FromMinutes(5);
 
     public static bool IsValid(
@@ -22,14 +23,14 @@ public static class SvixSignatureVerifier
         }
 
         // Fora da janela, a mensagem pode ser uma repetição de outra já aceita.
-        if ((now - DateTimeOffset.FromUnixTimeSeconds(seconds)).Duration() > Tolerance)
+        if (Math.Abs(now.ToUnixTimeSeconds() - seconds) > Tolerance.TotalSeconds)
         {
             return false;
         }
 
         var key = new byte[secret.Length];
         var encodedKey = secret.StartsWith(SecretPrefix, StringComparison.Ordinal) ? secret[SecretPrefix.Length..] : secret;
-        if (!Convert.TryFromBase64String(encodedKey, key, out var keyLength))
+        if (!Convert.TryFromBase64String(encodedKey, key, out var keyLength) || keyLength < MinimumKeyBytes)
         {
             return false;
         }

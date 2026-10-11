@@ -18,7 +18,7 @@ internal static class CatalogEndpoints
 
         catalog.MapGet("/exams/{slug}/themes", async (string slug, string? q, ICatalogQueries queries, CancellationToken ct) =>
             {
-                var search = q is { Length: > MaxSearchLength } ? q[..MaxSearchLength] : q;
+                var search = CleanSearch(q);
                 var themes = await queries.ListThemesAsync(slug, search, ct) ?? throw Errors.NotFound();
                 return TypedResults.Ok(themes);
             })
@@ -34,6 +34,31 @@ internal static class CatalogEndpoints
                 TypedResults.Ok(await queries.GetRubricAsync(versionId, ct) ?? throw Errors.NotFound()))
             .WithName("getRubric")
             .ProducesError(404);
+    }
+
+    /// <summary>Tira caracteres de controle (o PostgreSQL recusa NUL) e corta sem partir um par substituto.</summary>
+    private static string? CleanSearch(string? q)
+    {
+        if (string.IsNullOrEmpty(q))
+        {
+            return q;
+        }
+
+        var clean = new System.Text.StringBuilder(MaxSearchLength);
+        foreach (var rune in q.EnumerateRunes())
+        {
+            if (clean.Length + rune.Utf16SequenceLength > MaxSearchLength)
+            {
+                break;
+            }
+
+            if (!System.Text.Rune.IsControl(rune) && rune != System.Text.Rune.ReplacementChar)
+            {
+                clean.Append(rune.ToString());
+            }
+        }
+
+        return clean.ToString();
     }
 
     public static RouteHandlerBuilder ProducesError(this RouteHandlerBuilder builder, params int[] statusCodes)

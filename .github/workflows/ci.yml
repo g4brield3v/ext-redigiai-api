@@ -28,6 +28,7 @@ jobs:
       - name: Testes (unitários e integração com PostgreSQL real)
         run: dotnet test api/RedigiAI.sln --configuration Release --no-build
       - name: Dependências sem vulnerabilidade conhecida
+        shell: bash # com pipefail: se o dotnet list falhar, o passo falha
         run: |
           dotnet list api/RedigiAI.sln package --vulnerable --include-transitive | tee vulnerable.txt
           ! grep -qE "has the following vulnerable packages|tem os seguintes pacotes vulneráveis" vulnerable.txt

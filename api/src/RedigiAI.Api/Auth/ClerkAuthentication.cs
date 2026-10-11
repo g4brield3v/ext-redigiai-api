@@ -18,7 +18,7 @@ internal static class ClerkAuthentication
     /// <summary>
     /// Valida o JWT de sessão do Clerk: assinatura (JWKS), emissor, expiração e audiência.
     /// O token de sessão do Clerk não traz <c>aud</c> por padrão; a parte autorizada (<c>azp</c>) é conferida
-    /// contra as origens permitidas e <c>aud</c> é exigido quando <c>Clerk__Audience</c> está configurado.
+    /// contra as origens permitidas (token sem <c>azp</c> é recusado) e <c>aud</c> é exigido quando <c>Clerk__Audience</c> está configurado.
     /// </summary>
     public static IServiceCollection AddClerkAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -52,6 +52,7 @@ internal static class ClerkAuthentication
                     RequireSignedTokens = true,
                     ValidateIssuerSigningKey = true,
                     ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
+                    ValidTypes = ["JWT"],
                     ClockSkew = TimeSpan.FromSeconds(30),
                     NameClaimType = "sub",
                 };
@@ -66,7 +67,7 @@ internal static class ClerkAuthentication
                         {
                             context.Fail("Token without subject.");
                         }
-                        else if (authorizedParty is not null && !allowedOrigins.Contains(authorizedParty))
+                        else if (authorizedParty is null || !allowedOrigins.Contains(authorizedParty))
                         {
                             context.Fail("Token issued for another origin.");
                         }

@@ -19,7 +19,7 @@ services:
       POSTGRES_PASSWORD: redigiai
     ports:
       # Se a 5432 já estiver em uso na sua máquina, defina DB_PORT (e ajuste ConnectionStrings__Default no .env).
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
