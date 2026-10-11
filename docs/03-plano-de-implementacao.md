@@ -30,7 +30,7 @@ Especificação: seções 2, 5, 6 (Conta e Catálogo), 11, 12, 13 e 15.
 **Front-end**
 - Projeto Vite + React + TS estrito; tokens do design system; componentes base (botão, cartão, campo, navegação, chip, modal); cliente gerado do OpenAPI.
 - Login com Clerk no nosso visual, com data de nascimento no primeiro acesso.
-- Páginas Início (`/`) e Temas (`/temas`) com dados reais do catálogo.
+- Páginas Início (`/`), Temas (`/temas`) e Proposta e coletânea (`/temas/:themeId`) com dados reais do catálogo.
 
 **Infra**
 - GitHub Actions: build, testes, lint e tipos em todo pull request; CodeQL, gitleaks e auditoria de dependências.
@@ -53,7 +53,7 @@ Especificação: seções 3 (Seleção, Envio, Transcrição e revisão), 4, 6 (
 - Job `transcribe` com a API do Claude: ferramenta com JSON Schema, validação, regras de 0 / 1–10 / mais de 10 ilegíveis, custo por chamada gravado.
 - `PUT /v1/essays/{id}/illegible`; jobs agendados de lembrete (12 h) e cancelamento (24 h) com devolução.
 - Job `send_email` com SendGrid e os templates `illegible_words`, `illegible_reminder`, `review_expired`, `photo_unreadable`, `essay_failed`.
-- Telas: Tipo e envio, modal de confirmação, câmera no celular, rascunho antes do login, Palavras ilegíveis com modal, painel com status e polling.
+- Telas: Proposta e coletânea, Tipo e envio, modal de confirmação, câmera no celular, rascunho antes do login, Palavras ilegíveis com modal, painel com status e polling.
 - Folha pautada em PDF.
 
 **Aceite**

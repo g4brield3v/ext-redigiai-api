@@ -10,7 +10,7 @@ O MVP do RedigiAI corrige redações manuscritas da Fuvest com IA: o aluno escol
 
 - Vestibular: somente Fuvest, com a grade de 4 critérios (níveis 1 a 3, pesos 3, 2, 3 e 2, máximo de 30 pontos).
 - Entrada: somente foto JPG da folha, até 10 MB, uma face por redação. Envio em lote permitido.
-- Fluxo: seleção (vestibular → tema → tipo) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
+- Fluxo: seleção (vestibular → tema → leitura da proposta e da coletânea, em página própria → tipo) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
 - Cobrança: 1 correção grátis por conta, plano semanal no cartão e correção avulsa por Pix ou cartão.
 - Painel do aluno: lista de correções, evolução da nota e foco de melhoria.
 - Folha pautada da plataforma para download (PDF, 30 linhas).
@@ -46,7 +46,7 @@ Cada regra abaixo é requisito de backend e frontend; o backend é a fonte da ve
 
 **Seleção e título**
 
-1. O aluno escolhe, nesta ordem, o vestibular, um tema ativo desse vestibular e um tipo de redação aceito pelo tema. Cada redação responde a exatamente uma proposta (tema + tipo).
+1. O aluno escolhe, nesta ordem, o vestibular, um tema ativo desse vestibular e um tipo de redação aceito pelo tema. A proposta e a coletânea ficam numa página só de leitura, separada da página de envio, onde se escolhem o tipo e a foto. Cada redação responde a exatamente uma proposta (tema + tipo).
 2. O título de toda redação e correção segue o formato "Vestibular – Tipo – Tema", sem ano.
 
 **Envio**
@@ -584,7 +584,7 @@ Itens que decorrem das decisões jurídicas e de produto e que precisam existir 
 
 **Envio em lote (sem tela desenhada ainda)**
 
-- Na tela do tema, depois de escolher o tipo, o aluno pode adicionar várias fotos; cada foto é uma redação daquele tema e tipo.
+- Na página de envio (`/temas/:themeId/enviar`), depois de escolher o tipo, o aluno pode adicionar várias fotos; cada foto é uma redação daquele tema e tipo.
 - O modal de confirmação lista todas, mostra o custo (N correções) e o saldo depois. Se o saldo não cobre todas, o botão fica desabilitado e aparece "Comprar correções".
 - Uma chamada `POST /v1/essays/batch` com todas; tudo ou nada.
 
