@@ -8,6 +8,7 @@ using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Infrastructure.Clerk;
 using RedigiAI.Infrastructure.Cloudinary;
+using RedigiAI.Infrastructure.Jobs;
 using RedigiAI.Infrastructure.Persistence;
 using RedigiAI.Infrastructure.Persistence.Repositories;
 
@@ -37,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IEssayBatchRepository, EssayBatchRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IJobQueue, JobQueue>();
+        services.AddSingleton<IJobRunner, JobRunner>();
+        services.AddSingleton<JobSignal>();
 
         services.AddScoped<IClerkWebhookVerifier, ClerkWebhookVerifier>();
 

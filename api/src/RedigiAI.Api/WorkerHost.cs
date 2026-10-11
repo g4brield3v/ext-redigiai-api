@@ -11,7 +11,7 @@ internal static class WorkerHost
     public static async Task<int> RunAsync(string[] args)
     {
         var builder = CreateBuilder(args);
-        builder.Services.AddHostedService<IdleWorker>();
+        builder.Services.AddHostedService<JobWorker>();
 
         await builder.Build().RunAsync();
         return 0;
@@ -26,16 +26,6 @@ internal static class WorkerHost
         builder.Services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         return builder;
-    }
-
-    /// <summary>A fila de jobs entra na etapa 2; até lá o worker só sobe e fica de pé.</summary>
-    private sealed class IdleWorker(ILogger<IdleWorker> logger) : BackgroundService
-    {
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            logger.LogInformation("Worker started; no job handlers registered yet");
-            return Task.Delay(Timeout.Infinite, stoppingToken);
-        }
     }
 }
 

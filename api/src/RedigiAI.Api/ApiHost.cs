@@ -36,6 +36,7 @@ internal static class ApiHost
         if (devAccess)
         {
             services.AddHostedService<DevEnvironmentSetup>();
+            services.AddHostedService<JobWorker>();
         }
         AddControllers(services);
         AddOpenApiDocument(services);
