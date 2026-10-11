@@ -1,5 +1,5 @@
 # Desenvolvimento local. `docker compose up -d db` sobe só o PostgreSQL;
-# `docker compose up` sobe tudo. As chaves vêm do arquivo .env (veja .env.example).
+# `docker compose up` sobe o banco, a API e o worker. As chaves vêm do arquivo .env (veja .env.example).
 x-backend: &backend
   build: ./api
   env_file:
@@ -51,20 +51,5 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  web:
-    image: node:24-alpine
-    working_dir: /repo/web
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
-    environment:
-      VITE_API_URL: http://localhost:5080
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./:/repo
-      - web-node-modules:/repo/web/node_modules
-    depends_on:
-      - api
-
 volumes:
   db-data:
-  web-node-modules:

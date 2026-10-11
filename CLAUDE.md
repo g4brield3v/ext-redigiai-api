@@ -1,25 +1,24 @@
-# RedigiAI
+# RedigiAI · back-end
 
 SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestibular → tema → tipo, envia a foto da folha e recebe na plataforma a nota de cada critério, com as linhas que pesaram e o que corrigir. Domínio: redigiai.com.br. Público: estudantes a partir de 16 anos.
+
+Este repositório tem a API, o worker e a especificação do produto. O front-end fica em outro repositório (`ext-redigiai-web`), que consome o contrato publicado em `api/openapi.json`.
 
 ## Documentos (leia antes de qualquer tarefa)
 
 | Arquivo | Conteúdo |
 |---|---|
 | `docs/01-especificacao-tecnica.md` | **Fonte da verdade:** regras de negócio, estados, modelo de dados, API, fila, IA, pagamentos, e-mails, segurança, erros |
-| `docs/02-frontend.md` | Design system, rotas e o comportamento de cada tela |
-| `docs/04-construir-front.md` | Como construir todas as telas idênticas às aprovadas, com dados simulados e comparação visual |
 | `docs/03-plano-de-implementacao.md` | Etapas, critérios de aceite e checklist de segurança |
-| `docs/telas/html/` e `docs/telas/png/` | Telas aprovadas: HTML que abre no navegador e imagem de cada tela (computador e celular). **O front-end tem que ficar idêntico a elas.** |
 
 Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente regra de negócio. Se a especificação não cobre um caso, proponha a solução mais simples, implemente só depois de aprovada e registre a decisão em `docs/decisoes.md` (data, contexto, decisão).
 
 ## Stack
 
 - **Back-end:** .NET 10, ASP.NET Core com controllers (um por contexto, em `RedigiAI.Api/Controllers`), documentados no Swagger, EF Core + Npgsql, PostgreSQL 16+. Um executável com dois modos: `api` e `worker`.
-- **Front-end:** React + Vite + TypeScript (strict), React Router, TanStack Query, cliente gerado do `openapi.json`.
+- **Front-end:** em outro repositório (`ext-redigiai-web`): React + Vite + TypeScript, com o cliente gerado do `api/openapi.json` daqui.
 - **Serviços:** Clerk (login), Mercado Pago (pagamentos), Cloudinary (fotos privadas), SendGrid (e-mail), API do Claude (transcrição e correção), Sentry.
-- **Hospedagem:** Railway (api, worker, PostgreSQL) e Vercel (web). CI no GitHub Actions.
+- **Hospedagem:** Railway (api, worker, PostgreSQL e o front). CI no GitHub Actions.
 
 ## Estrutura do repositório
 
@@ -33,13 +32,6 @@ api/
   tests/RedigiAI.UnitTests/
   tests/RedigiAI.IntegrationTests/   Testcontainers + PostgreSQL real
   Dockerfile
-web/
-  src/api/        cliente gerado (não editar à mão) e mock-types.ts (tipos provisórios dos endpoints ainda sem backend)
-  src/mocks/      dados simulados (MSW) com o conteúdo das telas aprovadas
-  src/components/ componentes do design system
-  src/features/   uma pasta por área (temas, envio, revisao, correcao, painel, perfil, checkout)
-  src/routes/
-  e2e/            Playwright
 docs/
 docker-compose.yml
 ```
@@ -68,16 +60,9 @@ dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálo
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
-cd web && npm ci && npm run dev             # http://localhost:5173
-cd web && npm run dev:mock                   # front com dados simulados (MSW) e sessão simulada, sem backend nem Clerk
-cd web && npm run gen:api                   # regenera o cliente a partir do openapi.json
-cd web && npm test && npm run typecheck && npm run lint
-cd web && npx playwright test               # comportamento e regressão visual, sobre um build de teste com dados simulados (web/dist-e2e, http://localhost:4173)
-cd web && npm run e2e:design                # compara cada tela com docs/telas/png; resultado em web/design-diff/
-cd web && npx playwright test visual --update-snapshots   # aceita uma mudança visual intencional
 ```
 
-A configuração local vem do arquivo `.env` na raiz (copie de `.env.example`); o back-end e o Vite leem o mesmo arquivo.
+A configuração local vem do arquivo `.env` na raiz (copie de `.env.example`). Quando um endpoint muda, o `api/openapi.json` é regenerado no build e precisa ser levado ao repositório do front (`npm run sync:api` lá).
 
 Atualize esta seção sempre que um comando mudar.
 
@@ -110,17 +95,16 @@ Atualize esta seção sempre que um comando mudar.
 20. Logs sem conteúdo de redação, e-mail completo, tokens ou dados de cartão.
 21. Erros conhecidos como `AppError(code, httpStatus, userMessage, retryable)`; o front decide pelo `code`.
 
-**Front-end**
-22. Siga `docs/02-frontend.md` e os arquivos em `docs/telas/`. Copie os textos das telas; não reescreva.
-23. Nunca escreva tipos da API à mão: regenere o cliente quando o backend mudar.
-24. Sem bibliotecas de componentes prontas (MUI, Chakra etc.). Sem emojis, gradientes ou ícones de "IA".
+**Contrato com o front-end**
+22. O `api/openapi.json` é o contrato: o front gera os tipos a partir dele e nunca os escreve à mão. Mudou um endpoint, o arquivo regenerado entra no mesmo commit.
+23. O backend é a fonte da verdade: nota, saldo, prazos, status, preços e idade nunca são decididos pelo front.
 
 ## Como trabalhar
 
 - Siga as etapas de `docs/03-plano-de-implementacao.md`, uma por vez. Antes de codificar, apresente um plano curto e espere aprovação.
 - Commits pequenos e descritivos, em português, no imperativo ("Adiciona reserva de crédito no envio"). Uma branch por etapa ou funcionalidade; nunca faça commit direto na `master`.
 - Toda funcionalidade vem com testes. Regras de crédito, fila e status exigem teste de integração com PostgreSQL real, incluindo concorrência.
-- Antes de dar uma tarefa por concluída: `dotnet test`, `npm test`, `npm run typecheck`, `npm run lint` e, quando houver tela, Playwright. Relate o resultado real; não diga que passou sem rodar.
+- Antes de dar uma tarefa por concluída: `dotnet build` sem avisos e `dotnet test`. Relate o resultado real; não diga que passou sem rodar.
 - Ao fim de cada etapa, rode o subagente `security-reviewer` e corrija os achados altos e críticos.
 - Use só chaves de teste (Mercado Pago sandbox, Clerk de desenvolvimento). Nunca faça deploy em produção nem rode comandos contra bancos remotos.
 - Não adicione dependência nova sem dizer por quê. Prefira a biblioteca padrão.
