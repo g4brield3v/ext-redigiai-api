@@ -8,7 +8,7 @@ O MVP do RedigiAI corrige redações manuscritas da Fuvest com IA: o aluno escol
 
 **Escopo do MVP**
 
-- Vestibular: somente Fuvest, com a grade de 4 critérios (níveis 1 a 3, pesos 3, 2, 3 e 2, máximo de 30 pontos).
+- Vestibular: somente Fuvest, com a grade de 4 critérios (níveis de 1 a `max_level`, pesos 3, 2, 3 e 2; na grade publicada, 4 níveis e máximo de 40 pontos).
 - Entrada: somente foto JPG da folha, até 10 MB, uma face por redação. Envio em lote permitido.
 - Fluxo: seleção (vestibular → tema → leitura da proposta e da coletânea, em página própria → tipo) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
 - Cobrança: 1 correção grátis por conta, plano semanal no cartão e correção avulsa por Pix ou cartão.
@@ -65,7 +65,7 @@ Cada regra abaixo é requisito de backend e frontend; o backend é a fonte da ve
 **Correção e nota**
 
 10. Antes dos critérios, a IA verifica as hipóteses de nota zero: tema não desenvolvido, tipo não atendido, cópia integral da coletânea ou identificação do candidato. Se alguma se aplica, a nota é 0 e os critérios não são pontuados.
-11. A IA devolve só o nível (1 a 3), a justificativa e as linhas de cada critério. O backend calcula a nota: soma de nível × peso. Sem conversão de escala.
+11. A IA devolve só o nível (1 a `max_level` da grade), a justificativa e as linhas de cada critério. O backend calcula a nota: soma de nível × peso. Sem conversão de escala.
 12. Toda orientação é uma afirmação sobre o que corrigir, com as linhas; nunca uma pergunta. Erros de escrita são agrupados pela regra.
 13. A grade é dado versionado no banco. Versão publicada nunca é editada; cada correção guarda a versão usada.
 14. Ao fim da correção, o aluno pode avaliar se ela ajudou (3 opções) e deixar um comentário.
@@ -127,8 +127,8 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | Tabela | Campos principais | Regras |
 |---|---|---|
 | `exams` | id, slug (`fuvest`), name, status (`active`, `coming_soon`), sheet_lines (30) | Vestibular. |
-| `rubric_versions` | id, exam_id, version, published_at, max_score, zero_rules (jsonb) | Imutável depois de publicada. |
-| `rubric_criteria` | id, rubric_version_id, position (1–4), name, weight, level_descriptors (jsonb: 1, 2, 3) | Peso e descritores oficiais por nível. |
+| `rubric_versions` | id, exam_id, version, published_at, max_level, max_score, source, zero_rules (jsonb) | Imutável depois de publicada. |
+| `rubric_criteria` | id, rubric_version_id, position (1–4), name, weight, level_descriptors (jsonb: um por nível, de 1 a `max_level`) | Peso e descritores oficiais por nível. |
 | `themes` | id, exam_id, title, statement (texto do enunciado), status, published_at | Tema da proposta. Sem ano no título. |
 | `theme_texts` | id, theme_id, position, kind (`text`, `image`), title, source, body, image_asset_id | Coletânea. |
 | `essay_types` | id, exam_id, slug (`dissertacao`, `narrativa`), name, description | Tipos do vestibular. |
@@ -305,7 +305,7 @@ Ele resolve três requisitos de uma vez:
 
 **Como funciona tecnicamente**
 
-- Tabela `grading_profiles`: `id`, `exam_id`, `essay_type_id`, `version`, `status` (`draft`, `active`, `retired`), `prompt_template_version_id`, `rubric_version_id`, `guidelines_version_id`, `writing_rules_version_id`, `anchor_set_id` (pode ser nulo), `transcription_model`, `grading_model`, `created_at`, `activated_at`.
+- Tabela `grading_profiles`: `id`, `exam_id`, `essay_type_id`, `version`, `status` (`draft`, `active`, `retired`), `transcription_prompt_version_id`, `grading_prompt_version_id`, `rubric_version_id`, `guidelines_version_id`, `writing_rules_version_id`, `anchor_set_id` (pode ser nulo), `transcription_model`, `grading_model`, `created_at`, `activated_at`.
 - Índice único parcial em (`exam_id`, `essay_type_id`) onde `status = 'active'`: o banco impede dois perfis ativos para o mesmo vestibular e tipo.
 - O perfil só guarda referências. O conteúdo fica nas tabelas de cada camada, que nunca são alteradas depois de criadas; editar é inserir uma versão nova.
 - No início do job de correção, o worker lê o perfil ativo do tipo da redação, grava o `grading_profile_id` na correção e monta a chamada só com as versões apontadas. Uma nova tentativa da mesma redação usa o mesmo perfil.
@@ -366,7 +366,7 @@ O tema não faz parte do perfil: tem versão própria, porque muda a cada tema n
 **Validação no backend** (falha → nova tentativa; repetida → GRADING_FAILED)
 
 1. JSON válido contra o schema.
-2. Exatamente um item por critério da versão; `level` inteiro de 1 a 3.
+2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão.
 3. Linhas e posições citadas existem na transcrição.
 4. Nenhuma orientação ou próximo passo termina com ponto de interrogação.
 5. No máximo 3 próximos passos.
@@ -548,7 +548,7 @@ A entrega segue o caminho do aluno, em cinco etapas; cada uma termina com algo t
 **Pontos em aberto**
 
 - [x] Retenção da foto: apagada 90 dias após a correção, mantendo a transcrição. Confirmado.
-- [ ] Grade: editável no banco. Cada alteração gera uma nova versão; correções antigas continuam ligadas à versão com que foram feitas. A versão 1 usa os critérios do Simulado Fuvest 2025.
+- [ ] Grade: editável no banco. Cada alteração gera uma nova versão; correções antigas continuam ligadas à versão com que foram feitas. A versão 1 usa os critérios do Simulado Fuvest 2027, 2ª edição (4 níveis, máximo 40).
 - [ ] Conjunto de referência: quem fornece as redações já avaliadas por professor e qual diferença de nível por critério é aceitável.
 - [ ] Termos de Uso e Política de Privacidade: minutas no documento de estrutura jurídica, em revisão. Decidido: idade mínima de 16 anos pela data de nascimento, sem conta de responsável; compras de 16 e 17 anos com autorização do responsável; reembolso de correções não usadas em 7 dias (CDC, art. 49).
 - [ ] Taxas do Mercado Pago para Pix e cartão confirmadas na contratação.
