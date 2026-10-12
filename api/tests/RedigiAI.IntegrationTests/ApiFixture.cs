@@ -75,7 +75,11 @@ public sealed class ApiFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
-    public WebApplicationFactory<Program> CreateFactory(Action<IWebHostBuilder>? configure = null) =>
+    /// <param name="examplePrompt">
+    /// Os testes usam a proposta de exemplo da carga inicial, que fora deles só existe em Development. Com
+    /// <c>false</c>, vale o que o programa decide pelo ambiente.
+    /// </param>
+    public WebApplicationFactory<Program> CreateFactory(Action<IWebHostBuilder>? configure = null, bool examplePrompt = true) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -98,6 +102,11 @@ public sealed class ApiFixture : IAsyncLifetime
 
             builder.ConfigureTestServices(services =>
             {
+                if (examplePrompt)
+                {
+                    services.Configure<SeedOptions>(seed => seed.ExamplePrompt = true);
+                }
+
                 services.AddSingleton<IPhotoStorage>(Photos);
                 services.AddSingleton<IEssayTranscriber>(Transcriber);
                 services.AddSingleton<IEssayGrader>(Grader);

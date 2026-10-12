@@ -29,6 +29,7 @@ internal static class WorkerHost
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure();
         builder.Services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
+        builder.Services.Configure<SeedOptions>(seed => seed.ExamplePrompt = builder.Environment.IsDevelopment());
         builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.

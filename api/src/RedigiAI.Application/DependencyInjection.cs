@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IPromptAdminService, PromptAdminService>();
+        services.AddOptions<SeedOptions>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
         services.AddScoped<GradingSeedService>();
         services.AddScoped<IUploadService, UploadService>();

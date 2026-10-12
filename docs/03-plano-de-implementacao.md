@@ -24,7 +24,7 @@ Especificação: seções 2, 5, 6 (Conta e Catálogo), 11, 12, 13 e 15.
 - `AppError` + middleware de erros no formato `{code, message, retryable, traceId}`; logs JSON com `traceId`; `/health` e `/ready`.
 - `GET/POST/PATCH /v1/me` com data de nascimento, recusa de menores de 16, aceite de termos e concessão única do crédito grátis (o ledger completo entra na etapa 4; aqui basta o bucket `trial` com o lançamento no ledger).
 - Endpoints de catálogo; `openapi.json` publicado em build.
-- Script de seed: Fuvest, grade v1 do Simulado Fuvest 2027, 2ª edição (4 critérios, pesos 3, 2, 3, 2, níveis de 1 a `max_level` = 4, máximo 40, hipóteses de nota zero), tipos Dissertação e Narrativa, 1 tema de exemplo.
+- Script de seed: Fuvest, grade v1 do Simulado Fuvest 2027, 2ª edição (4 critérios, pesos 3, 2, 3, 2, níveis de 1 a `max_level` = 4, máximo 40, hipóteses de nota zero), tipos Dissertação e Narrativa. Só no ambiente Development entra também 1 proposta de exemplo; em staging e produção as propostas vêm do admin.
 - Limites de requisição, CORS restrito, cabeçalhos de segurança.
 
 **Front-end**

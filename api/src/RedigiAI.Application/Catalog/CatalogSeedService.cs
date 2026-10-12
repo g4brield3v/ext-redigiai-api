@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Grading;
 using RedigiAI.Domain.Catalog;
@@ -6,13 +7,23 @@ namespace RedigiAI.Application.Catalog;
 
 /// <summary>
 /// Carga inicial do catálogo e da base de conhecimento da correção. As propostas de redação são cadastradas pela
-/// área de administração; aqui entra só uma proposta de exemplo, em banco novo.
+/// área de administração; só em desenvolvimento entra uma proposta de exemplo, em banco novo.
 /// </summary>
 public interface ICatalogSeedService
 {
     /// <summary>Idempotente: só cria o que ainda não existe.</summary>
     /// <returns><c>true</c> se algo foi criado agora.</returns>
     Task<bool> SeedAsync(CancellationToken ct);
+}
+
+/// <summary>O que a carga inicial cria além do vestibular, da grade e dos perfis de correção.</summary>
+public sealed class SeedOptions
+{
+    /// <summary>
+    /// Cria a proposta de exemplo, com textos entre colchetes. Quem liga é o programa, e só no ambiente
+    /// <c>Development</c>: não é lido de configuração. Em staging e produção as propostas vêm só do admin.
+    /// </summary>
+    public bool ExamplePrompt { get; set; }
 }
 
 internal sealed class CatalogSeedService(
@@ -22,6 +33,7 @@ internal sealed class CatalogSeedService(
     IPromptRepository prompts,
     GradingSeedService grading,
     IUnitOfWork unitOfWork,
+    IOptions<SeedOptions> options,
     TimeProvider time) : ICatalogSeedService
 {
     public async Task<bool> SeedAsync(CancellationToken ct)
@@ -40,7 +52,7 @@ internal sealed class CatalogSeedService(
         }
 
         // Depois da base de conhecimento: a proposta só é publicada com perfil de correção ativo.
-        var promptCreated = await EnsureExamplePromptAsync(ct);
+        var promptCreated = options.Value.ExamplePrompt && await EnsureExamplePromptAsync(ct);
         if (promptCreated)
         {
             await unitOfWork.SaveChangesAsync(ct);
@@ -74,7 +86,7 @@ internal sealed class CatalogSeedService(
         return true;
     }
 
-    /// <summary>Uma proposta publicada de exemplo, só quando o vestibular ainda não tem nenhuma.</summary>
+    /// <summary>Uma proposta publicada de exemplo, só em desenvolvimento e quando o vestibular ainda não tem nenhuma.</summary>
     private async Task<bool> EnsureExamplePromptAsync(CancellationToken ct)
     {
         if (await exams.FindBySlugAsync("fuvest", ct) is not { } fuvest

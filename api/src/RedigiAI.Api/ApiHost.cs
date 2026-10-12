@@ -10,6 +10,7 @@ using Microsoft.OpenApi;
 using RedigiAI.Api.Http;
 using RedigiAI.Application;
 using RedigiAI.Application.Accounts;
+using RedigiAI.Application.Catalog;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
 using RedigiAI.Application.Essays;
@@ -34,6 +35,7 @@ internal static class ApiHost
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.Section));
+        services.Configure<SeedOptions>(seed => seed.ExamplePrompt = builder.Environment.IsDevelopment());
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.
