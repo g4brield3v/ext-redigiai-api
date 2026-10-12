@@ -1,0 +1,134 @@
+{
+  "exam": "fuvest",
+  "slug": "papel-da-ciencia",
+  "title": "O papel da ciência no mundo contemporâneo",
+  "summary": "Coletânea com tirinha, poema e três textos em prosa.",
+  "sourceLabel": "Fuvest (prova anterior)",
+  "essayType": "dissertacao",
+  "genreLabel": "Dissertação em prosa",
+  "sheet": { "minLines": 20, "maxLines": 30, "titleRequired": true },
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "image",
+        "assetId": "<assetId da tirinha>",
+        "alt": "Tirinha em três quadros com duas cobras numa ladeira e uma roda que desce e atropela uma delas.",
+        "aiDescription": "Tirinha em três quadros, com o título \"A História do Mundo – XI\". Quadro 1: duas cobras numa ladeira; uma desce deslizando e a outra, parada mais abaixo, pergunta: \"Não foi você que inventou a roda?\". Quadro 2: a cobra que desce responde: \"Foi\"; atrás dela, uma roda grande rola ladeira abaixo. Quadro 3: a roda passou por cima da cobra, que aparece achatada no chão e diz: \"Mas já me arrependi\"; a outra cobra observa.",
+        "source": "Luis Fernando Verissimo, *As cobras: Antologia Definitiva*."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "prose",
+        "body": "Somente numa sociedade onde exista um clima cultural, em que o impulso à curiosidade e o amor à descoberta sejam compreendidos e cultivados, pode a ciência florescer. Somente quando a ciência se torna profundamente enraizada como um elemento cultural da sociedade é que pode ser mantida e desenvolvida uma tecnologia progressista e inovadora, tornando-se, então, possível uma associação íntima e vital entre ciência e tecnologia. Essa associação é uma característica da nossa época e certamente essencial para a manutenção de uma civilização com os níveis presentes de população e qualidade de vida.",
+        "source": "Oscar Sala, *O papel da ciência na sociedade*. 1974. Disponível em http://www.revistas.usp.br/revhistoria. Adaptado."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "verse",
+        "columns": [
+          [
+            "Quanta do latim",
+            "Plural de quantum",
+            "Quando quase não há",
+            "Quantidade que se medir",
+            "Qualidade que se expressar",
+            "Fragmento infinitésimo",
+            "Quase que apenas mental",
+            "Quantum granulado no mel",
+            "Quantum ondulado no sal",
+            "Mel de urânio, sal de rádio",
+            "Qualquer coisa quase ideal"
+          ],
+          [
+            "Cântico dos cânticos",
+            "Quântico dos quânticos",
+            "Canto de louvor",
+            "De amor ao vento",
+            "Vento arte do ar",
+            "Balançando o corpo da flor",
+            "Levando o veleiro pro mar",
+            "Vento de calor",
+            "De pensamento em chamas",
+            "Inspiração",
+            "Arte de criar o saber"
+          ],
+          [
+            "Arte, descoberta, invenção",
+            "Teoria em grego quer dizer",
+            "O ser em contemplação",
+            "Sei que a arte é irmã da ciência",
+            "Ambas filhas de um Deus fugaz",
+            "Que faz num momento",
+            "E no mesmo momento desfaz",
+            "Esse vago Deus por trás do mundo",
+            "Por detrás do detrás",
+            "Cântico dos cânticos",
+            "Quântico dos quânticos"
+          ]
+        ],
+        "source": "Gilberto Gil, *Quanta*. 1997."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "prose",
+        "body": "Nós criamos uma civilização global em que os elementos mais cruciais – o transporte, as comunicações e todas as outras indústrias, a agricultura, a medicina, a educação, o entretenimento, a proteção ao meio ambiente e até a importante instituição democrática do voto – dependem profundamente da ciência e da tecnologia. Também criamos uma ordem em que quase ninguém compreende a ciência e a tecnologia. É uma receita para o desastre. Podemos escapar ilesos por algum tempo, porém mais cedo ou mais tarde essa mistura inflamável de ignorância e poder vai explodir na nossa cara.",
+        "source": "Carl Sagan, 1996."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "prose",
+        "body": "Algo muito estranho está acontecendo no mundo atual. Vivemos melhor que qualquer outra geração anterior. Pessoas são saudáveis graças às ciências da saúde. Moram em residências robustas, produto da engenharia. Usam eletricidade, domada pelo homem devido ao seu conhecimento de química e física. Paradoxalmente, essas mesmas pessoas ligam seus computadores, tablets e celulares para adquirir e disseminar informações que rejeitam a mesma ciência que é tão presente em suas vidas. Vivemos num mundo em que pessoas usam a ciência para negar a ciência.",
+        "source": "Alicia Kowaltowski, *Usando a ciência para negar a ciência*. 2019. Disponível em https://www.nexojornal.com.br/. Adaptado."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **o papel da ciência no mundo contemporâneo**."
+      }
+    },
+    {
+      "position": 70,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível e não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista sobre a função da ciência hoje: o paradoxo entre a dependência da sociedade em relação à ciência e a desconfiança ou ignorância sobre ela (textos 4 e 5), a ciência como parte da cultura (texto 2) e a aproximação entre ciência e arte (texto 3).",
+    "tangentSignals": "Fala de tecnologia ou de inovação em geral sem discutir o papel da ciência; trata só da história da ciência; lista avanços científicos sem posicionamento sobre o mundo contemporâneo.",
+    "offTopicSignals": "Não menciona ciência nem conhecimento científico.",
+    "keyData": [
+      "Texto 2: a ciência só floresce numa cultura que valoriza a curiosidade; ciência e tecnologia são associadas.",
+      "Texto 4: a sociedade depende da ciência, mas quase ninguém a compreende.",
+      "Texto 5: pessoas usam a ciência para negar a ciência.",
+      "Texto 3: arte e ciência como formas irmãs de conhecimento."
+    ]
+  }
+}
