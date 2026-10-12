@@ -20,8 +20,9 @@ internal sealed class AdminOnlyAttribute : Attribute, IAsyncAuthorizationFilter
     {
         var http = context.HttpContext;
         var access = http.RequestServices.GetRequiredService<IAdminAccessService>();
+        var identity = http.User.GetClerkIdentity();
         http.Items[AdminIdItem] = await access.RequireAdminAsync(
-            http.User.GetClerkIdentity().UserId, http.User.HasSecondFactor(), http.RequestAborted);
+            identity.UserId, identity.SessionId, http.User.HasSecondFactor(), http.RequestAborted);
     }
 
     /// <summary>O administrador que passou pela conferência desta requisição.</summary>

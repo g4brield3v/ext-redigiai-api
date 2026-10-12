@@ -21,7 +21,7 @@ internal sealed class AccountService(
         var existing = await users.FindByClerkIdAsync(command.ClerkUserId, ct);
         if (existing is not null)
         {
-            await SyncRoleAsync(existing, command.Origin.SessionId, ct);
+            await adminRole.EnsureCheckedAsync(existing, command.Origin.SessionId, ct);
             return new RegisterUserResult(await ReadProfileAsync(existing, ct), Created: false);
         }
 
@@ -38,7 +38,9 @@ internal sealed class AccountService(
         var now = time.GetUtcNow();
         var user = User.Register(
             command.ClerkUserId, command.Email, command.Name, birthDate, legal.Value.TermsVersion, now);
-        user.ConfirmRole(await adminRole.ResolveAsync(user, ct), command.Origin.SessionId);
+        // Sem resposta do provedor, a conta nasce como aluno e o papel é conferido de novo no próximo acesso.
+        var role = await adminRole.ResolveAsync(user, ct);
+        user.ConfirmRole(role ?? UserRole.Student, role is null ? null : command.Origin.SessionId);
         var bucket = CreditBucket.GrantTrial(user.Id, now);
 
         users.Add(user);
@@ -72,7 +74,7 @@ internal sealed class AccountService(
 
         await users.TouchAsync(user.Id, time.GetUtcNow(), ct);
         await accessLog.RecordSessionOnceAsync(user.Id, origin, ct);
-        await SyncRoleAsync(user, origin.SessionId, ct);
+        await adminRole.EnsureCheckedAsync(user, origin.SessionId, ct);
 
         return await ReadProfileAsync(user, ct);
     }
@@ -112,25 +114,6 @@ internal sealed class AccountService(
         if (!adminRole.IsListed(email) && user.ConfirmRole(UserRole.Student, sessionId: null))
         {
             audit.Record("clerk", "user.role_changed", "user", user.Id, new { role = "student" });
-        }
-
-        await unitOfWork.SaveChangesAsync(ct);
-    }
-
-    /// <summary>
-    /// Confere o papel uma vez por sessão de login. Só quem está na lista de administradores, ou ainda tem o papel
-    /// gravado, passa pela consulta: para os demais alunos nada é lido nem gravado.
-    /// </summary>
-    private async Task SyncRoleAsync(User user, string? sessionId, CancellationToken ct)
-    {
-        if ((user.Role != UserRole.Admin && !adminRole.IsListed(user.Email)) || !user.NeedsRoleCheck(sessionId))
-        {
-            return;
-        }
-
-        if (user.ConfirmRole(await adminRole.ResolveAsync(user, ct), sessionId))
-        {
-            audit.Record("system", "user.role_changed", "user", user.Id, new { role = user.Role == UserRole.Admin ? "admin" : "student" });
         }
 
         await unitOfWork.SaveChangesAsync(ct);

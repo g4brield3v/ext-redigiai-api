@@ -208,9 +208,17 @@ public sealed class FakeIdentityDirectory : IIdentityDirectory
 
     public ConcurrentQueue<string> Lookups { get; } = new();
 
+    /// <summary>Contas para as quais o provedor não responde agora (fora do ar, limite de chamadas).</summary>
+    public ConcurrentDictionary<string, bool> Unavailable { get; } = new();
+
     public Task<PrimaryEmail?> FindPrimaryEmailAsync(string clerkUserId, CancellationToken ct)
     {
         Lookups.Enqueue(clerkUserId);
+        if (Unavailable.ContainsKey(clerkUserId))
+        {
+            throw new IdentityDirectoryUnavailableException("test");
+        }
+
         return Task.FromResult(Accounts.TryGetValue(clerkUserId, out var email) ? email : null);
     }
 }

@@ -1,6 +1,6 @@
 # RedigiAI · back-end
 
-SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestibular → tema → tipo, envia a foto da folha e recebe na plataforma a nota de cada critério, com as linhas que pesaram e o que corrigir. Domínio: redigiai.com.br. Público: estudantes a partir de 16 anos.
+SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestibular → proposta de redação, envia a foto da folha e recebe na plataforma a nota de cada critério, com as linhas que pesaram e o que corrigir. Domínio: redigiai.com.br. Público: estudantes a partir de 16 anos.
 
 Este repositório tem a API, o worker e a especificação do produto. O front-end fica em outro repositório (`ext-redigiai-front`), que consome o contrato publicado em `api/openapi.json`.
 
@@ -41,7 +41,7 @@ docker-compose.yml
 
 Monólito modular em camadas: `Api → Application → Domain` e `Infrastructure → Application/Domain`. O Domain não referencia nenhum outro projeto nem pacote de infraestrutura.
 
-- **Contextos delimitados**, uma pasta por contexto em cada camada: `Catalog` (vestibular, tema, grade), `Accounts` (usuário, aceite, idade), `Essays` (envio, transcrição, revisão), `Grading` (correção, perfil de correção), `Billing` (créditos, pagamentos, assinatura), `Notifications` (e-mails).
+- **Contextos delimitados**, uma pasta por contexto em cada camada: `Catalog` (vestibular, proposta de redação, grade), `Accounts` (usuário, aceite, idade), `Essays` (envio, transcrição, revisão), `Grading` (correção, perfil de correção), `Billing` (créditos, pagamentos, assinatura), `Notifications` (e-mails).
 - **Agregados** guardam as invariantes e expõem as transições como métodos (`Essay.MarkQueued()`); nada de setters públicos. Um agregado referencia outro só pelo id.
 - **Objetos de valor** para conceitos com regra própria: `EssayTitle`, `Score`, `Level`, `BirthDate`, `Money`, `EssayStatus`.
 - **Fluxo de uma requisição:** controller → serviço de aplicação → domínio → repositório. O controller só traduz HTTP (token, cabeçalhos, corpo, código de resposta) e chama **um** serviço; nunca usa `AppDbContext`, repositório nem classe do Infrastructure.

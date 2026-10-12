@@ -5,6 +5,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using RedigiAI.Domain.Grading;
 using Microsoft.EntityFrameworkCore;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Catalog;
@@ -64,6 +67,89 @@ public class AdminPromptTests(ApiFixture api)
 
         var error = await AccountTests.AssertErrorAsync(response, HttpStatusCode.Forbidden, "ADMIN_2FA_REQUIRED");
         Assert.Equal("Ative a verificação em duas etapas para acessar a administração.", error.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public void Every_admin_route_is_guarded_by_the_admin_check()
+    {
+        // Uma rota nova em /v1/admin sem a conferência ficaria aberta a qualquer aluno logado.
+        var routes = api.Factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText!.TrimStart('/').StartsWith("v1/admin", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Assert.Equal(11, routes.Count);
+        Assert.All(routes, route => Assert.Contains(route.Metadata, item => item.GetType().Name == "AdminOnlyAttribute"));
+        Assert.All(routes, route => Assert.NotEmpty(route.Metadata.OfType<Microsoft.AspNetCore.Authorization.IAuthorizeData>()));
+    }
+
+    [Fact]
+    public async Task Admin_routes_have_their_own_request_limit()
+    {
+        var userId = await RegisterAdminAsync();
+        await using var factory = api.CreateFactory(builder => builder.UseSetting("RateLimit:AdminPerUserPerMinute", "3"));
+        var admin = ApiFixture.CreateClient(factory, api.CreateToken(userId, email: ApiFixture.AdminEmail, secondFactor: true));
+
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++)
+        {
+            statuses.Add((await admin.GetAsync("/v1/admin/prompts")).StatusCode);
+        }
+
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.TooManyRequests], statuses);
+        // O limite da administração não gasta o das outras rotas.
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/v1/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Category_without_an_active_grading_profile_blocks_publication()
+    {
+        var admin = await AdminAsync();
+        var document = ScienceDocument(NewSlug(), (await UploadAsync(admin, Png, "tirinha.png")).GetProperty("assetId").GetGuid());
+        document["essayType"] = "narrativa";
+        var narrativa = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "narrativa").Select(t => t.Id).SingleAsync());
+        var profile = await api.QueryAsync(db => db.GradingProfiles
+            .Where(p => p.EssayTypeId == narrativa && p.Status == GradingProfileStatus.Active).Select(p => p.Id).SingleAsync());
+
+        // Com perfil ativo, a narrativa publica; sem ele, vira pendência.
+        var withProfile = await admin.SendAsync(Create(document.DeepClone(), Guid.NewGuid().ToString()));
+        Assert.Empty((await withProfile.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("issues").EnumerateArray());
+        try
+        {
+            await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == profile)
+                .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Retired)));
+            document["slug"] = NewSlug();
+
+            var id = await CreateAsync(admin, document);
+
+            var validation = await (await admin.PostAsync($"/v1/admin/prompts/{id}/validate", null)).Content.ReadFromJsonAsync<JsonElement>();
+            Assert.False(validation.GetProperty("valid").GetBoolean());
+            Assert.Equal(["essayType"], Paths(validation.GetProperty("issues")));
+            Assert.Equal(["essayType"], Paths(await AssertValidationFailedAsync(await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null))));
+        }
+        finally
+        {
+            await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == profile)
+                .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Active)));
+        }
+    }
+
+    [Fact]
+    public async Task Reordering_and_uploading_go_to_the_audit_log_too()
+    {
+        var admin = await AdminAsync();
+        var image = (await UploadAsync(admin, Png, "tirinha.png")).GetProperty("assetId").GetGuid();
+        var id = await CreateAsync(admin, ScienceDocument(NewSlug(), image));
+        var blocks = (await admin.GetFromJsonAsync<JsonElement>($"/v1/admin/prompts/{id}")).GetProperty("blocks").EnumerateArray()
+            .Select((block, index) => new { id = block.GetProperty("id").GetGuid(), position = (7 - index) * 10 }).ToArray();
+
+        (await admin.PatchAsJsonAsync($"/v1/admin/prompts/{id}/order", new { blocks })).EnsureSuccessStatusCode();
+
+        var entries = await api.QueryAsync(db => db.AuditLog
+            .Where(a => a.EntityId == id || a.EntityId == image).Select(a => new { a.Action, a.Entity, a.Actor }).ToListAsync());
+        Assert.Equal(["asset.uploaded", "prompt.created", "prompt.reordered"], entries.Select(e => e.Action).Order());
+        Assert.Single(entries.Select(e => e.Actor).Distinct());
+        Assert.StartsWith("user:", entries[0].Actor);
     }
 
     [Fact]

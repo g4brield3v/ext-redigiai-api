@@ -53,13 +53,54 @@ public class AdminRoleTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task Listed_email_stays_student_when_the_provider_does_not_answer()
+    public async Task Listed_email_stays_student_when_the_provider_does_not_know_the_account()
     {
         var userId = ApiFixture.NewClerkUserId();
 
         var profile = await RegisterAsync(userId, ApiFixture.AdminEmail);
 
         Assert.Equal("student", profile.GetProperty("role").GetString());
+    }
+
+    [Fact]
+    public async Task Provider_out_of_reach_changes_no_role_and_opens_no_door()
+    {
+        // No primeiro acesso, sem resposta do provedor: nasce aluno, e o papel é conferido de novo depois.
+        var newcomer = Account(ApiFixture.AdminEmail, verified: true);
+        api.Directory.Unavailable[newcomer] = true;
+        Assert.Equal("student", (await RegisterAsync(newcomer, ApiFixture.AdminEmail, sessionId: "sess_down")).GetProperty("role").GetString());
+        api.Directory.Unavailable.TryRemove(newcomer, out _);
+        Assert.Equal("admin", await RoleInProfileAsync(api.Factory, newcomer, "sess_down"));
+
+        // Quem já é administrador não é rebaixado por uma falha do provedor, mas a sessão nova não entra na
+        // administração enquanto o papel não for conferido.
+        api.Directory.Unavailable[newcomer] = true;
+        Assert.Equal("admin", await RoleInProfileAsync(api.Factory, newcomer, "sess_new"));
+        Assert.DoesNotContain("user.role_changed:student", await RoleChangesAsync(newcomer));
+        var newSession = api.CreateClient(api.CreateToken(newcomer, email: ApiFixture.AdminEmail, sessionId: "sess_new", secondFactor: true));
+        await AccountTests.AssertErrorAsync(await newSession.GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
+
+        api.Directory.Unavailable.TryRemove(newcomer, out _);
+        Assert.Equal(HttpStatusCode.OK, (await newSession.GetAsync("/v1/admin/prompts")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_routes_check_the_role_again_in_a_new_session_even_without_reading_the_profile()
+    {
+        var userId = Account(ApiFixture.AdminEmail, verified: true);
+        await RegisterAsync(userId, ApiFixture.AdminEmail, sessionId: "sess_first");
+        HttpClient Session(string id) =>
+            api.CreateClient(api.CreateToken(userId, email: ApiFixture.AdminEmail, sessionId: id, secondFactor: true));
+        Assert.Equal(HttpStatusCode.OK, (await Session("sess_first").GetAsync("/v1/admin/prompts")).StatusCode);
+
+        // O e-mail deixa de estar verificado no provedor e o aviso (webhook) não chega: a cópia local não muda.
+        api.Directory.Accounts[userId] = new PrimaryEmail(ApiFixture.AdminEmail, Verified: false);
+
+        // Uma sessão nova que vai direto às rotas de administração, sem passar por /v1/me, já não entra.
+        await AccountTests.AssertErrorAsync(await Session("sess_second").GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
+        Assert.Equal(UserRole.Student, await RoleOfAsync(userId));
+        // E a sessão antiga também perde o acesso, porque o papel gravado mudou.
+        await AccountTests.AssertErrorAsync(await Session("sess_first").GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
     }
 
     [Fact]
@@ -179,6 +220,13 @@ public class AdminRoleTests(ApiFixture api)
     private Task<UserRole> RoleOfAsync(string userId) =>
         api.QueryAsync(db => db.Users.Where(u => u.ClerkUserId == userId).Select(u => u.Role).SingleAsync());
 
+    private async Task<List<string>> RoleChangesAsync(string userId) =>
+        [.. (await api.QueryAsync(db => db.AuditLog
+                .Where(a => a.Action == "user.role_changed" && db.Users.Any(u => u.Id == a.EntityId && u.ClerkUserId == userId))
+                .Select(a => a.Data)
+                .ToListAsync()))
+            .Select(data => $"user.role_changed:{JsonDocument.Parse(data!).RootElement.GetProperty("role").GetString()}")];
+
     private Task<List<string>> AuditActionsAsync(string userId) =>
         api.QueryAsync(db => db.AuditLog
             .Where(a => db.Users.Any(u => u.Id == a.EntityId && u.ClerkUserId == userId))
@@ -189,7 +237,7 @@ public class AdminRoleTests(ApiFixture api)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<IAdminAccessService>()
-            .RequireAdminAsync(userId, hasSecondFactor, CancellationToken.None);
+            .RequireAdminAsync(userId, sessionId: null, hasSecondFactor, CancellationToken.None);
     }
 
     private static async Task AssertRefusedAsync(

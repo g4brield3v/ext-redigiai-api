@@ -38,6 +38,9 @@ public sealed record PromptBlockData
 {
     public static PromptBlockData None { get; } = new();
 
+    /// <summary>Título da seção de instruções quando o cadastro não informa outro.</summary>
+    public const string DefaultInstructionsTitle = "Instruções";
+
     /// <summary>Rótulo do texto da coletânea ("Texto 1").</summary>
     public string? Label { get; init; }
 
@@ -93,7 +96,7 @@ public sealed record PromptBlockData
         PromptBlockKind.Command or PromptBlockKind.Paragraph => new PromptBlockData { Body = Clean(data.Body) },
         PromptBlockKind.Instructions => new PromptBlockData
         {
-            Title = Clean(data.Title),
+            Title = Clean(data.Title) ?? DefaultInstructionsTitle,
             Items = [.. (data.Items ?? []).Select(Clean).OfType<string>()],
         },
         PromptBlockKind.Heading => new PromptBlockData { Text = Clean(data.Text) },

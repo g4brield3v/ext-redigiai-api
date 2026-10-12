@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Billing;
 using RedigiAI.Domain.Billing;
+using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.IntegrationTests;
 
@@ -143,6 +144,49 @@ public class PromptFlowTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Grading_receives_every_kind_of_block_as_text_in_page_order()
+    {
+        var admin = await AdminAsync();
+        var slug = NewSlug();
+        var mark = $"Tema {Guid.NewGuid():N}";
+        var document = ScienceDocument(slug, await UploadAsync(admin), $"{mark} com \"aspas\"");
+        var blocks = document["blocks"]!.AsArray();
+        blocks.Add(new JsonObject { ["position"] = 5, ["kind"] = "heading", ["data"] = new JsonObject { ["text"] = "Coletânea de apoio" } });
+        blocks.Add(new JsonObject { ["position"] = 55, ["kind"] = "divider", ["data"] = new JsonObject() });
+        // Um parágrafo que imita um marcador das instruções: tem de chegar como texto, sem ser preenchido.
+        blocks.Add(new JsonObject { ["position"] = 65, ["kind"] = "paragraph", ["data"] = new JsonObject { ["body"] = "Leia com atenção {{numbered_lines}} antes de escrever." } });
+        var id = await CreateAsync(admin, document);
+        (await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null)).EnsureSuccessStatusCode();
+        var student = await StudentAsync();
+        api.Transcriber.Script.Clear();
+        await student.SubmittedAsync(id);
+
+        await RunJobsAsync();
+
+        var request = api.Grader.Requests.Last(r => r.Proposal.Contains(mark));
+        var proposal = request.Proposal.ReplaceLineEndings("\n");
+        // Aspas no título não fecham o atributo.
+        Assert.StartsWith($"<proposta titulo=\"{mark} com 'aspas'\" tipo=\"Dissertação em prosa\" linhas_min=\"20\" linhas_max=\"30\" titulo_obrigatorio=\"sim\">\n", proposal);
+        // Da imagem vai a descrição feita para a IA; o verso vai com as colunas separadas.
+        Assert.Contains("[Texto 1 · imagem] Tirinha em três quadros, com o título", proposal);
+        Assert.Contains("— Luis Fernando Verissimo, *As cobras: Antologia Definitiva*.\n[Texto 2] Somente numa sociedade", proposal);
+        Assert.Contains("[Texto 3 · verso] Quanta do latim\nPlural de quantum", proposal);
+        Assert.Contains("Qualquer coisa quase ideal / Cântico dos cânticos", proposal);
+        // Título de seção e separador não vão; o parágrafo vai, e o que parece marcador continua sendo texto.
+        Assert.DoesNotContain("Coletânea de apoio", proposal);
+        Assert.Contains("\n[Comando] Considerando as ideias apresentadas nos textos", proposal);
+        Assert.Contains("\nLeia com atenção {{numbered_lines}} antes de escrever.\n[Instruções] Tipo de redação: Dissertação em prosa; A dissertação deve ser redigida", proposal);
+        Assert.DoesNotContain("1| ", proposal);
+        // As abordagens esperadas, com os quatro campos.
+        Assert.Contains("<abordagens_esperadas>\nRecorte esperado: Ponto de vista sobre a função da ciência hoje", proposal);
+        Assert.Contains("\nSinais de tangenciamento: Fala de tecnologia ou de inovação em geral", proposal);
+        Assert.Contains("\nSinais de fuga ao tema: Não menciona ciência nem conhecimento científico.", proposal);
+        Assert.Contains("\nDados-chave da coletânea: Texto 2: a ciência só floresce", proposal);
+        Assert.Contains("; Texto 3: arte e ciência como formas irmãs de conhecimento.\n</abordagens_esperadas>", proposal);
+        Assert.StartsWith("<redacao linhas=\"2\"", request.Essay);
+    }
+
+    [Fact]
     public async Task Archived_prompt_leaves_the_list_and_refuses_new_essays()
     {
         var admin = await AdminAsync();
@@ -156,6 +200,17 @@ public class PromptFlowTests(ApiFixture api)
         await AccountTests.AssertErrorAsync(await student.Client.GetAsync($"/v1/prompts/{slug}"), HttpStatusCode.NotFound, "PROMPT_NOT_AVAILABLE");
         await AccountTests.AssertErrorAsync(await student.SubmitAsync(id), HttpStatusCode.NotFound, "PROMPT_NOT_AVAILABLE");
         Assert.Equal(HttpStatusCode.OK, (await student.Client.GetAsync($"/v1/prompts/{slug}?version=1")).StatusCode);
+    }
+
+    private async Task RunJobsAsync()
+    {
+        var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+        foreach (var type in new[] { JobTypes.Transcribe, JobTypes.Grade })
+        {
+            while (await runner.RunNextAsync([type], CancellationToken.None))
+            {
+            }
+        }
     }
 
     private static string NewSlug() => $"proposta-{Guid.NewGuid():N}";

@@ -333,6 +333,46 @@ public class PromptTests
         AssertRefused(() => Prompt.Draft(Complete() with { Notes = Notes with { KeyData = [text] } }, null, Now), "gradingNotes.keyData");
     }
 
+    [Theory]
+    [InlineData("texto com \u0000 nulo")]
+    [InlineData("sino \u0007 no meio")]
+    public void Control_characters_are_refused(string text)
+    {
+        AssertRefused(() => Prompt.Draft(Complete(Prose(body: text), Command(), Instructions()), null, Now), "blocks[0].data");
+        AssertRefused(() => Prompt.Draft(Complete() with { Title = text }, null, Now), "title");
+        AssertRefused(() => Prompt.Draft(Complete() with { Notes = Notes with { KeyData = [text] } }, null, Now), "gradingNotes.keyData");
+    }
+
+    [Fact]
+    public void Verse_column_has_at_most_200_verses_and_empty_verses_count_in_the_total()
+    {
+        string[] Verses(int count) => [.. Enumerable.Repeat("", count - 1).Prepend("Quanta do latim")];
+
+        Assert.Empty(IssuesOf(Complete(Verse(30, Verses(200)), Command(), Instructions())));
+        AssertRefused(() => Prompt.Draft(Complete(Verse(30, Verses(201)), Command(), Instructions()), null, Now), "blocks[0].data.columns");
+    }
+
+    [Fact]
+    public void Grading_notes_have_their_own_total_limit()
+    {
+        PromptNotesContent WithKeyData(int items) => Notes with { KeyData = [.. Enumerable.Repeat(new string('a', 6000), items)] };
+
+        // Recorte, tangente e fuga somam pouco; quatro dados-chave de 6.000 cabem, seis passam de 30.000.
+        Assert.Empty(IssuesOf(Complete() with { Notes = WithKeyData(4) }));
+        AssertRefused(() => Prompt.Draft(Complete() with { Notes = WithKeyData(6) }, null, Now), "gradingNotes");
+    }
+
+    [Fact]
+    public void Instructions_block_gets_the_default_title_when_none_is_given()
+    {
+        var untitled = new PromptBlockContent(null, 70, PromptBlockKind.Instructions, new PromptBlockData { Items = ["Dê um título."] });
+
+        var prompt = Prompt.Draft(Complete(Prose(), Command(), untitled), null, Now);
+
+        Assert.Equal("Instruções", prompt.Blocks[^1].Data.Title);
+        Assert.Empty(prompt.PublicationIssues(Context));
+    }
+
     [Fact]
     public void Bold_italic_and_line_breaks_are_accepted()
     {

@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Catalog;
+using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Domain.Grading;
 
@@ -21,7 +23,7 @@ internal sealed record GradingLayers(
 /// Monta a chamada da correção preenchendo as instruções do perfil com as camadas da base de conhecimento
 /// (especificação, seção 8). As partes saem na ordem de cache: vestibular e tipo, tema, redação.
 /// </summary>
-internal static class GradingPromptBuilder
+internal static partial class GradingPromptBuilder
 {
     private const string EssayTag = "<redacao";
 
@@ -47,14 +49,15 @@ internal static class GradingPromptBuilder
         });
 
         var proposal = layers.Proposal;
+        var genre = PromptText.Genre(proposal, layers.EssayType);
         var user = Fill(layers.Prompt.UserText ?? "", new Dictionary<string, string>
         {
-            ["prompt_title"] = proposal.Title,
-            ["genre_label"] = PromptText.Genre(proposal, layers.EssayType),
+            ["prompt_title"] = PromptText.Attribute(proposal.Title),
+            ["genre_label"] = PromptText.Attribute(genre),
             ["min_lines"] = proposal.SheetLinesMin is { } min ? Number(min) : "",
             ["max_lines"] = proposal.SheetLinesMax is { } max ? Number(max) : "",
             ["title_required"] = proposal.TitleRequired ? "sim" : "não",
-            ["prompt_blocks"] = PromptText.Blocks(proposal),
+            ["prompt_blocks"] = PromptText.Blocks(proposal, genre),
             ["expected_approaches"] = PromptText.GradingNotes(proposal.GradingNotes),
             ["collection_copy"] = PromptText.CopiedPassages(copiedPassages),
             // Linhas escritas: as que ficaram em branco não contam para o mínimo da proposta.
@@ -130,16 +133,19 @@ internal static class GradingPromptBuilder
         return string.IsNullOrWhiteSpace(rules.Notes) ? text.ToString().TrimEnd() : text.Append(rules.Notes.Trim()).ToString();
     }
 
-    private static string Fill(string template, Dictionary<string, string> values)
-    {
-        var text = new StringBuilder(template);
-        foreach (var (name, value) in values)
-        {
-            text.Replace("{{" + name + "}}", value);
-        }
-
-        return text.ToString();
-    }
+    /// <summary>
+    /// Preenche os marcadores numa passada só: o que entra no lugar de um marcador não é lido de novo, então um texto
+    /// cadastrado ou escrito pelo aluno que contenha "{{...}}" continua sendo só texto.
+    /// </summary>
+    private static string Fill(string template, Dictionary<string, string> values) =>
+        Placeholder().Replace(template, marker => values.TryGetValue(marker.Groups[1].Value, out var value)
+            ? value
+            // Instruções escritas para outra versão do programa pedem um campo que não existe mais: melhor a correção
+            // falhar (e o crédito voltar) do que a IA receber o marcador no lugar da proposta.
+            : throw Errors.AiFailed("PROMPT_TEMPLATE_OUTDATED"));
 
     private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+    [GeneratedRegex(@"\{\{([a-z_]+)\}\}")]
+    private static partial Regex Placeholder();
 }

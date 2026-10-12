@@ -22,6 +22,7 @@ public static partial class PromptRules
     public const int MinGenreLength = 3;
     public const int MaxGenreLength = 80;
     public const int MaxColumns = 4;
+    public const int MaxVersesPerColumn = 200;
     public const int MaxAltLength = 300;
     public const int MinAiDescriptionLength = 40;
     public const int MaxAiDescriptionLength = 3_000;
@@ -80,10 +81,19 @@ public static partial class PromptRules
                 issues.Add(new ValidationIssue($"blocks[{index}].data.columns", $"Um texto em verso pode ter até {MaxColumns} colunas."));
             }
 
+            if (data.Columns is not null && data.Columns.Any(column => column.Count > MaxVersesPerColumn))
+            {
+                issues.Add(new ValidationIssue(
+                    $"blocks[{index}].data.columns", $"Cada coluna de um texto em verso pode ter até {MaxVersesPerColumn} versos."));
+            }
+
             foreach (var text in data.Texts())
             {
                 total += text.Length;
             }
+
+            // Cada verso ocupa a sua linha, mesmo vazio (a separação entre estrofes).
+            total += data.Columns?.Sum(column => column.Count) ?? 0;
 
             var tooLong = data.Texts().Any(text => text.Length > MaxTextLength);
             var hasMarkup = data.Texts().Any(HasForbiddenMarkup);
@@ -110,11 +120,18 @@ public static partial class PromptRules
             CheckText(issues, $"gradingNotes.{paths[index]}", notes[index], MaxTextLength);
         }
 
-        var keyData = content.Notes.KeyData ?? [];
-        if (keyData.Count > MaxBlocks || keyData.Any(item => item is { Length: > MaxTextLength } || HasForbiddenMarkup(item)))
+        var keyData = (content.Notes.KeyData ?? []).Select(Clean).OfType<string>().ToList();
+        if (keyData.Count > MaxBlocks || keyData.Any(item => item.Length > MaxTextLength || HasForbiddenMarkup(item)))
         {
             issues.Add(new ValidationIssue(
                 "gradingNotes.keyData", $"Até {MaxBlocks} dados-chave, cada um com até {Thousands(MaxTextLength)} caracteres, sem os sinais < e >."));
+        }
+
+        // As abordagens vão inteiras para a IA em toda correção: têm o seu próprio teto, igual ao da página.
+        if (notes.Sum(note => Clean(note)?.Length ?? 0) + keyData.Sum(item => item.Length) > MaxTotalLength)
+        {
+            issues.Add(new ValidationIssue(
+                "gradingNotes", $"As abordagens esperadas, somadas, podem ter até {Thousands(MaxTotalLength)} caracteres."));
         }
 
         return issues;
@@ -300,9 +317,11 @@ public static partial class PromptRules
     }
 
     private const string ForbiddenMarkupMessage =
-        "Os sinais < e > não são aceitos. Use só **negrito**, *itálico* e quebra de linha.";
+        "Os sinais < e > e os caracteres de controle não são aceitos. Use só **negrito**, *itálico* e quebra de linha.";
 
-    private static bool HasForbiddenMarkup(string? text) => text is not null && text.AsSpan().IndexOfAny('<', '>') >= 0;
+    /// <summary>HTML nunca entra; caractere de controle (fora a quebra de linha e a tabulação) o banco nem guarda.</summary>
+    private static bool HasForbiddenMarkup(string? text) =>
+        text is not null && text.Any(character => character is '<' or '>' || (char.IsControl(character) && character is not ('\n' or '\t')));
 
     private static void CheckText(List<ValidationIssue> issues, string path, string? text, int maxLength)
     {

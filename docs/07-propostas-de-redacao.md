@@ -1,5 +1,7 @@
 # RedigiAI — Propostas de redação: modelo, área de administração e guia de uso
 
+> **Ajustes decididos na implementação (12/10/2026), registrados em `docs/decisoes.md`:** `Admin__Require2fa` fica desligado enquanto o plano do Clerk não tem MFA; `<copia_da_coletanea>` vem depois de `<redacao>`, fora do trecho em cache; com 30% ou mais copiado, qualquer hipótese de nota zero é aceita; a folha pautada (`sheet.pdf`) entra numa branch própria; `GET /v1/prompts/{slug}` aceita `?version=`. No resto, vale o que está abaixo.
+
 Este documento **substitui** o modelo de temas da especificação (`themes`, `theme_texts`, `theme_essay_types`, `theme_grading_notes`). Ele tem duas partes:
 
 - **Parte A**, para o Claude CLI: modelo de dados, regras, API, telas e mudanças no fluxo.

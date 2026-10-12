@@ -12,10 +12,14 @@ internal static class PromptText
     /// Os blocos na ordem da página: <c>[Texto 2] corpo — Fonte</c>, <c>[Comando] corpo</c>,
     /// <c>[Instruções] Tipo de redação: …; item; item</c>.
     /// </summary>
-    public static string Blocks(Prompt prompt) =>
+    /// <param name="genre">O tipo de redação, que abre as instruções.</param>
+    public static string Blocks(Prompt prompt, string genre) =>
         string.Join("\n", prompt.Blocks
-            .Select(block => block.Kind == PromptBlockKind.CollectionItem ? CollectionItem(block.Data) : Statement(prompt, block))
+            .Select(block => block.Kind == PromptBlockKind.CollectionItem ? CollectionItem(block.Data) : Statement(block, genre))
             .OfType<string>());
+
+    /// <summary>Texto que vai dentro de um atributo da marcação: sem aspas duplas, que fechariam o atributo.</summary>
+    public static string Attribute(string text) => text.Replace('"', '\'');
 
     /// <summary>Os trechos copiados da coletânea, um por linha, ou "nenhum".</summary>
     public static string CopiedPassages(IReadOnlyList<Domain.Grading.CopiedPassage> passages) =>
@@ -67,12 +71,11 @@ internal static class PromptText
         return $"[{data.Label}{mark}] {content} — {data.Source}";
     }
 
-    private static string? Statement(Prompt prompt, PromptBlock block) => block.Kind switch
+    private static string? Statement(PromptBlock block, string genre) => block.Kind switch
     {
         PromptBlockKind.Command => $"[Comando] {block.Data.Body}",
         PromptBlockKind.Paragraph => block.Data.Body,
-        PromptBlockKind.Instructions =>
-            $"[{block.Data.Title ?? "Instruções"}] " + string.Join("; ", (block.Data.Items ?? []).Prepend($"Tipo de redação: {prompt.GenreLabel}")),
+        PromptBlockKind.Instructions => "[Instruções] " + string.Join("; ", (block.Data.Items ?? []).Prepend($"Tipo de redação: {genre}")),
         _ => null,
     };
 }

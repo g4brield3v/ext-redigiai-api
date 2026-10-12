@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,7 @@ internal sealed class ClerkBackendApi(IOptions<ClerkOptions> options, ILogger<Cl
         if (clerk.SecretKey.Length == 0)
         {
             logger.LogError("Clerk Backend API is not configured: set Clerk__SecretKey");
-            return null;
+            throw new IdentityDirectoryUnavailableException("Clerk secret key is not configured.");
         }
 
         using var request = new HttpRequestMessage(
@@ -33,10 +34,15 @@ internal sealed class ClerkBackendApi(IOptions<ClerkOptions> options, ILogger<Cl
         try
         {
             using var response = await Http.SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("Clerk user lookup answered {Status}", (int)response.StatusCode);
-                return null;
+                throw new IdentityDirectoryUnavailableException($"Clerk answered {(int)response.StatusCode}.");
             }
 
             await using var body = await response.Content.ReadAsStreamAsync(ct);
@@ -46,7 +52,7 @@ internal sealed class ClerkBackendApi(IOptions<ClerkOptions> options, ILogger<Cl
         catch (Exception ex) when (ex is HttpRequestException or JsonException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
         {
             logger.LogWarning("Clerk user lookup did not complete: {Error}", ex.GetType().Name);
-            return null;
+            throw new IdentityDirectoryUnavailableException(ex.GetType().Name);
         }
     }
 }

@@ -180,7 +180,7 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 | `GET /v1/exams` | Vestibulares e status (`active`, `coming_soon`). |
 | `GET /v1/exams/{slug}/prompts?q=` | Propostas publicadas, com `title`, `summary`, `genreLabel` e nº de textos. |
 | `GET /v1/prompts/{slug}?version=` | Versão publicada da proposta: blocos em ordem, `genreLabel`, linhas, URLs públicas das imagens e `essayTitle` (o título que a redação vai ter). Não devolve as abordagens esperadas nem a descrição das imagens feita para a IA. Com `version`, devolve essa versão se ela já foi publicada (`status` `archived`): é o que a redação feita numa versão antiga continua mostrando. |
-| `GET /v1/prompts/{id}/sheet.pdf` | Folha pautada em PDF, com o título da proposta e o tipo no topo. |
+| `GET /v1/prompts/{id}/sheet.pdf` | Folha pautada em PDF, com o título da proposta e o tipo no topo. Ainda não implementada: entra numa branch própria, depois da etapa 3b. |
 | `GET /v1/rubrics/{versionId}` | Critérios, pesos e descritores (seção "Como a nota é calculada"). |
 
 **Conta**
@@ -458,7 +458,7 @@ Todos os e-mails saem pelo SendGrid, por job `send_email`, com no máximo um env
 | `subscription_payment_failed` | Cobrança do plano recusada | Gerenciar assinatura | Não |
 | `inactivity_warning` | 7 dias antes da exclusão por inatividade | Entrar | Não |
 | `account_deleted` | Exclusão concluída | — | Não |
-| `new_themes` | Tema novo publicado | Temas | Sim, desligado por padrão |
+| `new_themes` | Proposta nova publicada | Propostas | Sim, desligado por padrão |
 
 - Remetente `correcoes@redigiai.com.br`, com SPF, DKIM e DMARC configurados no domínio.
 - Assunto e pré-visualização trazem o título no formato "Vestibular – Tipo – Tema".
