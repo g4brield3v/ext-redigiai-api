@@ -44,6 +44,22 @@ public static class Errors
     public static AppError AiFailed(string code) =>
         new(code, 500, "Algo deu errado do nosso lado. Tente novamente em instantes.");
 
+    public static AppError PromptNotAvailable() =>
+        new("PROMPT_NOT_AVAILABLE", 404, "Essa proposta não está disponível. Escolha outra.");
+
+    public static AppError PromptNotDraft() =>
+        new("PROMPT_NOT_DRAFT", 409, "Esta proposta já foi publicada. Crie uma nova versão para alterar.");
+
+    public static AppError PromptChanged() =>
+        new("PROMPT_CHANGED", 409, "A proposta foi alterada em outro lugar. Recarregue para continuar.");
+
+    public static AppError PromptInvalidState() =>
+        new("INVALID_STATE", 409, "Essa ação não está disponível para esta proposta agora.");
+
+    /// <summary>Só nas rotas de administração: as pendências vão em <see cref="AppError.Details"/>.</summary>
+    public static AppError ValidationFailed(IReadOnlyList<ValidationIssue> details) =>
+        new("VALIDATION_FAILED", 422, "Há pendências na proposta.", details: details);
+
     public static AppError AdminSecondFactorRequired() =>
         new("ADMIN_2FA_REQUIRED", 403, "Ative a verificação em duas etapas para acessar a administração.");
 

@@ -396,6 +396,198 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.ToTable("exams", (string)null);
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.Prompt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("EssayTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("essay_type_id");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<string>("GenreLabel")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("genre_label");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid?>("PublishedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("published_by");
+
+                    b.Property<int?>("SheetLinesMax")
+                        .HasColumnType("integer")
+                        .HasColumnName("sheet_lines_max");
+
+                    b.Property<int?>("SheetLinesMin")
+                        .HasColumnType("integer")
+                        .HasColumnName("sheet_lines_min");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("SourceLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source_label");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<bool>("TitleRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("title_required");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_prompts");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_prompts_created_by");
+
+                    b.HasIndex("EssayTypeId")
+                        .HasDatabaseName("ix_prompts_essay_type_id");
+
+                    b.HasIndex("PublishedBy")
+                        .HasDatabaseName("ix_prompts_published_by");
+
+                    b.HasIndex("ExamId", "Status")
+                        .HasDatabaseName("ix_prompts_exam_id_status");
+
+                    b.HasIndex("Slug", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_prompts_slug_version");
+
+                    b.HasIndex(new[] { "Slug" }, "ux_prompts_published_per_slug")
+                        .IsUnique()
+                        .HasDatabaseName("ux_prompts_published_per_slug")
+                        .HasFilter("status = 'published'");
+
+                    b.ToTable("prompts", (string)null);
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.PromptBlock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("data");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("PromptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("prompt_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_prompt_blocks");
+
+                    b.HasIndex("PromptId")
+                        .HasDatabaseName("ix_prompt_blocks_prompt_id");
+
+                    b.ToTable("prompt_blocks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_prompt_blocks_position", "position >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.PromptGradingNotes", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ExpectedFocus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("expected_focus");
+
+                    b.Property<string>("Extra")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("extra");
+
+                    b.Property<string>("KeyData")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("key_data");
+
+                    b.Property<string>("OffTopicSignals")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("off_topic_signals");
+
+                    b.Property<Guid>("PromptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("prompt_id");
+
+                    b.Property<string>("TangentSignals")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tangent_signals");
+
+                    b.HasKey("Id")
+                        .HasName("pk_prompt_grading_notes");
+
+                    b.HasIndex("PromptId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_prompt_grading_notes_prompt_id");
+
+                    b.ToTable("prompt_grading_notes", (string)null);
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Catalog.RubricCriterion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -724,6 +916,14 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("PurgeAfter")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("purge_after");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("essay_photo")
+                        .HasColumnName("scope");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -1852,6 +2052,54 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_essay_types_exams_exam_id");
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.Prompt", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_prompts_users_created_by");
+
+                    b.HasOne("RedigiAI.Domain.Catalog.EssayType", null)
+                        .WithMany()
+                        .HasForeignKey("EssayTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_prompts_essay_types_essay_type_id");
+
+                    b.HasOne("RedigiAI.Domain.Catalog.Exam", null)
+                        .WithMany()
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_prompts_exams_exam_id");
+
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_prompts_users_published_by");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.PromptBlock", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Catalog.Prompt", null)
+                        .WithMany("Blocks")
+                        .HasForeignKey("PromptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_prompt_blocks_prompts_prompt_id");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.PromptGradingNotes", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Catalog.Prompt", null)
+                        .WithOne("GradingNotes")
+                        .HasForeignKey("RedigiAI.Domain.Catalog.PromptGradingNotes", "PromptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_prompt_grading_notes_prompts_prompt_id");
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Catalog.RubricCriterion", b =>
                 {
                     b.HasOne("RedigiAI.Domain.Catalog.RubricVersion", null)
@@ -2283,6 +2531,14 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_writing_rules_writing_rules_versions_writing_rules_version_");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Catalog.Prompt", b =>
+                {
+                    b.Navigation("Blocks");
+
+                    b.Navigation("GradingNotes")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Catalog.RubricVersion", b =>

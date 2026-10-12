@@ -53,6 +53,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.Provider).HasMaxLength(20);
         builder.Property(a => a.PublicId).HasMaxLength(200);
         builder.Property(a => a.Mime).HasMaxLength(40);
+        builder.Property(a => a.Scope).HasMaxLength(20).HasDefaultValue(AssetScope.EssayPhoto);
         builder.Ignore(a => a.IsConfirmed);
         builder.HasOne<User>().WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(a => a.PublicId).IsUnique();

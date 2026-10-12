@@ -53,6 +53,24 @@ internal sealed class RubricRepository(AppDbContext db) : IRubricRepository
     public void Add(RubricVersion rubric) => db.RubricVersions.Add(rubric);
 }
 
+internal sealed class PromptRepository(AppDbContext db) : IPromptRepository
+{
+    public void Add(Prompt prompt) => db.Prompts.Add(prompt);
+
+    public Task<Prompt?> FindForUpdateAsync(Guid promptId, CancellationToken ct) =>
+        Whole(db.Prompts).FirstOrDefaultAsync(p => p.Id == promptId, ct);
+
+    public Task<Prompt?> FindAsync(Guid promptId, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.Id == promptId, ct);
+
+    public Task<Prompt?> FindPublishedAsync(string slug, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.Slug == slug && p.Status == PromptStatus.Published, ct);
+
+    /// <summary>A proposta inteira, com os blocos na ordem de posição.</summary>
+    private static IQueryable<Prompt> Whole(IQueryable<Prompt> prompts) =>
+        prompts.Include(p => p.Blocks.OrderBy(b => b.Position)).Include(p => p.GradingNotes).AsSplitQuery();
+}
+
 internal sealed class ThemeRepository(AppDbContext db) : IThemeRepository
 {
     public async Task<IReadOnlyList<Theme>> ListActiveAsync(Guid examId, string? titleSearch, CancellationToken ct)

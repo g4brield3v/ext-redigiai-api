@@ -33,6 +33,20 @@ public interface IRubricRepository
     void Add(RubricVersion rubric);
 }
 
+public interface IPromptRepository
+{
+    void Add(Prompt prompt);
+
+    /// <summary>A versão, com os blocos e as abordagens esperadas, pronta para ser alterada.</summary>
+    Task<Prompt?> FindForUpdateAsync(Guid promptId, CancellationToken ct);
+
+    /// <summary>A versão em qualquer situação, só para leitura: a correção usa a versão com que a redação foi enviada.</summary>
+    Task<Prompt?> FindAsync(Guid promptId, CancellationToken ct);
+
+    /// <summary>A versão publicada desse endereço; <c>null</c> se não há nenhuma.</summary>
+    Task<Prompt?> FindPublishedAsync(string slug, CancellationToken ct);
+}
+
 public interface IThemeRepository
 {
     /// <summary>Temas ativos do vestibular, do mais recente para o mais antigo, com textos e tipos aceitos.</summary>

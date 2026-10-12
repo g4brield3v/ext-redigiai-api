@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IEssayTypeRepository, EssayTypeRepository>();
         services.AddScoped<IRubricRepository, RubricRepository>();
         services.AddScoped<IThemeRepository, ThemeRepository>();
+        services.AddScoped<IPromptRepository, PromptRepository>();
 
         services.AddScoped<IEssayRepository, EssayRepository>();
         services.AddScoped<IEssayBatchRepository, EssayBatchRepository>();

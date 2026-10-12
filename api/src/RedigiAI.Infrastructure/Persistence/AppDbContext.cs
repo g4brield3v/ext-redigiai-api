@@ -15,6 +15,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<EssayType> EssayTypes => Set<EssayType>();
     public DbSet<RubricVersion> RubricVersions => Set<RubricVersion>();
     public DbSet<Theme> Themes => Set<Theme>();
+    public DbSet<Prompt> Prompts => Set<Prompt>();
     public DbSet<User> Users => Set<User>();
     public DbSet<CreditBucket> CreditBuckets => Set<CreditBucket>();
     public DbSet<CreditLedgerEntry> CreditLedger => Set<CreditLedgerEntry>();
@@ -40,6 +41,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<ExamStatus>().HaveConversion<SnakeCaseEnumConverter<ExamStatus>>();
         configuration.Properties<ThemeStatus>().HaveConversion<SnakeCaseEnumConverter<ThemeStatus>>();
         configuration.Properties<ThemeTextKind>().HaveConversion<SnakeCaseEnumConverter<ThemeTextKind>>();
+        configuration.Properties<PromptStatus>().HaveConversion<SnakeCaseEnumConverter<PromptStatus>>();
+        configuration.Properties<PromptBlockKind>().HaveConversion<SnakeCaseEnumConverter<PromptBlockKind>>();
+        configuration.Properties<AssetScope>().HaveConversion<SnakeCaseEnumConverter<AssetScope>>();
         configuration.Properties<UserRole>().HaveConversion<SnakeCaseEnumConverter<UserRole>>();
         configuration.Properties<CreditSource>().HaveConversion<SnakeCaseEnumConverter<CreditSource>>();
         configuration.Properties<EssayStatus>().HaveConversion<SnakeCaseEnumConverter<EssayStatus>>();

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Catalog;
 
 namespace RedigiAI.Infrastructure.Persistence.Configurations;
@@ -56,6 +57,58 @@ internal sealed class RubricCriterionConfiguration : IEntityTypeConfiguration<Ru
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyDictionary<int, string>>, JsonComparer<IReadOnlyDictionary<int, string>>>();
         builder.HasIndex(c => new { c.RubricVersionId, c.Position }).IsUnique();
+    }
+}
+
+internal sealed class PromptConfiguration : IEntityTypeConfiguration<Prompt>
+{
+    public void Configure(EntityTypeBuilder<Prompt> builder)
+    {
+        builder.ToTable("prompts");
+        builder.Property(p => p.Slug).HasMaxLength(PromptRules.MaxSlugLength);
+        builder.Property(p => p.Status).HasMaxLength(20);
+        builder.Property(p => p.Title).HasMaxLength(PromptRules.MaxTitleLength);
+        builder.Property(p => p.Summary).HasMaxLength(PromptRules.MaxSummaryLength);
+        builder.Property(p => p.SourceLabel).HasMaxLength(PromptRules.MaxSourceLabelLength);
+        builder.Property(p => p.GenreLabel).HasMaxLength(PromptRules.MaxGenreLength);
+        builder.HasOne<Exam>().WithMany().HasForeignKey(p => p.ExamId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<EssayType>().WithMany().HasForeignKey(p => p.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.PublishedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(p => p.Blocks).WithOne().HasForeignKey(b => b.PromptId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(p => p.GradingNotes).WithOne().HasForeignKey<PromptGradingNotes>(n => n.PromptId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(p => new { p.Slug, p.Version }).IsUnique();
+        // Só uma versão publicada por endereço, garantido pelo banco.
+        builder.HasIndex(p => p.Slug, "ux_prompts_published_per_slug")
+            .HasDatabaseName("ux_prompts_published_per_slug")
+            .IsUnique()
+            .HasFilter("status = 'published'");
+        builder.HasIndex(p => new { p.ExamId, p.Status });
+    }
+}
+
+internal sealed class PromptBlockConfiguration : IEntityTypeConfiguration<PromptBlock>
+{
+    public void Configure(EntityTypeBuilder<PromptBlock> builder)
+    {
+        // A posição é única por proposta por uma restrição adiável (ux_prompt_blocks_position), criada na migração:
+        // assim a troca de posição entre dois blocos vale no fim da transação, e não a cada linha gravada.
+        builder.ToTable("prompt_blocks", table => table.HasCheckConstraint("ck_prompt_blocks_position", "position >= 0"));
+        builder.Property(b => b.Kind).HasMaxLength(20);
+        builder.Property(b => b.Data)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<PromptBlockData>, JsonComparer<PromptBlockData>>();
+    }
+}
+
+internal sealed class PromptGradingNotesConfiguration : IEntityTypeConfiguration<PromptGradingNotes>
+{
+    public void Configure(EntityTypeBuilder<PromptGradingNotes> builder)
+    {
+        builder.ToTable("prompt_grading_notes");
+        builder.Property(n => n.KeyData)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<IReadOnlyList<string>>, JsonComparer<IReadOnlyList<string>>>();
     }
 }
 
