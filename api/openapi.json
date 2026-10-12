@@ -1174,13 +1174,13 @@
         }
       }
     },
-    "/v1/exams/{slug}/themes": {
+    "/v1/exams/{slug}/prompts": {
       "get": {
         "tags": [
           "Catalog"
         ],
-        "summary": "Temas ativos do vestibular, com os tipos aceitos e o número de textos da coletânea.",
-        "operationId": "listThemes",
+        "summary": "Propostas publicadas do vestibular, com o título, o resumo, o tipo de redação e o número de textos da\r\ncoletânea. `q` filtra pelo título.",
+        "operationId": "listPrompts",
         "parameters": [
           {
             "name": "slug",
@@ -1206,7 +1206,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ThemeSummaryDto"
+                    "$ref": "#/components/schemas/PromptSummaryDto"
                   }
                 }
               }
@@ -1225,21 +1225,28 @@
         }
       }
     },
-    "/v1/themes/{id}": {
+    "/v1/prompts/{slug}": {
       "get": {
         "tags": [
           "Catalog"
         ],
-        "summary": "Enunciado, coletânea e tipos de redação aceitos pelo tema.",
-        "operationId": "getTheme",
+        "summary": "A versão publicada da proposta, com os blocos na ordem da página, o tipo de redação, as linhas e os endereços\r\ndas imagens. Com `version`, devolve essa versão se ela já foi publicada: é o que a redação feita numa\r\nversão antiga continua mostrando.",
+        "operationId": "getPrompt",
         "parameters": [
           {
-            "name": "id",
+            "name": "slug",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -1249,7 +1256,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ThemeDetailDto"
+                  "$ref": "#/components/schemas/PromptDetailDto"
                 }
               }
             }
@@ -1989,18 +1996,13 @@
     "schemas": {
       "BatchEssayItem": {
         "required": [
-          "themeId",
-          "essayTypeId",
+          "promptId",
           "assetId",
           "parentEssayId"
         ],
         "type": "object",
         "properties": {
-          "themeId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "essayTypeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
           },
@@ -2225,7 +2227,9 @@
           "id",
           "essayId",
           "title",
-          "themeId",
+          "promptId",
+          "promptSlug",
+          "promptVersion",
           "essayTypeId",
           "sentAt",
           "version",
@@ -2259,9 +2263,16 @@
           "title": {
             "type": "string"
           },
-          "themeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
+          },
+          "promptSlug": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "essayTypeId": {
             "type": "string",
@@ -2617,7 +2628,9 @@
         "required": [
           "id",
           "title",
-          "themeId",
+          "promptId",
+          "promptSlug",
+          "promptVersion",
           "essayTypeId",
           "status",
           "version",
@@ -2641,9 +2654,16 @@
           "title": {
             "type": "string"
           },
-          "themeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
+          },
+          "promptSlug": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "essayTypeId": {
             "type": "string",
@@ -2748,7 +2768,9 @@
         "required": [
           "id",
           "title",
-          "themeId",
+          "promptId",
+          "promptSlug",
+          "promptVersion",
           "essayTypeId",
           "status",
           "version",
@@ -2769,9 +2791,16 @@
           "title": {
             "type": "string"
           },
-          "themeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
+          },
+          "promptSlug": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "essayTypeId": {
             "type": "string",
@@ -2821,39 +2850,6 @@
               "null",
               "string"
             ]
-          }
-        }
-      },
-      "EssayTypeDto": {
-        "required": [
-          "id",
-          "slug",
-          "name",
-          "description",
-          "rubricVersionId",
-          "instruction"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "rubricVersionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "instruction": {
-            "type": "string"
           }
         }
       },
@@ -3249,6 +3245,100 @@
           }
         }
       },
+      "PromptBlockPublicDataDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "columns": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptBlockPublicDto": {
+        "required": [
+          "position",
+          "kind",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PromptBlockPublicDataDto"
+          }
+        }
+      },
       "PromptCountsDto": {
         "required": [
           "all",
@@ -3273,6 +3363,104 @@
           "archived": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "PromptDetailDto": {
+        "required": [
+          "id",
+          "slug",
+          "version",
+          "status",
+          "title",
+          "summary",
+          "genreLabel",
+          "essayTypeId",
+          "essayTypeName",
+          "essayTitle",
+          "examSlug",
+          "examName",
+          "sheetLines",
+          "minLines",
+          "maxLines",
+          "titleRequired",
+          "textCount",
+          "blocks"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PromptStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "genreLabel": {
+            "type": "string"
+          },
+          "essayTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "essayTypeName": {
+            "type": "string"
+          },
+          "essayTitle": {
+            "type": "string"
+          },
+          "examSlug": {
+            "type": "string"
+          },
+          "examName": {
+            "type": "string"
+          },
+          "sheetLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minLines": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxLines": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "titleRequired": {
+            "type": "boolean"
+          },
+          "textCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptBlockPublicDto"
+            }
           }
         }
       },
@@ -3593,6 +3781,74 @@
           "archived"
         ]
       },
+      "PromptSummaryDto": {
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "genreLabel",
+          "essayTypeName",
+          "textCount",
+          "minLines",
+          "maxLines",
+          "titleRequired",
+          "examSlug",
+          "examName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "genreLabel": {
+            "type": "string"
+          },
+          "essayTypeName": {
+            "type": "string"
+          },
+          "textCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minLines": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxLines": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "titleRequired": {
+            "type": "boolean"
+          },
+          "examSlug": {
+            "type": "string"
+          },
+          "examName": {
+            "type": "string"
+          }
+        }
+      },
       "PromptValidationDto": {
         "required": [
           "valid",
@@ -3761,126 +4017,6 @@
             "format": "int32"
           }
         }
-      },
-      "ThemeDetailDto": {
-        "required": [
-          "id",
-          "title",
-          "statement",
-          "examSlug",
-          "examName",
-          "sheetLines",
-          "texts",
-          "essayTypes"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "statement": {
-            "type": "string"
-          },
-          "examSlug": {
-            "type": "string"
-          },
-          "examName": {
-            "type": "string"
-          },
-          "sheetLines": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "texts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ThemeTextDto"
-            }
-          },
-          "essayTypes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EssayTypeDto"
-            }
-          }
-        }
-      },
-      "ThemeSummaryDto": {
-        "required": [
-          "id",
-          "title",
-          "examSlug",
-          "examName",
-          "essayTypes",
-          "textCount"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "examSlug": {
-            "type": "string"
-          },
-          "examName": {
-            "type": "string"
-          },
-          "essayTypes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EssayTypeDto"
-            }
-          },
-          "textCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "ThemeTextDto": {
-        "required": [
-          "position",
-          "kind",
-          "title",
-          "source",
-          "body"
-        ],
-        "type": "object",
-        "properties": {
-          "position": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/ThemeTextKind"
-          },
-          "title": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "body": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "ThemeTextKind": {
-        "enum": [
-          "text",
-          "image"
-        ]
       },
       "TranscriptionLineDto": {
         "required": [

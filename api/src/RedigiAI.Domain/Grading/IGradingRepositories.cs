@@ -39,10 +39,3 @@ public interface IWritingRulesRepository
     Task<WritingRulesVersion?> FindLatestAsync(CancellationToken ct);
 }
 
-public interface IThemeGradingNotesRepository
-{
-    void Add(ThemeGradingNotes notes);
-
-    /// <summary>A versão mais recente das notas do tema; <c>null</c> se o tema não tem notas.</summary>
-    Task<ThemeGradingNotes?> FindLatestAsync(Guid themeId, CancellationToken ct);
-}

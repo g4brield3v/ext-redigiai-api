@@ -40,16 +40,16 @@ public sealed record NextStep(string Text, int? Criterion);
 public sealed record EssayLine(int Number, string Text, bool Indent);
 
 /// <summary>Com que a correção foi feita: tudo o que é preciso para explicar e reproduzir a nota depois.</summary>
-/// <param name="ThemeGradingNotesId">Notas do tema usadas; nulo quando o tema não tem notas.</param>
+/// <param name="PromptId">A versão da proposta usada.</param>
+/// <param name="PromptGradingNotesId">As abordagens esperadas dessa versão.</param>
 /// <param name="IdentificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
 /// <param name="WritingRuleCodes">Códigos do catálogo de regras de escrita do perfil.</param>
 public sealed record GradingContext(
     Guid EssayId,
     RubricVersion Rubric,
     Guid GradingProfileId,
-    Guid ThemeId,
-    int ThemeVersion,
-    Guid? ThemeGradingNotesId,
+    Guid PromptId,
+    Guid PromptGradingNotesId,
     IReadOnlyList<EssayLine> Lines,
     bool IdentificationFound,
     IReadOnlySet<string> WritingRuleCodes);
@@ -79,9 +79,8 @@ public sealed class Correction
     public Guid EssayId { get; private set; }
     public Guid RubricVersionId { get; private set; }
     public Guid GradingProfileId { get; private set; }
-    public Guid ThemeId { get; private set; }
-    public int ThemeVersion { get; private set; }
-    public Guid? ThemeGradingNotesId { get; private set; }
+    public Guid PromptId { get; private set; }
+    public Guid PromptGradingNotesId { get; private set; }
 
     /// <summary>Código da hipótese de nota zero aplicada; nulo quando os critérios foram pontuados.</summary>
     public string? ZeroReason { get; private set; }
@@ -157,9 +156,8 @@ public sealed class Correction
             EssayId = context.EssayId,
             RubricVersionId = rubric.Id,
             GradingProfileId = context.GradingProfileId,
-            ThemeId = context.ThemeId,
-            ThemeVersion = context.ThemeVersion,
-            ThemeGradingNotesId = context.ThemeGradingNotesId,
+            PromptId = context.PromptId,
+            PromptGradingNotesId = context.PromptGradingNotesId,
             ZeroReason = zero ? output.Zero.Reason : null,
             ZeroExplanation = zero ? output.Zero.Explanation : null,
             MaxScore = rubric.MaxScore,

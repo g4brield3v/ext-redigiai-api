@@ -11,7 +11,6 @@ internal sealed class GradingSeedService(
     IExamRepository exams,
     IEssayTypeRepository essayTypes,
     IRubricRepository rubrics,
-    IThemeRepository themes,
     IPromptTemplateRepository prompts,
     IGuidelinesRepository guidelines,
     IWritingRulesRepository writingRules,
@@ -31,17 +30,12 @@ internal sealed class GradingSeedService(
         var now = time.GetUtcNow();
         var created = false;
 
-        // Banco criado antes da grade oficial: ela entra como a versão seguinte e os temas passam a usá-la.
+        // Banco criado antes da grade oficial: ela entra como a versão seguinte.
         var rubric = await rubrics.FindLatestAsync(fuvest.Id, ct);
         if (rubric?.Source != FuvestKnowledgeBaseV1.RubricSource)
         {
             rubric = PublishRubric(fuvest.Id, (rubric?.Version ?? 0) + 1, now);
             rubrics.Add(rubric);
-            foreach (var theme in await themes.ListForUpdateAsync(fuvest.Id, ct))
-            {
-                theme.UseRubric(rubric);
-            }
-
             created = true;
         }
 

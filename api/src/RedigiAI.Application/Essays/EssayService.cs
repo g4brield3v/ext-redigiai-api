@@ -45,9 +45,11 @@ internal sealed class EssayService(
     IAssetRepository assets,
     ITranscriptionRepository transcriptions,
     ICorrectionRepository corrections,
-    IThemeRepository themes,
+    IPromptRepository prompts,
     IExamRepository exams,
     IEssayTypeRepository essayTypes,
+    IRubricRepository rubrics,
+    IGradingProfileRepository profiles,
     ICreditRepository credits,
     IPhotoStorage storage,
     IJobQueue jobs,
@@ -139,9 +141,10 @@ internal sealed class EssayService(
         var rewritten = await essays.RewrittenAsync(ids, ct);
         var illegible = await transcriptions.IllegibleCountsAsync(ids, ct);
         var scores = await corrections.ScoresAsync(ids, ct);
+        var references = await prompts.ReferencesAsync([.. page.Select(e => e.PromptId).Distinct()], ct);
 
         return new EssayListDto(
-            [.. page.Select(e => ToSummary(e, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id), scores))],
+            [.. page.Select(e => ToSummary(e, references, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id), scores))],
             found.Count > PageSize ? page[^1].Id.ToString("N") : null);
     }
 
@@ -153,14 +156,20 @@ internal sealed class EssayService(
         var rewritten = await essays.RewrittenAsync([essay.Id], ct);
         var transcription = await transcriptions.FindByEssayAsync(essay.Id, ct);
         var summary = ToSummary(
-            essay, rewritten.Contains(essay.Id), transcription?.IllegibleCount ?? 0, await corrections.ScoresAsync([essay.Id], ct));
+            essay,
+            await prompts.ReferencesAsync([essay.PromptId], ct),
+            rewritten.Contains(essay.Id),
+            transcription?.IllegibleCount ?? 0,
+            await corrections.ScoresAsync([essay.Id], ct));
         var lines = transcription?.Lines ?? [];
         var textByLine = lines.ToDictionary(line => line.Number, line => line.Text);
 
         return new EssayDetailDto(
             summary.Id,
             summary.Title,
-            summary.ThemeId,
+            summary.PromptId,
+            summary.PromptSlug,
+            summary.PromptVersion,
             summary.EssayTypeId,
             summary.Status,
             summary.Version,
@@ -250,10 +259,25 @@ internal sealed class EssayService(
     private async Task<PreparedEssay> PrepareAsync(
         Guid userId, BatchEssayItem item, List<PreparedEssay> previous, CancellationToken ct)
     {
-        var theme = await themes.FindActiveAsync(item.ThemeId, ct) ?? throw Errors.ThemeNotAvailable();
-        var exam = await exams.FindByIdAsync(theme.ExamId, ct) ?? throw Errors.ThemeNotAvailable();
-        var essayType = (await essayTypes.ListByExamAsync(exam.Id, ct)).FirstOrDefault(t => t.Id == item.EssayTypeId)
-            ?? throw Errors.EssayTypeNotAccepted();
+        var prompt = await prompts.FindAsync(item.PromptId, ct) ?? throw Errors.PromptNotAvailable();
+
+        Essay? rewriteOf = null;
+        if (item.ParentEssayId is { } parentId)
+        {
+            rewriteOf = await essays.FindAsync(parentId, userId, ct) ?? throw Errors.EssayNotFound();
+
+            // A reescrita usa a versão da proposta da redação original, mesmo que já exista uma versão mais nova.
+            var original = await prompts.FindAsync(rewriteOf.PromptId, ct) ?? throw Errors.Internal();
+            prompt = original.Slug == prompt.Slug ? original : throw Errors.EssayNotFound();
+        }
+
+        // O tipo e a grade vêm da proposta e do perfil de correção; o aluno não escolhe nenhum dos dois.
+        var exam = await exams.FindByIdAsync(prompt.ExamId, ct) ?? throw Errors.PromptNotAvailable();
+        var essayType = (await essayTypes.ListByExamAsync(exam.Id, ct)).FirstOrDefault(t => t.Id == prompt.EssayTypeId)
+            ?? throw Errors.PromptNotAvailable();
+        var rubricVersionId = (await profiles.FindActiveAsync(exam.Id, essayType.Id, ct))?.RubricVersionId
+            ?? (await rubrics.FindLatestAsync(exam.Id, ct))?.Id
+            ?? throw Errors.PromptNotAvailable();
 
         // Cada foto é uma redação: a mesma não entra duas vezes no envio nem em outro envio.
         var asset = await assets.FindAsync(item.AssetId, userId, ct);
@@ -264,13 +288,7 @@ internal sealed class EssayService(
 
         var stored = await storage.FindAsync(asset.PublicId, ct) ?? throw Errors.InvalidFile();
 
-        Essay? rewriteOf = null;
-        if (item.ParentEssayId is { } parentId)
-        {
-            rewriteOf = await essays.FindAsync(parentId, userId, ct) ?? throw Errors.EssayNotFound();
-        }
-
-        return new PreparedEssay(exam, theme, essayType, asset, stored, rewriteOf);
+        return new PreparedEssay(exam, prompt, essayType, rubricVersionId, asset, stored, rewriteOf);
     }
 
     private async Task<BatchEssayResponseDto> ReserveAndCreateAsync(
@@ -287,7 +305,8 @@ internal sealed class EssayService(
         var ids = new List<Guid>(prepared.Count);
         foreach (var item in prepared)
         {
-            var essay = Essay.Submit(user.Id, batch.Id, item.Exam, item.Theme, item.EssayType, item.Photo, item.RewriteOf, now);
+            var essay = Essay.Submit(
+                user.Id, batch.Id, item.Exam, item.Prompt, item.EssayType, item.RubricVersionId, item.Photo, item.RewriteOf, now);
             item.Photo.Confirm(item.Stored.Bytes, item.Stored.Format);
 
             var bucket = await ReserveAsync(available, now, ct);
@@ -339,11 +358,17 @@ internal sealed class EssayService(
             lineText[word.CharEnd..Math.Min(lineText.Length, word.CharEnd + ContextLength)]);
 
     private static EssaySummaryDto ToSummary(
-        Essay essay, bool rewritten, int illegibleCount, IReadOnlyDictionary<Guid, (int Score, int MaxScore)> scores) =>
+        Essay essay,
+        IReadOnlyDictionary<Guid, PromptReference> references,
+        bool rewritten,
+        int illegibleCount,
+        IReadOnlyDictionary<Guid, (int Score, int MaxScore)> scores) =>
         new(
             essay.Id,
             essay.Title,
-            essay.ThemeId,
+            essay.PromptId,
+            references[essay.PromptId].Slug,
+            references[essay.PromptId].Version,
             essay.EssayTypeId,
             essay.Status,
             essay.Version,
@@ -356,7 +381,7 @@ internal sealed class EssayService(
             essay.FailureCode);
 
     private sealed record PreparedEssay(
-        Exam Exam, Theme Theme, EssayType EssayType, Asset Photo, StoredPhoto Stored, Essay? RewriteOf);
+        Exam Exam, Prompt Prompt, EssayType EssayType, Guid RubricVersionId, Asset Photo, StoredPhoto Stored, Essay? RewriteOf);
 
     private sealed class BucketBalance(CreditBucket bucket)
     {

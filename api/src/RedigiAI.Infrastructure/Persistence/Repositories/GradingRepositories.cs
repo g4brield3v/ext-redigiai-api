@@ -89,10 +89,3 @@ internal sealed class CorrectionRepository(AppDbContext db) : ICorrectionReposit
     }
 }
 
-internal sealed class ThemeGradingNotesRepository(AppDbContext db) : IThemeGradingNotesRepository
-{
-    public void Add(ThemeGradingNotes notes) => db.ThemeGradingNotes.Add(notes);
-
-    public Task<ThemeGradingNotes?> FindLatestAsync(Guid themeId, CancellationToken ct) =>
-        db.ThemeGradingNotes.AsNoTracking().Where(n => n.ThemeId == themeId).OrderByDescending(n => n.Version).FirstOrDefaultAsync(ct);
-}

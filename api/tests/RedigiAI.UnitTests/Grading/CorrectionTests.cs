@@ -28,7 +28,7 @@ public class CorrectionTests
 
     private static GradingContext Context(bool identificationFound = false) =>
         new(
-            Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), 1, null, Lines, identificationFound,
+            Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Lines, identificationFound,
             new HashSet<string> { "CRASE_VERBO", WritingRulesVersion.OtherCode });
 
     private static GradedCriterion Criterion(int position, int level = 3, string? guidance = "Troque o parágrafo da linha 2 por um argumento próprio.") =>
@@ -238,28 +238,5 @@ public class CorrectionTests
             transcription.FinalLines().Select(line => line.Text));
         // A transcrição continua como a IA leu.
         Assert.Equal("Os [?] decidem o que [?] vemos", transcription.Lines[0].Text);
-    }
-
-    [Fact]
-    public void Published_theme_is_not_edited_and_a_revision_is_a_new_version()
-    {
-        var exam = Exam.Create("fuvest", "Fuvest", ExamStatus.Active, sheetLines: 30, position: 1);
-        var type = EssayType.Create(exam.Id, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
-        var rubric = RubricVersion.Publish(exam.Id, 1, 4, Now, [], [new CriterionSpec("C", 1, Enumerable.Range(1, 4).ToDictionary(l => l, l => "d"))]);
-        var theme = Theme.Draft(exam.Id, "Algoritmos e o debate público", "Enunciado original.");
-        theme.AddText(ThemeTextKind.Text, "Texto 1", "Fonte", "Trecho.");
-        theme.AcceptType(type, rubric, "Defenda um ponto de vista.");
-
-        Assert.Throws<InvalidOperationException>(() => theme.Revise("Ainda é rascunho."));
-        theme.Publish(Now);
-        Assert.Throws<InvalidOperationException>(() => theme.AddText(ThemeTextKind.Text, "Texto 2", "Fonte", "Outro."));
-
-        var revision = theme.Revise("Enunciado revisado.");
-
-        Assert.Equal((1, "Enunciado original.", 1), (theme.Version, theme.Statement, theme.Texts.Count));
-        Assert.Equal((2, theme.Id, ThemeStatus.Draft, "Enunciado revisado."), (revision.Version, revision.SupersedesThemeId, revision.Status, revision.Statement));
-        Assert.NotEqual(theme.Id, revision.Id);
-        Assert.Equal(type.Id, Assert.Single(revision.AcceptedTypes).EssayTypeId);
-        Assert.Empty(revision.Texts);
     }
 }

@@ -14,7 +14,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Exam> Exams => Set<Exam>();
     public DbSet<EssayType> EssayTypes => Set<EssayType>();
     public DbSet<RubricVersion> RubricVersions => Set<RubricVersion>();
-    public DbSet<Theme> Themes => Set<Theme>();
     public DbSet<Prompt> Prompts => Set<Prompt>();
     public DbSet<User> Users => Set<User>();
     public DbSet<CreditBucket> CreditBuckets => Set<CreditBucket>();
@@ -28,7 +27,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<PromptTemplate> PromptTemplates => Set<PromptTemplate>();
     public DbSet<GuidelinesVersion> GuidelinesVersions => Set<GuidelinesVersion>();
     public DbSet<WritingRulesVersion> WritingRulesVersions => Set<WritingRulesVersion>();
-    public DbSet<ThemeGradingNotes> ThemeGradingNotes => Set<ThemeGradingNotes>();
     public DbSet<GradingProfile> GradingProfiles => Set<GradingProfile>();
     public DbSet<Correction> Corrections => Set<Correction>();
     public DbSet<CorrectionFeedback> CorrectionFeedback => Set<CorrectionFeedback>();
@@ -39,8 +37,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     protected override void ConfigureConventions(ModelConfigurationBuilder configuration)
     {
         configuration.Properties<ExamStatus>().HaveConversion<SnakeCaseEnumConverter<ExamStatus>>();
-        configuration.Properties<ThemeStatus>().HaveConversion<SnakeCaseEnumConverter<ThemeStatus>>();
-        configuration.Properties<ThemeTextKind>().HaveConversion<SnakeCaseEnumConverter<ThemeTextKind>>();
         configuration.Properties<PromptStatus>().HaveConversion<SnakeCaseEnumConverter<PromptStatus>>();
         configuration.Properties<PromptBlockKind>().HaveConversion<SnakeCaseEnumConverter<PromptBlockKind>>();
         configuration.Properties<AssetScope>().HaveConversion<SnakeCaseEnumConverter<AssetScope>>();

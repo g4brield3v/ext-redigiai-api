@@ -59,18 +59,6 @@ internal sealed class PromptAdminService(
     public const long MaxImageBytes = 5 * 1024 * 1024;
     private const int MaxSearchLength = 80;
 
-    private static readonly Dictionary<string, PromptBlockKind> Kinds = new(StringComparer.Ordinal)
-    {
-        ["collection_item"] = PromptBlockKind.CollectionItem,
-        ["command"] = PromptBlockKind.Command,
-        ["instructions"] = PromptBlockKind.Instructions,
-        ["heading"] = PromptBlockKind.Heading,
-        ["paragraph"] = PromptBlockKind.Paragraph,
-        ["divider"] = PromptBlockKind.Divider,
-    };
-
-    private static readonly Dictionary<PromptBlockKind, string> KindNames = Kinds.ToDictionary(pair => pair.Value, pair => pair.Key);
-
     private static readonly Dictionary<string, PromptStatus> Statuses = new(StringComparer.Ordinal)
     {
         ["draft"] = PromptStatus.Draft,
@@ -471,7 +459,7 @@ internal sealed class PromptAdminService(
             {
                 issues.Add(new ValidationIssue($"blocks[{index}].position", "Informe a posição do bloco."));
             }
-            else if (block.Kind is null || !Kinds.TryGetValue(block.Kind, out var kind))
+            else if (block.Kind is null || !PromptBlockKinds.TryParse(block.Kind, out var kind))
             {
                 issues.Add(new ValidationIssue($"blocks[{index}].kind", "Tipo de bloco desconhecido."));
             }
@@ -525,7 +513,7 @@ internal sealed class PromptAdminService(
         return new PromptBlockDto(
             block.Id,
             block.Position,
-            KindNames[block.Kind],
+            PromptBlockKinds.NameOf(block.Kind),
             new PromptBlockDataDto
             {
                 Label = data.Label,
@@ -597,4 +585,24 @@ public static class ImageFormat
             ? "image/webp"
             : null;
     }
+}
+
+/// <summary>Os nomes dos tipos de bloco no JSON (<c>collection_item</c>, <c>command</c>…).</summary>
+internal static class PromptBlockKinds
+{
+    private static readonly Dictionary<string, PromptBlockKind> Kinds = new(StringComparer.Ordinal)
+    {
+        ["collection_item"] = PromptBlockKind.CollectionItem,
+        ["command"] = PromptBlockKind.Command,
+        ["instructions"] = PromptBlockKind.Instructions,
+        ["heading"] = PromptBlockKind.Heading,
+        ["paragraph"] = PromptBlockKind.Paragraph,
+        ["divider"] = PromptBlockKind.Divider,
+    };
+
+    private static readonly Dictionary<PromptBlockKind, string> Names = Kinds.ToDictionary(pair => pair.Value, pair => pair.Key);
+
+    public static bool TryParse(string name, out PromptBlockKind kind) => Kinds.TryGetValue(name, out kind);
+
+    public static string NameOf(PromptBlockKind kind) => Names[kind];
 }

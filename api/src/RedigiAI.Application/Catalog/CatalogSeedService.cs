@@ -4,7 +4,10 @@ using RedigiAI.Domain.Catalog;
 
 namespace RedigiAI.Application.Catalog;
 
-/// <summary>Carga inicial do catálogo e da base de conhecimento da correção (no MVP não há painel administrativo).</summary>
+/// <summary>
+/// Carga inicial do catálogo e da base de conhecimento da correção. As propostas de redação são cadastradas pela
+/// área de administração; aqui entra só uma proposta de exemplo, em banco novo.
+/// </summary>
 public interface ICatalogSeedService
 {
     /// <summary>Idempotente: só cria o que ainda não existe.</summary>
@@ -16,7 +19,7 @@ internal sealed class CatalogSeedService(
     IExamRepository exams,
     IEssayTypeRepository essayTypes,
     IRubricRepository rubrics,
-    IThemeRepository themes,
+    IPromptRepository prompts,
     GradingSeedService grading,
     IUnitOfWork unitOfWork,
     TimeProvider time) : ICatalogSeedService
@@ -36,7 +39,14 @@ internal sealed class CatalogSeedService(
             await unitOfWork.SaveChangesAsync(ct);
         }
 
-        return catalogCreated || gradingCreated;
+        // Depois da base de conhecimento: a proposta só é publicada com perfil de correção ativo.
+        var promptCreated = await EnsureExamplePromptAsync(ct);
+        if (promptCreated)
+        {
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        return catalogCreated || gradingCreated || promptCreated;
     }
 
     private async Task<bool> SeedCatalogAsync(CancellationToken ct)
@@ -61,20 +71,66 @@ internal sealed class CatalogSeedService(
         var rubric = GradingSeedService.PublishRubric(fuvest.Id, version: 1, now);
         rubrics.Add(rubric);
 
-        // TODO(conteúdo): o enunciado, a coletânea e as instruções do tema ainda não foram fornecidos.
-        // Os textos entre colchetes são marcadores, substituídos direto no banco.
-        var theme = Theme.Draft(
-            fuvest.Id,
-            "Algoritmos e o debate público",
-            "[Enunciado da proposta: o que o candidato deve discutir sobre o tema e como usar a coletânea.]");
-        theme.AddText(ThemeTextKind.Text, "[Título do texto 1]", "[Fonte do texto 1]", "[Trecho do texto 1, como aparece na proposta da prova.]");
-        theme.AddText(ThemeTextKind.Text, "[Título do texto 2]", "[Fonte do texto 2]", "[Trecho do texto 2.]");
-        theme.AddText(ThemeTextKind.Image, "[Gráfico ou charge]", "[Fonte do texto 3]", null);
-        theme.AddText(ThemeTextKind.Text, "[Título do texto 4]", "[Fonte do texto 4]", "[Trecho do texto 4.]");
-        theme.AcceptType(dissertacao, rubric, "[Instrução da proposta para o texto dissertativo-argumentativo.]");
-        theme.AcceptType(narrativa, rubric, "[Instrução da proposta para o texto narrativo com reflexão.]");
-        theme.Publish(now);
-        themes.Add(theme);
+        return true;
+    }
+
+    /// <summary>Uma proposta publicada de exemplo, só quando o vestibular ainda não tem nenhuma.</summary>
+    private async Task<bool> EnsureExamplePromptAsync(CancellationToken ct)
+    {
+        if (await exams.FindBySlugAsync("fuvest", ct) is not { } fuvest
+            || await prompts.AnyAsync(fuvest.Id, ct)
+            || (await essayTypes.ListByExamAsync(fuvest.Id, ct)).FirstOrDefault(type => type.Slug == "dissertacao") is not { } dissertacao)
+        {
+            return false;
+        }
+
+        // TODO(conteúdo): os textos entre colchetes são marcadores. A proposta de verdade é cadastrada pelo admin,
+        // e esta é arquivada por lá.
+        static PromptBlockContent Text(int position, string label, string body) => new(
+            null,
+            position,
+            PromptBlockKind.CollectionItem,
+            new PromptBlockData { Label = label, Format = CollectionFormat.Prose, Source = $"[Fonte do {label.ToLowerInvariant()}]", Body = body });
+
+        var now = time.GetUtcNow();
+        var prompt = Prompt.Draft(
+            new PromptContent(
+                fuvest.Id,
+                "algoritmos-e-o-debate-publico",
+                "Algoritmos e o debate público",
+                "[Resumo da proposta, para o cartão da lista.]",
+                "Exemplo",
+                dissertacao.Id,
+                "Dissertação em prosa",
+                MinLines: 20,
+                MaxLines: fuvest.SheetLines,
+                TitleRequired: true,
+                [
+                    Text(10, "Texto 1", "[Trecho do texto 1, como aparece na proposta da prova.]"),
+                    Text(20, "Texto 2", "[Trecho do texto 2.]"),
+                    new(null, 30, PromptBlockKind.CollectionItem, new PromptBlockData
+                    {
+                        Label = "Texto 3",
+                        Format = CollectionFormat.Verse,
+                        Source = "[Fonte do texto 3]",
+                        Columns = [["[verso]", "[verso]"], ["[verso]", "[verso]"]],
+                    }),
+                    Text(40, "Texto 4", "[Trecho do texto 4.]"),
+                    new(null, 50, PromptBlockKind.Command, new PromptBlockData
+                    {
+                        Body = "[Enunciado da proposta: o que o candidato deve discutir sobre o tema e como usar a coletânea.]",
+                    }),
+                    new(null, 60, PromptBlockKind.Instructions, new PromptBlockData
+                    {
+                        Title = "Instruções",
+                        Items = ["[Instrução da proposta para o texto dissertativo-argumentativo.]"],
+                    }),
+                ],
+                new PromptNotesContent("[Recorte que a banca espera do tema.]", "[O que caracteriza tangenciar o tema.]", null, null, null)),
+            createdBy: null,
+            now);
+        prompt.Publish(new PublicationContext(true, fuvest.SheetLines, new HashSet<Guid>()), publishedBy: null, now);
+        prompts.Add(prompt);
 
         return true;
     }

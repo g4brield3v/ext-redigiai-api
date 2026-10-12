@@ -6,7 +6,9 @@ namespace RedigiAI.Application.Essays;
 /// <param name="Fields">Campos que o navegador envia ao provedor junto com o arquivo.</param>
 public sealed record UploadSignatureDto(Guid AssetId, string UploadUrl, IReadOnlyDictionary<string, string> Fields);
 
-public sealed record BatchEssayItem(Guid ThemeId, Guid EssayTypeId, Guid AssetId, Guid? ParentEssayId);
+/// <summary>Uma redação do envio. Sem tipo: o backend usa o da proposta.</summary>
+/// <param name="PromptId">A versão publicada da proposta; numa reescrita vale a versão da redação original.</param>
+public sealed record BatchEssayItem(Guid PromptId, Guid AssetId, Guid? ParentEssayId);
 
 public sealed record SubmitEssaysCommand(
     string ClerkUserId,
@@ -24,12 +26,16 @@ public sealed record IllegibleAnswer(Guid WordId, string? Value);
 public sealed record PhotoUrlDto(string Url);
 
 /// <param name="Title">"Vestibular – Tipo – Tema", gerado pelo backend.</param>
+/// <param name="PromptSlug">Endereço da proposta (<c>/propostas/{slug}</c>).</param>
+/// <param name="PromptVersion">A versão da proposta que o aluno usou; pode não ser mais a publicada.</param>
 /// <param name="HasVersions">A redação é uma reescrita ou já foi reescrita.</param>
 /// <param name="FailureCode">Código do erro quando o status é <c>failed</c> ou <c>cancelled</c>.</param>
 public sealed record EssaySummaryDto(
     Guid Id,
     string Title,
-    Guid ThemeId,
+    Guid PromptId,
+    string PromptSlug,
+    int PromptVersion,
     Guid EssayTypeId,
     EssayStatus Status,
     int Version,
@@ -54,7 +60,9 @@ public sealed record IllegibleWordDto(
 public sealed record EssayDetailDto(
     Guid Id,
     string Title,
-    Guid ThemeId,
+    Guid PromptId,
+    string PromptSlug,
+    int PromptVersion,
     Guid EssayTypeId,
     EssayStatus Status,
     int Version,

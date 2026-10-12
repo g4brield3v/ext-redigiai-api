@@ -15,7 +15,7 @@ public enum EssayStatus
 }
 
 /// <summary>
-/// Redação enviada: responde a exatamente uma proposta (tema + tipo). Só o sistema muda o status;
+/// Redação enviada: responde a exatamente uma proposta, na versão publicada no envio. Só o sistema muda o status;
 /// depois de confirmado o envio, o aluno não troca a foto nem cancela.
 /// </summary>
 public sealed class Essay
@@ -26,7 +26,10 @@ public sealed class Essay
     public Guid UserId { get; private set; }
     public Guid BatchId { get; private set; }
     public Guid ExamId { get; private set; }
-    public Guid ThemeId { get; private set; }
+    /// <summary>A versão exata da proposta que o aluno usou.</summary>
+    public Guid PromptId { get; private set; }
+
+    /// <summary>Copiado da proposta no envio: o aluno não escolhe tipo.</summary>
     public Guid EssayTypeId { get; private set; }
     public Guid RubricVersionId { get; private set; }
 
@@ -45,34 +48,36 @@ public sealed class Essay
     public Guid? GradingProfileId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <param name="essayType">A categoria de correção da proposta.</param>
+    /// <param name="rubricVersionId">A grade em uso para esse vestibular e categoria.</param>
     /// <param name="rewriteOf">Redação que está sendo reescrita, se for o caso.</param>
     public static Essay Submit(
         Guid userId,
         Guid batchId,
         Exam exam,
-        Theme theme,
+        Prompt prompt,
         EssayType essayType,
+        Guid rubricVersionId,
         Asset photo,
         Essay? rewriteOf,
         DateTimeOffset now)
     {
-        if (exam.Status != ExamStatus.Active || theme.Status != ThemeStatus.Active || theme.ExamId != exam.Id)
+        // A reescrita responde à mesma versão da proposta, na conta de quem escreveu a primeira, mesmo que a
+        // proposta já tenha uma versão mais nova ou tenha saído da lista.
+        if (rewriteOf is not null && (rewriteOf.UserId != userId || rewriteOf.PromptId != prompt.Id))
         {
-            throw Errors.ThemeNotAvailable();
+            throw Errors.EssayNotFound();
         }
 
-        var accepted = theme.AcceptedTypes.FirstOrDefault(a => a.EssayTypeId == essayType.Id)
-            ?? throw Errors.EssayTypeNotAccepted();
+        var available = rewriteOf is null ? prompt.Status == PromptStatus.Published : prompt.Status != PromptStatus.Draft;
+        if (exam.Status != ExamStatus.Active || !available || prompt.ExamId != exam.Id || prompt.EssayTypeId != essayType.Id)
+        {
+            throw Errors.PromptNotAvailable();
+        }
 
         if (photo.UserId != userId)
         {
             throw Errors.InvalidFile();
-        }
-
-        // A reescrita responde à mesma proposta, na conta de quem escreveu a primeira versão.
-        if (rewriteOf is not null && (rewriteOf.UserId != userId || rewriteOf.ThemeId != theme.Id))
-        {
-            throw Errors.EssayNotFound();
         }
 
         return new Essay
@@ -81,10 +86,10 @@ public sealed class Essay
             UserId = userId,
             BatchId = batchId,
             ExamId = exam.Id,
-            ThemeId = theme.Id,
+            PromptId = prompt.Id,
             EssayTypeId = essayType.Id,
-            RubricVersionId = accepted.RubricVersionId,
-            Title = EssayTitle.Compose(exam.Name, essayType.Name, theme.Title),
+            RubricVersionId = rubricVersionId,
+            Title = EssayTitle.Compose(exam.Name, essayType.Name, prompt.Title),
             Status = EssayStatus.Uploaded,
             PhotoAssetId = photo.Id,
             Version = (rewriteOf?.Version ?? 0) + 1,
@@ -156,8 +161,8 @@ public sealed record EssayTransition
 public static class EssayTitle
 {
     /// <summary>Formato único do produto: "Vestibular – Tipo – Tema", sem ano.</summary>
-    public static string Compose(string examName, string essayTypeName, string themeTitle) =>
-        $"{examName} – {essayTypeName} – {themeTitle}";
+    public static string Compose(string examName, string essayTypeName, string promptTitle) =>
+        $"{examName} – {essayTypeName} – {promptTitle}";
 }
 
 /// <summary>Uma confirmação de envio (uma ou várias redações). A chave de idempotência é única por aluno.</summary>

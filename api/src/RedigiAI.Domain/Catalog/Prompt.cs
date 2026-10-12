@@ -233,7 +233,10 @@ public sealed class Prompt
     }
 }
 
-/// <summary>Uma versão na lista da administração, sem o conteúdo.</summary>
+/// <summary>Onde uma versão da proposta é lida: <c>/propostas/{slug}</c>, com a versão quando ela não é mais a publicada.</summary>
+public sealed record PromptReference(string Slug, int Version);
+
+/// <summary>Uma versão numa lista, sem o conteúdo.</summary>
 /// <param name="TextCount">Textos da coletânea.</param>
 public sealed record PromptListItem(
     Guid Id,
@@ -246,7 +249,10 @@ public sealed record PromptListItem(
     Guid? EssayTypeId,
     string? GenreLabel,
     int TextCount,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int? SheetLinesMin = null,
+    int? SheetLinesMax = null,
+    bool TitleRequired = false);
 
 /// <summary>Nova posição de um bloco, para a reordenação.</summary>
 public sealed record BlockPosition(Guid Id, int Position);

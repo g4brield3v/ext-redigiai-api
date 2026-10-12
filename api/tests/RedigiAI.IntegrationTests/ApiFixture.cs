@@ -39,6 +39,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public byte[] WebhookKey { get; } = RandomNumberGenerator.GetBytes(24);
 
+    /// <summary>O servidor de banco dos testes, para quem precisa de um banco à parte.</summary>
+    public string ConnectionString => _database.GetConnectionString();
+
     /// <summary>Faz o papel do Cloudinary: o que o teste "enviou" e a assinatura devolvida ao navegador.</summary>
     public FakePhotoStorage Photos { get; } = new();
 

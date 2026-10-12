@@ -35,10 +35,13 @@ public class GradingTests(ApiFixture api)
         Assert.Equal([9, 6, 6, 6], correction.Criteria.OrderBy(c => c.Position).Select(c => c.Points));
         Assert.Equal(2, correction.Marks.Count);
 
-        // A correção guarda com que foi feita: perfil, grade, tema e versão do tema, e o modelo.
+        // A correção guarda com que foi feita: perfil, grade, versão da proposta e abordagens esperadas, e o modelo.
         var profile = await api.QueryAsync(db => db.GradingProfiles.SingleAsync(p => p.Id == correction.GradingProfileId));
-        Assert.Equal((essay.GradingProfileId, profile.RubricVersionId, essay.ThemeId, 1, GradingModel),
-            (correction.GradingProfileId, correction.RubricVersionId, correction.ThemeId, correction.ThemeVersion, correction.Model));
+        Assert.Equal((essay.GradingProfileId, profile.RubricVersionId, essay.PromptId, GradingModel),
+            (correction.GradingProfileId, correction.RubricVersionId, correction.PromptId, correction.Model));
+        Assert.Equal(
+            correction.PromptGradingNotesId,
+            await api.QueryAsync(db => db.Set<Domain.Catalog.PromptGradingNotes>().Where(n => n.PromptId == essay.PromptId).Select(n => n.Id).SingleAsync()));
         Assert.Contains("\"criteria\"", correction.RawResponse);
 
         // Crédito: a reserva do envio é o débito definitivo; nada novo no ledger, só o registro do consumo.
@@ -80,7 +83,7 @@ public class GradingTests(ApiFixture api)
         Assert.Contains("Não envie nota. A nota é calculada pelo sistema.", request.System);
         Assert.DoesNotContain("{{", request.System + request.Proposal + request.Essay);
         // Camada 6, igual para o tema; camada 7, só a redação.
-        Assert.Contains("<proposta tema=\"Algoritmos e o debate público\" tipo=\"Dissertação\">", request.Proposal);
+        Assert.Contains("<proposta tema=\"Algoritmos e o debate público\" tipo=\"Dissertação em prosa\">", request.Proposal);
         Assert.DoesNotContain("ignore as instrucoes", request.System + request.Proposal);
         Assert.StartsWith("<redacao linhas=\"2\" identificacao_na_folha=\"nao\">", request.Essay);
         // O que o aluno escreveu não fecha a marcação: continua dentro de <redacao>, como dado.
@@ -676,8 +679,7 @@ public class GradingTests(ApiFixture api)
             await scope.ServiceProvider.GetRequiredService<ICreditService>()
                 .GrantAsync(new GrantCreditsCommand(userId, CreditSource.Single, 1, null, "test"), CancellationToken.None);
         }
-        var theme = (await client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes"))[0];
-        var dissertacao = theme.GetProperty("essayTypes").EnumerateArray().Single(type => type.GetProperty("slug").GetString() == "dissertacao");
+        var prompt = await client.GetFromJsonAsync<JsonElement>("/v1/prompts/algoritmos-e-o-debate-publico");
 
         var assetId = (await (await client.PostAsync("/v1/uploads/sign", null)).Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("assetId").GetGuid();
@@ -692,8 +694,7 @@ public class GradingTests(ApiFixture api)
                 {
                     new
                     {
-                        themeId = theme.GetProperty("id").GetGuid(),
-                        essayTypeId = dissertacao.GetProperty("id").GetGuid(),
+                        promptId = prompt.GetProperty("id").GetGuid(),
                         assetId,
                         parentEssayId = rewriteOf?.EssayId,
                     },

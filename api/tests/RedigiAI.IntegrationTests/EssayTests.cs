@@ -166,19 +166,15 @@ public class EssayTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task Theme_type_and_ai_notice_are_validated()
+    public async Task Prompt_and_ai_notice_are_validated()
     {
         var student = await Student.CreateAsync(api);
         var assetId = await student.UploadAsync();
 
         await AccountTests.AssertErrorAsync(
-            await student.SubmitAsync([student.Item(assetId) with { ThemeId = Guid.CreateVersion7() }]),
+            await student.SubmitAsync([student.Item(assetId) with { PromptId = Guid.CreateVersion7() }]),
             HttpStatusCode.NotFound,
-            "THEME_NOT_AVAILABLE");
-        await AccountTests.AssertErrorAsync(
-            await student.SubmitAsync([student.Item(assetId) with { EssayTypeId = Guid.CreateVersion7() }]),
-            HttpStatusCode.UnprocessableEntity,
-            "ESSAY_TYPE_NOT_ACCEPTED");
+            "PROMPT_NOT_AVAILABLE");
         await AccountTests.AssertErrorAsync(
             await student.SubmitAsync([student.Item(assetId)], aiNoticeAccepted: false),
             HttpStatusCode.UnprocessableEntity,
@@ -263,14 +259,13 @@ public class EssayTests(ApiFixture api)
         Assert.Equal(sent.OrderByDescending(id => id).ToList(), listed);
     }
 
-    private sealed record Item(Guid ThemeId, Guid EssayTypeId, Guid AssetId, Guid? ParentEssayId = null);
+    private sealed record Item(Guid PromptId, Guid AssetId, Guid? ParentEssayId = null);
 
     /// <summary>Um aluno cadastrado, com o teste grátis e, se pedido, correções avulsas.</summary>
     private sealed class Student
     {
         private readonly ApiFixture _api;
-        private Guid _themeId;
-        private Guid _essayTypeId;
+        private Guid _promptId;
 
         private Student(ApiFixture api, HttpClient client)
         {
@@ -288,10 +283,8 @@ public class EssayTests(ApiFixture api)
             var profile = await student.Client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true });
             student.Id = (await profile.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
-            var theme = (await student.Client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes"))[0];
-            student._themeId = theme.GetProperty("id").GetGuid();
-            student._essayTypeId = theme.GetProperty("essayTypes").EnumerateArray()
-                .Single(t => t.GetProperty("slug").GetString() == "dissertacao").GetProperty("id").GetGuid();
+            var prompt = await student.Client.GetFromJsonAsync<JsonElement>("/v1/prompts/algoritmos-e-o-debate-publico");
+            student._promptId = prompt.GetProperty("id").GetGuid();
 
             if (extraCredits > 0)
             {
@@ -308,7 +301,7 @@ public class EssayTests(ApiFixture api)
                 .GrantAsync(new GrantCreditsCommand(Id, source, amount, expiresAt, "test"), CancellationToken.None);
         }
 
-        public Item Item(Guid assetId) => new(_themeId, _essayTypeId, assetId);
+        public Item Item(Guid assetId) => new(_promptId, assetId);
 
         public async Task<JsonElement> SignAsync() =>
             await (await Client.PostAsync("/v1/uploads/sign", null)).Content.ReadFromJsonAsync<JsonElement>();

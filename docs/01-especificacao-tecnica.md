@@ -179,7 +179,7 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 |---|---|
 | `GET /v1/exams` | Vestibulares e status (`active`, `coming_soon`). |
 | `GET /v1/exams/{slug}/prompts?q=` | Propostas publicadas, com `title`, `summary`, `genreLabel` e nº de textos. |
-| `GET /v1/prompts/{slug}` | Versão publicada da proposta: blocos em ordem, `genreLabel`, linhas e URLs públicas das imagens. Não devolve as abordagens esperadas. |
+| `GET /v1/prompts/{slug}?version=` | Versão publicada da proposta: blocos em ordem, `genreLabel`, linhas, URLs públicas das imagens e `essayTitle` (o título que a redação vai ter). Não devolve as abordagens esperadas nem a descrição das imagens feita para a IA. Com `version`, devolve essa versão se ela já foi publicada (`status` `archived`): é o que a redação feita numa versão antiga continua mostrando. |
 | `GET /v1/prompts/{id}/sheet.pdf` | Folha pautada em PDF, com o título da proposta e o tipo no topo. |
 | `GET /v1/rubrics/{versionId}` | Critérios, pesos e descritores (seção "Como a nota é calculada"). |
 

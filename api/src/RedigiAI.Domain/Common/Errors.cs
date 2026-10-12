@@ -9,14 +9,8 @@ public static class Errors
     public static AppError AgeBelowMinimum() =>
         new("AGE_BELOW_MINIMUM", 422, "A plataforma é destinada a pessoas com 16 anos ou mais.");
 
-    public static AppError ThemeNotAvailable() =>
-        new("THEME_NOT_AVAILABLE", 404, "Esse tema não está disponível. Escolha outro.");
-
     public static AppError QuotaExceeded() =>
         new("QUOTA_EXCEEDED", 402, "Você não tem correções suficientes para este envio.");
-
-    public static AppError EssayTypeNotAccepted() =>
-        new("ESSAY_TYPE_NOT_ACCEPTED", 422, "Esse tipo de redação não é aceito neste tema.");
 
     public static AppError InvalidFile() =>
         new("INVALID_FILE", 422, "Envie uma foto JPG da folha, com até 10 MB.");

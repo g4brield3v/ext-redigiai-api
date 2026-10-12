@@ -34,7 +34,6 @@ public static class DependencyInjection
         services.AddScoped<IExamRepository, ExamRepository>();
         services.AddScoped<IEssayTypeRepository, EssayTypeRepository>();
         services.AddScoped<IRubricRepository, RubricRepository>();
-        services.AddScoped<IThemeRepository, ThemeRepository>();
         services.AddScoped<IPromptRepository, PromptRepository>();
 
         services.AddScoped<IEssayRepository, EssayRepository>();
@@ -46,7 +45,6 @@ public static class DependencyInjection
         services.AddScoped<IPromptTemplateRepository, PromptTemplateRepository>();
         services.AddScoped<IGuidelinesRepository, GuidelinesRepository>();
         services.AddScoped<IWritingRulesRepository, WritingRulesRepository>();
-        services.AddScoped<IThemeGradingNotesRepository, ThemeGradingNotesRepository>();
         services.AddScoped<ICorrectionRepository, CorrectionRepository>();
         services.AddScoped<IJobQueue, JobQueue>();
         services.AddSingleton<IJobRunner, JobRunner>();

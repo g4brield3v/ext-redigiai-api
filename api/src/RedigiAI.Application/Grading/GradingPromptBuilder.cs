@@ -15,8 +15,7 @@ internal sealed record GradingLayers(
     WritingRulesVersion WritingRules,
     Exam Exam,
     EssayType EssayType,
-    Theme Theme,
-    ThemeGradingNotes? ThemeNotes);
+    Prompt Proposal);
 
 /// <summary>
 /// Monta a chamada da correção preenchendo as instruções do perfil com as camadas da base de conhecimento
@@ -42,16 +41,14 @@ internal static class GradingPromptBuilder
             ["writing_rules"] = WritingRules(layers.WritingRules),
         });
 
-        var instruction = layers.Theme.AcceptedTypes.FirstOrDefault(t => t.EssayTypeId == layers.EssayType.Id)?.Instruction;
+        var proposal = layers.Proposal;
         var user = Fill(layers.Prompt.UserText ?? "", new Dictionary<string, string>
         {
-            ["theme_title"] = layers.Theme.Title,
-            ["essay_type_name"] = layers.EssayType.Name,
-            ["theme_statement"] = string.IsNullOrWhiteSpace(instruction)
-                ? layers.Theme.Statement
-                : $"{layers.Theme.Statement}\n{instruction}",
-            ["theme_texts"] = "\n" + string.Join("\n", layers.Theme.Texts.OrderBy(t => t.Position).Select(Text)) + "\n",
-            ["theme_grading_notes"] = layers.ThemeNotes?.Notes ?? "",
+            ["theme_title"] = proposal.Title,
+            ["essay_type_name"] = PromptText.Genre(proposal, layers.EssayType),
+            ["theme_statement"] = PromptText.Statement(proposal),
+            ["theme_texts"] = "\n" + PromptText.Collection(proposal) + "\n",
+            ["theme_grading_notes"] = "\n" + PromptText.GradingNotes(proposal.GradingNotes) + "\n",
             ["line_count"] = Number(lines.Count),
             ["identification_found"] = identificationFound ? "sim" : "nao",
             ["numbered_lines"] = string.Join("\n", lines.Select(line => $"{Number(line.Number)}| {AsData(line.Text)}")),
@@ -123,12 +120,6 @@ internal static class GradingPromptBuilder
 
         return string.IsNullOrWhiteSpace(rules.Notes) ? text.ToString().TrimEnd() : text.Append(rules.Notes.Trim()).ToString();
     }
-
-    /// <summary>A correção recebe só texto: de uma imagem da coletânea vão o título e a fonte.</summary>
-    private static string Text(ThemeText text) =>
-        text.Kind == ThemeTextKind.Image || string.IsNullOrWhiteSpace(text.Body)
-            ? $"Texto {Number(text.Position)} · {text.Title} ({text.Source}) [imagem]"
-            : $"Texto {Number(text.Position)} · {text.Title} ({text.Source})\n{text.Body}";
 
     private static string Fill(string template, Dictionary<string, string> values)
     {

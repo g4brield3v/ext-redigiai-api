@@ -48,24 +48,6 @@ public class KnowledgeBaseTests
         Assert.Equal([1, 2], catalog.Rules.Select(r => r.Position));
     }
 
-    [Fact]
-    public void Theme_moves_to_a_newer_rubric_of_the_same_exam()
-    {
-        var levels3 = new Dictionary<int, string> { [1] = "um", [2] = "dois", [3] = "três" };
-        var levels4 = new Dictionary<int, string>(levels3) { [4] = "quatro" };
-        var old = RubricVersion.Publish(ExamId, 1, 3, Now, [], [new CriterionSpec("Tema", 3, levels3)]);
-        var current = RubricVersion.Publish(ExamId, 2, 4, Now, [], [new CriterionSpec("Tema", 3, levels4)], "Simulado Fuvest 2027 – 2ª edição");
-        var foreign = RubricVersion.Publish(Guid.CreateVersion7(), 1, 4, Now, [], [new CriterionSpec("Tema", 3, levels4)]);
-        var theme = Theme.Draft(ExamId, "Tema", "Enunciado");
-        theme.AcceptType(EssayType.Create(ExamId, "dissertacao", "Dissertação", "Texto"), old, "Instrução");
-
-        theme.UseRubric(current);
-
-        Assert.Equal(current.Id, theme.AcceptedTypes[0].RubricVersionId);
-        Assert.Equal((12, "Simulado Fuvest 2027 – 2ª edição"), (current.MaxScore, current.Source));
-        Assert.Throws<InvalidOperationException>(() => theme.UseRubric(foreign));
-    }
-
     private static GradingProfile Draft(PromptTemplate transcription, PromptTemplate grading) =>
         GradingProfile.Draft(
             ExamId,
