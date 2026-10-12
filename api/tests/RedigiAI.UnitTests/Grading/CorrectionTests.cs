@@ -154,6 +154,21 @@ public class CorrectionTests
     }
 
     [Fact]
+    public void Main_issue_is_a_statement_about_a_criterion_that_can_still_gain_points()
+    {
+        AssertRejected(4, Output(mainIssue: new GradedPoint("Que tal trazer argumentos próprios?", 1)));
+
+        // O critério 2 já está no nível máximo e outros não: começar por ele não rende nada.
+        var oneAtTop = new[] { Criterion(1, 3), Criterion(2, 4, guidance: null), Criterion(3, 2), Criterion(4, 3) };
+        AssertRejected(2, Output(criteria: oneAtTop, mainIssue: new GradedPoint("Estrutura.", 2)));
+        Assert.Equal(3, Grade(Output(criteria: oneAtTop, mainIssue: new GradedPoint("Coesão.", 3))).MainIssueCriterion);
+
+        // Com tudo no nível máximo não há critério com pontos a ganhar: qualquer um é aceito.
+        var allAtTop = Enumerable.Range(1, 4).Select(position => Criterion(position, 4, guidance: null)).ToList();
+        Assert.Equal(40, Grade(Output(criteria: allAtTop, mainIssue: new GradedPoint("Nada a corrigir.", 2))).Score);
+    }
+
+    [Fact]
     public void Points_lost_are_what_is_missing_for_the_top_level()
     {
         var third = Rubric.Criteria.Single(criterion => criterion.Position == 3);

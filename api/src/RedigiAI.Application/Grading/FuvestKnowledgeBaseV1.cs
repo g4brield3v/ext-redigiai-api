@@ -80,16 +80,16 @@ internal static class FuvestKnowledgeBaseV1
         new(
             "modality_not_met",
             "Não atendimento à modalidade textual da proposta escolhida.",
-            "Texto que não é do tipo pedido na proposta recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de misturar traços de outro tipo, que só reduz o nível do critério 2."),
+            "Texto que não segue o tipo e o gênero escolhidos recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de atender parcialmente ao tipo, que só reduz o nível do critério 2."),
         new(
             "collection_copy",
             "Cópia integral ou parcial da coletânea.",
-            "Texto copiado da coletânea, no todo ou em parte, recebe nota zero, e os quatro critérios não são pontuados."),
+            "Texto que copia a coletânea, no todo ou em parte, recebe nota zero. A banca espera que a coletânea seja usada como apoio, com as suas palavras e ideias."),
         // Não consta do PDF de critérios: regra geral das provas da Fuvest, a confirmar no Guia 2027.
         new(
             "candidate_identification",
             "Nome, assinatura ou qualquer marca que identifique o candidato.",
-            "Folha com nome, assinatura ou qualquer marca que identifique quem escreveu recebe nota zero, e os quatro critérios não são pontuados."),
+            "Nome, assinatura ou qualquer marca que identifique o autor anula a redação. Na prova, escreva só o texto, sem se identificar."),
     ];
 
     // ---- Camada 3 · Manual do corretor
@@ -265,7 +265,7 @@ internal static class FuvestKnowledgeBaseV1
         1. Verifique primeiro as hipóteses de nota zero. Se alguma se aplica, preencha "zero" e não pontue os critérios.
         2. Para cada critério, escolha um nível de 1 a {{max_level}}, escreva a justificativa (até 60 palavras) citando linhas e, se o nível não for o máximo, a orientação.
         3. Marque na redação até 12 trechos: o que funcionou e o que tirou pontos, cada um ligado a um critério e com uma nota curta que explica o apontamento. No critério 4, use o código da regra e escreva em "fix" a forma correta do trecho marcado; nos outros critérios, "fix" é nulo.
-        4. Escreva o ponto forte, o problema principal e até 3 próximos passos. No problema principal e em cada próximo passo, informe em "criterion" o número do critério a que ele se refere. Com nota zero, "criterion" é nulo.
+        4. Escreva o ponto forte, o problema principal e até 3 próximos passos. No problema principal e em cada próximo passo, informe em "criterion" o número do critério a que ele se refere. O problema principal é sempre de um critério que não está no nível máximo. Com nota zero, "criterion" é nulo.
 
         Forma obrigatória:
         - Toda orientação e todo próximo passo é uma afirmação do que fazer. Nunca termine com ponto de interrogação.

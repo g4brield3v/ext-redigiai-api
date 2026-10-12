@@ -102,6 +102,7 @@ public class GradingTests(ApiFixture api)
     [InlineData("four-next-steps", 5)]
     [InlineData("plain-next-steps", 1)]
     [InlineData("main-issue-without-criterion", 2)]
+    [InlineData("main-issue-as-question", 4)]
     [InlineData("no-tool", 1)]
     public async Task Bad_response_is_rejected_and_asked_again(string problem, int rule)
     {
@@ -174,7 +175,9 @@ public class GradingTests(ApiFixture api)
             (zero.GetProperty("applies").GetBoolean(), zero.GetProperty("ruleCode").GetString(), zero.GetProperty("explanation").GetString()));
         Assert.StartsWith("Nome, assinatura", zero.GetProperty("ruleLabel").GetString());
         // O texto para o aluno vem da grade, não do front.
-        Assert.StartsWith("Folha com nome, assinatura", zero.GetProperty("ruleNote").GetString());
+        Assert.Equal(
+            "Nome, assinatura ou qualquer marca que identifique o autor anula a redação. Na prova, escreva só o texto, sem se identificar.",
+            zero.GetProperty("ruleNote").GetString());
         Assert.Equal(0, shown.GetProperty("criteria").GetArrayLength());
         // Sem critério pontuado, nada tem pontos a ganhar.
         Assert.Equal((JsonValueKind.Null, JsonValueKind.Null),
@@ -453,6 +456,8 @@ public class GradingTests(ApiFixture api)
             var response = FakeGrader.Good();
             response["criteria"] = new JsonArray(
                 FakeGrader.Criterion(1, 3), FakeGrader.Criterion(2, 3), FakeGrader.Criterion(3, 4), FakeGrader.Criterion(4, 3));
+            // O critério 3 chegou ao máximo: o problema principal passa a ser de outro.
+            response["main_issue"] = FakeGrader.Point("Ainda há desvios de crase.", 4);
             return response.ToJsonString();
         });
 
@@ -465,7 +470,7 @@ public class GradingTests(ApiFixture api)
         // No nível máximo não há descritor seguinte nem pontos a ganhar.
         var third = shown.GetProperty("criteria")[2];
         Assert.Equal((0, JsonValueKind.Null), (third.GetProperty("pointsLost").GetInt32(), third.GetProperty("nextDescriptor").ValueKind));
-        Assert.Equal(0, shown.GetProperty("mainIssue").GetProperty("potentialGain").GetInt32());
+        Assert.Equal(2, shown.GetProperty("mainIssue").GetProperty("potentialGain").GetInt32());
     }
 
     [Fact]
@@ -596,6 +601,9 @@ public class GradingTests(ApiFixture api)
                 break;
             case "main-issue-without-criterion":
                 response["main_issue"] = FakeGrader.Point("O segundo parágrafo repete o primeiro.", null);
+                break;
+            case "main-issue-as-question":
+                response["main_issue"] = FakeGrader.Point("Que tal rever o segundo parágrafo?", 3);
                 break;
             case "no-tool":
                 return null;

@@ -370,9 +370,9 @@ O tema não faz parte do perfil: tem versão própria, porque muda a cada tema n
 **Validação no backend** (falha → nova tentativa; repetida → GRADING_FAILED)
 
 1. JSON válido contra o schema. Aspas que o modelo escreve já com a barra de escape (`\"assim\"`) são gravadas sem a barra em todos os campos de texto; `raw_response` guarda a resposta como veio.
-2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão. Sem nota zero, `main_issue.criterion` é um critério da grade; o `criterion` de um próximo passo é um critério da grade ou nulo.
+2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão. Sem nota zero, `main_issue.criterion` é um critério da grade que não está no nível máximo (a não ser que todos estejam); o `criterion` de um próximo passo é um critério da grade ou nulo.
 3. Linhas e posições citadas existem na transcrição.
-4. Nenhuma orientação ou próximo passo termina com ponto de interrogação nem traz "?" fora de um trecho entre aspas.
+4. Nenhuma orientação, próximo passo ou problema principal termina com ponto de interrogação nem traz "?" fora de um trecho entre aspas.
 5. No máximo 3 próximos passos.
 6. Se `zero.applies`, `reason` é uma das hipóteses da grade e a nota gravada é 0.
 7. A transcrição indicou identificação na folha e a correção não aplicou nota zero → inconsistência, nova tentativa.

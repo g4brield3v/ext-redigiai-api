@@ -52,7 +52,8 @@ public class KnowledgeBaseTests(ApiFixture api)
             ["Tema e autoria", "Tipo e gênero", "Coesão e progressão", "Escrita e vocabulário"],
             rubric.Criteria.OrderBy(c => c.Position).Select(c => c.ShortName));
         Assert.Equal(4, rubric.ZeroRules.Count);
-        Assert.All(rubric.ZeroRules, rule => Assert.Contains("recebe nota zero", rule.StudentNote));
+        Assert.All(rubric.ZeroRules, rule => Assert.False(string.IsNullOrWhiteSpace(rule.StudentNote)));
+        Assert.StartsWith("Nome, assinatura", rubric.ZeroRules.Single(rule => rule.Code == "candidate_identification").StudentNote);
         Assert.EndsWith(
             "Isso é diferente de tangenciar o tema, que só reduz o nível do critério 1.",
             rubric.ZeroRules.Single(rule => rule.Code == "theme_not_addressed").StudentNote);

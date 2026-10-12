@@ -59,9 +59,9 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         FROM jsonb_array_elements(r.zero_rules) WITH ORDINALITY AS z(rule, ord)
                         LEFT JOIN (VALUES
                             ('theme_not_addressed', 'Texto que não aborda o tema recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de tangenciar o tema, que só reduz o nível do critério 1.'),
-                            ('modality_not_met', 'Texto que não é do tipo pedido na proposta recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de misturar traços de outro tipo, que só reduz o nível do critério 2.'),
-                            ('collection_copy', 'Texto copiado da coletânea, no todo ou em parte, recebe nota zero, e os quatro critérios não são pontuados.'),
-                            ('candidate_identification', 'Folha com nome, assinatura ou qualquer marca que identifique quem escreveu recebe nota zero, e os quatro critérios não são pontuados.'))
+                            ('modality_not_met', 'Texto que não segue o tipo e o gênero escolhidos recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de atender parcialmente ao tipo, que só reduz o nível do critério 2.'),
+                            ('collection_copy', 'Texto que copia a coletânea, no todo ou em parte, recebe nota zero. A banca espera que a coletânea seja usada como apoio, com as suas palavras e ideias.'),
+                            ('candidate_identification', 'Nome, assinatura ou qualquer marca que identifique o autor anula a redação. Na prova, escreva só o texto, sem se identificar.'))
                             AS n(code, note) ON n.code = z.rule->>'code'), '[]'::jsonb)
                 WHERE r.source = 'Simulado Fuvest 2027 – 2ª edição';
                 """);

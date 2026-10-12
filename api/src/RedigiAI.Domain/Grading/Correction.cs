@@ -134,6 +134,12 @@ public sealed class Correction
             throw new InvalidGradingException(4, "A next step is a question.");
         }
 
+        // O problema principal é o destaque da correção ("Comece por aqui"): também é sempre afirmação.
+        if (Feedback.IsQuestion(output.MainIssue.Text))
+        {
+            throw new InvalidGradingException(4, "The main issue is a question.");
+        }
+
         // Com nota zero nenhum critério é pontuado: o problema principal e os passos não ficam ligados a critério.
         if (!zero && (output.MainIssue.Criterion is not { } mainCriterion || !HasCriterion(rubric, mainCriterion)))
         {
@@ -172,6 +178,13 @@ public sealed class Correction
         if (!zero)
         {
             correction.AddCriteria(rubric, output.Criteria, textByLine);
+
+            // Por onde começar tem de render pontos: só vale um critério no nível máximo quando todos estão nele.
+            if (correction._criteria.Single(c => c.Position == output.MainIssue.Criterion).Level == rubric.MaxLevel
+                && correction._criteria.Any(c => c.Level < rubric.MaxLevel))
+            {
+                throw new InvalidGradingException(2, "The main issue points to a criterion that is already at the top level.");
+            }
         }
 
         correction.AddMarks(rubric, output.Marks, textByLine, context.WritingRuleCodes);

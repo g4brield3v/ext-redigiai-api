@@ -75,9 +75,9 @@ Cada hipótese tem também um texto para o aluno (`studentNote`), exibido na cor
 | Código | Texto para o aluno |
 |---|---|
 | `theme_not_addressed` | Texto que não aborda o tema recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de tangenciar o tema, que só reduz o nível do critério 1. |
-| `modality_not_met` | Texto que não é do tipo pedido na proposta recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de misturar traços de outro tipo, que só reduz o nível do critério 2. |
-| `collection_copy` | Texto copiado da coletânea, no todo ou em parte, recebe nota zero, e os quatro critérios não são pontuados. |
-| `candidate_identification` | Folha com nome, assinatura ou qualquer marca que identifique quem escreveu recebe nota zero, e os quatro critérios não são pontuados. |
+| `modality_not_met` | Texto que não segue o tipo e o gênero escolhidos recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de atender parcialmente ao tipo, que só reduz o nível do critério 2. |
+| `collection_copy` | Texto que copia a coletânea, no todo ou em parte, recebe nota zero. A banca espera que a coletânea seja usada como apoio, com as suas palavras e ideias. |
+| `candidate_identification` | Nome, assinatura ou qualquer marca que identifique o autor anula a redação. Na prova, escreva só o texto, sem se identificar. |
 
 Não aplicar no MVP: "opção de gênero não marcada na folha" (Guia 2027). Na plataforma, o aluno escolhe o tipo antes de enviar, então a marcação é feita pelo sistema.
 
@@ -249,7 +249,7 @@ Procedimento:
 1. Verifique primeiro as hipóteses de nota zero. Se alguma se aplica, preencha "zero" e não pontue os critérios.
 2. Para cada critério, escolha um nível de 1 a {{max_level}}, escreva a justificativa (até 60 palavras) citando linhas e, se o nível não for o máximo, a orientação.
 3. Marque na redação até 12 trechos: o que funcionou e o que tirou pontos, cada um ligado a um critério e com uma nota curta que explica o apontamento. No critério 4, use o código da regra e escreva em "fix" a forma correta do trecho marcado; nos outros critérios, "fix" é nulo.
-4. Escreva o ponto forte, o problema principal e até 3 próximos passos. No problema principal e em cada próximo passo, informe em "criterion" o número do critério a que ele se refere. Com nota zero, "criterion" é nulo.
+4. Escreva o ponto forte, o problema principal e até 3 próximos passos. No problema principal e em cada próximo passo, informe em "criterion" o número do critério a que ele se refere. O problema principal é sempre de um critério que não está no nível máximo. Com nota zero, "criterion" é nulo.
 
 Forma obrigatória:
 - Toda orientação e todo próximo passo é uma afirmação do que fazer. Nunca termine com ponto de interrogação.
