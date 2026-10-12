@@ -437,9 +437,7 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnName("exam_id");
 
                     b.Property<int>("MaxLevel")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(3)
                         .HasColumnName("max_level");
 
                     b.Property<int>("MaxScore")

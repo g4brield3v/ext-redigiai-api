@@ -38,6 +38,22 @@ public class KnowledgeBaseTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task New_database_has_only_the_official_rubric_with_4_levels()
+    {
+        var rubric = await api.QueryAsync(db => db.RubricVersions.Include(r => r.Criteria).SingleAsync());
+
+        Assert.Equal((1, 4, 40, "Simulado Fuvest 2027 – 2ª edição"), (rubric.Version, rubric.MaxLevel, rubric.MaxScore, rubric.Source));
+        Assert.Equal([12, 8, 12, 8], rubric.Criteria.OrderBy(c => c.Position).Select(c => c.MaxPoints));
+
+        // Nenhuma grade nasce com 3 níveis por omissão: a coluna não tem valor padrão.
+        var columnDefault = await api.QueryAsync(db => db.Database
+            .SqlQueryRaw<string?>(
+                "SELECT column_default AS \"Value\" FROM information_schema.columns WHERE table_name = 'rubric_versions' AND column_name = 'max_level'")
+            .SingleAsync());
+        Assert.Null(columnDefault);
+    }
+
+    [Fact]
     public async Task Each_fuvest_essay_type_has_one_active_profile_pointing_to_the_layers()
     {
         var exams = await api.CreateClient().GetFromJsonAsync<JsonElement>("/v1/exams");

@@ -35,8 +35,6 @@ internal sealed class RubricVersionConfiguration : IEntityTypeConfiguration<Rubr
     {
         builder.ToTable("rubric_versions");
         builder.Property(r => r.Source).HasMaxLength(200);
-        // Grades publicadas antes de o número de níveis ser da versão tinham 3.
-        builder.Property(r => r.MaxLevel).HasDefaultValue(3);
         builder.Property(r => r.ZeroRules)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<ZeroRule>>, JsonComparer<IReadOnlyList<ZeroRule>>>();
