@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Essays;
+using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Infrastructure.Persistence.Configurations;
@@ -23,6 +24,7 @@ internal sealed class EssayConfiguration : IEntityTypeConfiguration<Essay>
         builder.HasOne<RubricVersion>().WithMany().HasForeignKey(e => e.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Essay>().WithMany().HasForeignKey(e => e.ParentEssayId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Asset>().WithMany().HasForeignKey(e => e.PhotoAssetId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<GradingProfile>().WithMany().HasForeignKey(e => e.GradingProfileId).OnDelete(DeleteBehavior.Restrict);
 
         // Uma foto, uma redação.
         builder.HasIndex(e => e.PhotoAssetId).IsUnique();

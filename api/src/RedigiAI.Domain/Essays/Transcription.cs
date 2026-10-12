@@ -45,6 +45,29 @@ public sealed class Transcription
 
     public bool IsUnreadable => IllegibleCount > MaxIllegibleWords;
 
+    /// <summary>
+    /// O texto que vai para a correção: cada marcador trocado pela palavra que o aluno digitou. A transcrição
+    /// em si não muda.
+    /// </summary>
+    public IReadOnlyList<TranscribedLine> FinalLines()
+    {
+        var lines = new List<TranscribedLine>(Lines.Count);
+        foreach (var line in Lines)
+        {
+            var text = line.Text;
+            var typed = _words.Where(w => w.LineNumber == line.Number && w.StudentValue is not null);
+            // Do fim para o começo, para as posições das palavras anteriores continuarem valendo.
+            foreach (var word in typed.OrderByDescending(w => w.CharStart))
+            {
+                text = string.Concat(text.AsSpan(0, word.CharStart), word.StudentValue, text.AsSpan(word.CharEnd));
+            }
+
+            lines.Add(line with { Text = text });
+        }
+
+        return lines;
+    }
+
     /// <exception cref="InvalidTranscriptionException">Linha fora da folha, repetida ou com texto inválido.</exception>
     public static Transcription Create(
         Guid essayId,
@@ -156,6 +179,7 @@ public sealed class IllegibleWord
 public sealed class AiUsage
 {
     public const string Transcription = "transcription";
+    public const string Grading = "grading";
 
     private AiUsage() { }
 

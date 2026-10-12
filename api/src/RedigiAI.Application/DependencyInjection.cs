@@ -24,9 +24,12 @@ public static class DependencyInjection
         services.AddScoped<IUploadService, UploadService>();
         services.AddScoped<IEssayService, EssayService>();
         services.AddScoped<EssayOutcomes>();
+        services.AddScoped<ICorrectionService, CorrectionService>();
         services.AddOptions<AiBudgetOptions>();
         services.AddSingleton<AiBudget>();
+        services.AddScoped<AiSpending>();
         services.AddScoped<Abstractions.IJobHandler, TranscribeEssayHandler>();
+        services.AddScoped<Abstractions.IJobHandler, GradeEssayHandler>();
 
         return services;
     }

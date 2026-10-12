@@ -35,6 +35,7 @@ internal sealed class RubricVersionConfiguration : IEntityTypeConfiguration<Rubr
     {
         builder.ToTable("rubric_versions");
         builder.Property(r => r.Source).HasMaxLength(200);
+        builder.Property(r => r.Label).HasMaxLength(80);
         builder.Property(r => r.ZeroRules)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<ZeroRule>>, JsonComparer<IReadOnlyList<ZeroRule>>>();
@@ -50,6 +51,7 @@ internal sealed class RubricCriterionConfiguration : IEntityTypeConfiguration<Ru
     {
         builder.ToTable("rubric_criteria");
         builder.Property(c => c.Name).HasMaxLength(120);
+        builder.Property(c => c.ShortName).HasMaxLength(120);
         builder.Property(c => c.LevelDescriptors)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyDictionary<int, string>>, JsonComparer<IReadOnlyDictionary<int, string>>>();
@@ -67,7 +69,10 @@ internal sealed class ThemeConfiguration : IEntityTypeConfiguration<Theme>
         builder.HasOne<Exam>().WithMany().HasForeignKey(t => t.ExamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(t => t.Texts).WithOne().HasForeignKey(x => x.ThemeId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(t => t.AcceptedTypes).WithOne().HasForeignKey(x => x.ThemeId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Theme>().WithMany().HasForeignKey(t => t.SupersedesThemeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(t => new { t.ExamId, t.Status });
+        // Cada versão publicada tem no máximo uma revisão.
+        builder.HasIndex(t => t.SupersedesThemeId).IsUnique();
     }
 }
 

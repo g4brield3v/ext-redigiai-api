@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Essays;
+using RedigiAI.Domain.Jobs;
 using RedigiAI.Infrastructure.Jobs;
 
 namespace RedigiAI.Api;
@@ -12,6 +15,7 @@ internal sealed class JobWorker(
     IJobRunner runner,
     JobSignal signal,
     IConfiguration configuration,
+    IOptions<AiBudgetOptions> ai,
     ILogger<JobWorker> logger) : BackgroundService
 {
     private const int DefaultConcurrency = 2;
@@ -23,6 +27,11 @@ internal sealed class JobWorker(
         await using (var scope = scopes.CreateAsyncScope())
         {
             types = [.. scope.ServiceProvider.GetServices<IJobHandler>().Select(handler => handler.Type).Distinct()];
+        }
+
+        if (!ai.Value.Enabled && types.RemoveAll(type => type is JobTypes.Transcribe or JobTypes.Grade) > 0)
+        {
+            logger.LogWarning("AI is disabled (Ai__Enabled=false): transcribe and grade jobs stay in the queue");
         }
 
         if (types.Count == 0)

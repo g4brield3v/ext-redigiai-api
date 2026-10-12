@@ -16,6 +16,12 @@ public sealed class AiBudgetOptions
 {
     public const string Section = "Ai";
 
+    /// <summary>
+    /// Desligado, os jobs que chamam a IA (transcrição e correção) ficam parados na fila. É o padrão em
+    /// desenvolvimento, para rodar a aplicação local sem gastar com a API.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Teto de referência por redação; passar dele só gera alerta.</summary>
     public decimal ReferenceCapUsd { get; set; } = 0.15m;
 

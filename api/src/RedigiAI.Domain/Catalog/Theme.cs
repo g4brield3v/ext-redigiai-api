@@ -13,7 +13,11 @@ public enum ThemeTextKind
     Image,
 }
 
-/// <summary>Tema da proposta, com a coletânea e os tipos de redação aceitos. Sem ano no título.</summary>
+/// <summary>
+/// Tema da proposta, com a coletânea e os tipos de redação aceitos. Sem ano no título. Depois de publicado, o
+/// enunciado e a coletânea não mudam: uma alteração é uma versão nova (<see cref="Revise"/>), e a anterior fica
+/// preservada para as correções feitas com ela.
+/// </summary>
 public sealed class Theme
 {
     private readonly List<ThemeText> _texts = [];
@@ -27,6 +31,12 @@ public sealed class Theme
     public string Statement { get; private set; } = null!;
     public ThemeStatus Status { get; private set; }
     public DateTimeOffset? PublishedAt { get; private set; }
+
+    /// <summary>1 na primeira versão; cada revisão soma 1.</summary>
+    public int Version { get; private set; }
+
+    /// <summary>A versão anterior deste tema, quando esta é uma revisão.</summary>
+    public Guid? SupersedesThemeId { get; private set; }
     public IReadOnlyList<ThemeText> Texts => _texts;
     public IReadOnlyList<ThemeEssayType> AcceptedTypes => _acceptedTypes;
 
@@ -42,11 +52,47 @@ public sealed class Theme
             Title = title,
             Statement = statement,
             Status = ThemeStatus.Draft,
+            Version = 1,
         };
     }
 
+    /// <summary>
+    /// Versão nova de um tema já publicado, ainda em rascunho, com o enunciado novo e os mesmos tipos aceitos.
+    /// A coletânea é montada de novo com <see cref="AddText"/>. Ao publicar a revisão, quem chama arquiva esta.
+    /// </summary>
+    public Theme Revise(string statement)
+    {
+        if (Status == ThemeStatus.Draft)
+        {
+            throw new InvalidOperationException("Um rascunho é editado direto; só tema publicado ganha versão nova.");
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(statement);
+        var revision = new Theme
+        {
+            Id = Guid.CreateVersion7(),
+            ExamId = ExamId,
+            Title = Title,
+            Statement = statement,
+            Status = ThemeStatus.Draft,
+            Version = Version + 1,
+            SupersedesThemeId = Id,
+        };
+        revision._acceptedTypes.AddRange(
+            _acceptedTypes.Select(t => new ThemeEssayType(revision.Id, t.EssayTypeId, t.RubricVersionId, t.Instruction)));
+        return revision;
+    }
+
+    /// <summary>Sai do catálogo; as redações e correções feitas com ele continuam apontando para cá.</summary>
+    public void Archive() => Status = ThemeStatus.Archived;
+
     public void AddText(ThemeTextKind kind, string title, string source, string? body)
     {
+        if (Status != ThemeStatus.Draft)
+        {
+            throw new InvalidOperationException("Tema publicado não é editado: crie uma versão nova.");
+        }
+
         _texts.Add(ThemeText.Create(Id, _texts.Count + 1, kind, title, source, body));
     }
 

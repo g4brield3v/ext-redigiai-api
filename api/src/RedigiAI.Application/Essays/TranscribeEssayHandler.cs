@@ -19,14 +19,13 @@ internal sealed class TranscribeEssayHandler(
     IGradingProfileRepository profiles,
     IPromptTemplateRepository prompts,
     ITranscriptionRepository transcriptions,
-    IAiUsageRepository usages,
     IPhotoStorage storage,
     IEssayTranscriber transcriber,
     IJobQueue jobs,
     IAuditLog audit,
     IUnitOfWork unitOfWork,
     EssayOutcomes outcomes,
-    AiBudget budget,
+    AiSpending spending,
     TimeProvider time) : IJobHandler
 {
     /// <summary>Resposta fora do formato: pede mais uma vez; repetida, a falha é definitiva.</summary>
@@ -106,13 +105,10 @@ internal sealed class TranscribeEssayHandler(
     {
         for (var attempt = 1; attempt <= InvalidResponseAttempts; attempt++)
         {
-            if (!budget.AllowsAnotherCall(await usages.ListCostsAsync(essay.Id, ct)))
-            {
-                throw Errors.AiFailed("AI_BUDGET_EXCEEDED");
-            }
+            await spending.EnsureRoomForAnotherCallAsync(essay.Id, ct);
 
             var call = await transcriber.TranscribeAsync(request, ct);
-            await RecordUsageAsync(essay.Id, call, ct);
+            await spending.RecordAsync(essay.Id, AiUsage.Transcription, call.Model, call.Tokens, ct);
 
             if (call.Reading is not { } reading)
             {
@@ -136,29 +132,5 @@ internal sealed class TranscribeEssayHandler(
         }
 
         throw Errors.AiFailed("AI_INVALID_RESPONSE");
-    }
-
-    /// <summary>O consumo é gravado logo depois da chamada, mesmo que o resto do job falhe.</summary>
-    private async Task RecordUsageAsync(Guid essayId, TranscriptionCall call, CancellationToken ct)
-    {
-        var cost = budget.CostOf(call.Model, call.Tokens);
-        usages.Add(AiUsage.Record(
-            essayId,
-            AiUsage.Transcription,
-            call.Model,
-            call.Tokens.Input,
-            call.Tokens.Output,
-            call.Tokens.CacheRead,
-            call.Tokens.CacheWrite,
-            cost,
-            time.GetUtcNow()));
-
-        var spent = (await usages.ListCostsAsync(essayId, ct)).Sum() + (cost ?? 0);
-        if (spent > budget.ReferenceCapMicroUsd)
-        {
-            audit.Record("system", "ai.cost_above_reference", "essay", essayId, new { spentMicroUsd = spent });
-        }
-
-        await unitOfWork.SaveChangesAsync(ct);
     }
 }

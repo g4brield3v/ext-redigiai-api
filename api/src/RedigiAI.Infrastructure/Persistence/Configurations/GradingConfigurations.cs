@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RedigiAI.Domain.Catalog;
+using RedigiAI.Domain.Essays;
 using RedigiAI.Domain.Grading;
 
 namespace RedigiAI.Infrastructure.Persistence.Configurations;
@@ -154,5 +155,67 @@ internal sealed class EvalRunConfiguration : IEntityTypeConfiguration<EvalRun>
         builder.ToTable("eval_runs");
         builder.Property(r => r.Results).HasColumnType("jsonb");
         builder.HasOne<GradingProfile>().WithMany().HasForeignKey(r => r.GradingProfileId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CorrectionConfiguration : IEntityTypeConfiguration<Correction>
+{
+    public void Configure(EntityTypeBuilder<Correction> builder)
+    {
+        builder.ToTable("corrections");
+        builder.Property(c => c.ZeroReason).HasMaxLength(60);
+        builder.Property(c => c.Model).HasMaxLength(80);
+        builder.Property(c => c.RawResponse).HasColumnType("jsonb");
+        builder.Property(c => c.NextSteps)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<IReadOnlyList<NextStep>>, JsonComparer<IReadOnlyList<NextStep>>>();
+        builder.HasOne<Essay>().WithMany().HasForeignKey(c => c.EssayId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<RubricVersion>().WithMany().HasForeignKey(c => c.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<GradingProfile>().WithMany().HasForeignKey(c => c.GradingProfileId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Theme>().WithMany().HasForeignKey(c => c.ThemeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ThemeGradingNotes>().WithMany().HasForeignKey(c => c.ThemeGradingNotesId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(c => c.Criteria).WithOne().HasForeignKey(x => x.CorrectionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(c => c.Marks).WithOne().HasForeignKey(x => x.CorrectionId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(c => c.Criteria).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Navigation(c => c.Marks).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Uma correção por redação: é o que impede duas execuções do mesmo job de gravarem duas.
+        builder.HasIndex(c => c.EssayId).IsUnique();
+    }
+}
+
+internal sealed class CorrectionCriterionConfiguration : IEntityTypeConfiguration<CorrectionCriterion>
+{
+    public void Configure(EntityTypeBuilder<CorrectionCriterion> builder)
+    {
+        builder.ToTable("correction_criteria");
+        builder.HasOne<RubricCriterion>().WithMany().HasForeignKey(c => c.CriterionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => new { c.CorrectionId, c.Position }).IsUnique();
+    }
+}
+
+internal sealed class CorrectionMarkConfiguration : IEntityTypeConfiguration<CorrectionMark>
+{
+    public void Configure(EntityTypeBuilder<CorrectionMark> builder)
+    {
+        builder.ToTable("correction_marks");
+        builder.Property(m => m.Kind).HasMaxLength(10);
+        builder.Property(m => m.RuleCode).HasMaxLength(40);
+        builder.HasOne<RubricCriterion>().WithMany().HasForeignKey(m => m.CriterionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(m => m.CorrectionId);
+    }
+}
+
+internal sealed class CorrectionFeedbackConfiguration : IEntityTypeConfiguration<CorrectionFeedback>
+{
+    public void Configure(EntityTypeBuilder<CorrectionFeedback> builder)
+    {
+        builder.ToTable("correction_feedback");
+        builder.Property(f => f.Rating).HasMaxLength(20);
+        builder.Property(f => f.Comment).HasMaxLength(CorrectionFeedback.MaxCommentLength);
+        builder.HasOne<Correction>().WithMany().HasForeignKey(f => f.CorrectionId).OnDelete(DeleteBehavior.Cascade);
+
+        // Uma avaliação por correção: é o que impede dois envios simultâneos de gravarem duas.
+        builder.HasIndex(f => f.CorrectionId).IsUnique();
     }
 }

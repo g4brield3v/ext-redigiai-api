@@ -100,7 +100,7 @@ Especificação: seções 3 (Créditos e cobrança), 9 e 15 (arrependimento e au
 
 Especificação: seções 3 (Conta e dados), 11 e 13.
 
-- Perfil completo; exportação (`export_user`) e exclusão (`delete_user`) com anonimização e remoção no Clerk.
+- Perfil completo; exportação (`export_user`) e exclusão (`delete_user`) com anonimização e remoção no Clerk. O comentário da avaliação da correção (`correction_feedback.comment`) é texto livre e pode trazer dado pessoal: a exclusão apaga o comentário (a opção escolhida fica) e a exportação inclui a avaliação.
 - Rotina de inatividade (aviso 7 dias antes, exclusão em 3 meses); limpeza das fotos após 90 dias; limpeza de `access_logs` após 6 meses.
 - Envio em lote na interface; reescrita com `parent_essay_id`.
 - Páginas de Termos e Privacidade; rodapé com identificação da empresa; aviso sobre IA.

@@ -23,7 +23,9 @@ internal sealed class EssayRepository(AppDbContext db) : IEssayRepository
                 essay => essay
                     .SetProperty(e => e.Status, transition.To)
                     .SetProperty(e => e.ReviewDeadlineAt, transition.ReviewDeadlineAt)
-                    .SetProperty(e => e.FailureCode, transition.FailureCode),
+                    .SetProperty(e => e.FailureCode, transition.FailureCode)
+                    // Só a passagem que inicia a correção traz o perfil; nas outras, o que está gravado fica.
+                    .SetProperty(e => e.GradingProfileId, e => transition.GradingProfileId ?? e.GradingProfileId),
                 ct) == 1;
 
     public async Task<IReadOnlyList<Guid>> ListExpiredReviewsAsync(DateTimeOffset now, int limit, CancellationToken ct) =>

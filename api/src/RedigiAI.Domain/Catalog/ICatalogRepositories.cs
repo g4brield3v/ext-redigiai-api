@@ -45,5 +45,8 @@ public interface IThemeRepository
     /// <summary>O tema ativo, com textos e tipos aceitos.</summary>
     Task<Theme?> FindActiveAsync(Guid themeId, CancellationToken ct);
 
+    /// <summary>O tema em qualquer situação, com textos e tipos aceitos: a correção usa a versão com que a redação foi enviada.</summary>
+    Task<Theme?> FindAsync(Guid themeId, CancellationToken ct);
+
     void Add(Theme theme);
 }

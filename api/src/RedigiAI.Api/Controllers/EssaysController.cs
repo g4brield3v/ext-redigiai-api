@@ -4,10 +4,16 @@ using Microsoft.AspNetCore.RateLimiting;
 using RedigiAI.Api.Auth;
 using RedigiAI.Api.Http;
 using RedigiAI.Application.Essays;
+using RedigiAI.Application.Grading;
+using RedigiAI.Domain.Grading;
 
 namespace RedigiAI.Api.Controllers;
 
 public sealed record BatchEssayRequest(IReadOnlyList<BatchEssayItem>? Essays, bool? AiNoticeAccepted);
+
+/// <param name="Rating">Uma das três opções da avaliação.</param>
+/// <param name="Comment">Comentário opcional, com até 1.000 caracteres.</param>
+public sealed record CorrectionFeedbackRequest(FeedbackRating? Rating, string? Comment = null);
 
 /// <summary>Envio e acompanhamento das redações do aluno logado.</summary>
 [ApiController]
@@ -16,7 +22,7 @@ public sealed record BatchEssayRequest(IReadOnlyList<BatchEssayItem>? Essays, bo
 [Tags("Essays")]
 [Produces("application/json")]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
-public sealed class EssaysController(IUploadService uploads, IEssayService essays) : ControllerBase
+public sealed class EssaysController(IUploadService uploads, IEssayService essays, ICorrectionService corrections) : ControllerBase
 {
     /// <summary>
     /// Assinatura para o navegador enviar 1 foto JPG direto ao Cloudinary, em área privada.
@@ -81,6 +87,32 @@ public sealed class EssaysController(IUploadService uploads, IEssayService essay
     public async Task<IActionResult> FillIllegible(Guid id, [FromBody] IReadOnlyList<IllegibleAnswer> answers, CancellationToken ct)
     {
         await essays.FillIllegibleAsync(User.GetClerkIdentity().UserId, id, answers, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Correção completa: nota calculada pelo backend, nível e orientação de cada critério, apontamentos na
+    /// redação, por onde começar e o plano de reescrita, com os pontos que cada passo pode render. Só existe
+    /// depois que a redação chega a <c>completed</c>; antes disso responde 409.
+    /// </summary>
+    [HttpGet("essays/{id:guid}/correction", Name = "getCorrection")]
+    [ProducesResponseType<CorrectionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> GetCorrection(Guid id, CancellationToken ct) =>
+        Ok(await corrections.GetAsync(User.GetClerkIdentity().UserId, id, ct));
+
+    /// <summary>
+    /// Avaliação do aluno sobre a correção, com comentário opcional. Uma por correção: a segunda responde 409.
+    /// </summary>
+    [HttpPost("corrections/{id:guid}/feedback", Name = "sendCorrectionFeedback")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> SendFeedback(Guid id, [FromBody] CorrectionFeedbackRequest request, CancellationToken ct)
+    {
+        await corrections.SendFeedbackAsync(User.GetClerkIdentity().UserId, id, request.Rating, request.Comment, ct);
         return NoContent();
     }
 

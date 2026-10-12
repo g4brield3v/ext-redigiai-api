@@ -53,7 +53,9 @@ Monólito modular em camadas: `Api → Application → Domain` e `Infrastructure
 ## Comandos
 
 ```bash
-docker compose up -d db                     # PostgreSQL local (DB_PORT muda a porta, se a 5432 estiver ocupada)
+docker compose up -d db                     # PostgreSQL local, na porta de DB_PORT (padrão 5432)
+# Porta 5432 ocupada ou bloqueada: ponha no .env DB_PORT=55432 e a mesma porta em ConnectionStrings__Default
+# (Host=localhost;Port=55432;Database=redigiai;Username=redigiai;Password=redigiai). O docker compose lê o .env da raiz.
 dotnet tool restore                         # dotnet-ef na versão do projeto
 dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
 dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
@@ -61,6 +63,8 @@ dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
 dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevAuth__Enabled=true, a própria API já roda a fila)
+# Em desenvolvimento a IA fica desligada (Ai__Enabled=false): os jobs transcribe e grade esperam na fila e nada é
+# cobrado. Ai__Enabled=true no .env liga as chamadas reais ao Claude.
 # Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
 # carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova).
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations

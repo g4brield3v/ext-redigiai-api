@@ -127,9 +127,9 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | Tabela | Campos principais | Regras |
 |---|---|---|
 | `exams` | id, slug (`fuvest`), name, status (`active`, `coming_soon`), sheet_lines (30) | Vestibular. |
-| `rubric_versions` | id, exam_id, version, published_at, max_level, max_score, source, zero_rules (jsonb) | Imutável depois de publicada. |
-| `rubric_criteria` | id, rubric_version_id, position (1–4), name, weight, level_descriptors (jsonb: um por nível, de 1 a `max_level`) | Peso e descritores oficiais por nível. |
-| `themes` | id, exam_id, title, statement (texto do enunciado), status, published_at | Tema da proposta. Sem ano no título. |
+| `rubric_versions` | id, exam_id, version, published_at, max_level, max_score, source, label ("Fuvest 2027"), zero_rules (jsonb: `code`, `description`, `studentNote`) | Imutável depois de publicada. `studentNote` é a explicação da hipótese para o aluno, exibida na correção com nota zero. |
+| `rubric_criteria` | id, rubric_version_id, position (1–4), name, short_name ("Tema e autoria"), weight, level_descriptors (jsonb: um por nível, de 1 a `max_level`) | Peso e descritores oficiais por nível. O nome curto é o que a tela da correção usa em títulos e filtros. |
+| `themes` | id, exam_id, title, statement (texto do enunciado), status, published_at, version, supersedes_theme_id | Tema da proposta. Sem ano no título. Depois de publicado não é editado: mudar o enunciado ou a coletânea cria uma linha nova, com a versão seguinte, e a anterior fica arquivada. |
 | `theme_texts` | id, theme_id, position, kind (`text`, `image`), title, source, body, image_asset_id | Coletânea. |
 | `essay_types` | id, exam_id, slug (`dissertacao`, `narrativa`), name, description | Tipos do vestibular. |
 | `theme_essay_types` | theme_id, essay_type_id, rubric_version_id | Tipos aceitos por tema e a grade de cada um. |
@@ -139,13 +139,13 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | Tabela | Campos principais | Regras |
 |---|---|---|
 | `users` | id, clerk_user_id (único), email, name, birth_date, last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. |
-| `essays` | id, user_id, batch_id, theme_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, created_at | `parent_essay_id` liga a reescrita à versão anterior. |
+| `essays` | id, user_id, batch_id, theme_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, grading_profile_id, created_at | `parent_essay_id` liga a reescrita à versão anterior. |
 | `transcriptions` | id, essay_id, lines (jsonb: número + texto), illegible_count, model, created_at | Texto fiel, nunca editado. |
 | `illegible_words` | id, transcription_id, line_number, char_start, char_end, student_value, filled_at | O que o aluno digitou fica separado da transcrição. |
-| `corrections` | id, essay_id, rubric_version_id, zero_reason, score, max_score, strengths, main_issue, next_steps (jsonb), model, raw_response (jsonb), created_at | `score` calculado pelo backend. |
-| `correction_criteria` | id, correction_id, criterion_id, level, points, justification, guidance, lines (int[]) | `points` = level × weight. |
-| `correction_marks` | id, correction_id, criterion_id, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note | Marcas na redação e nota de margem. |
-| `correction_feedback` | id, correction_id, rating (`helped_a_lot`, `helped_partly`, `did_not_help`), comment, created_at | 1 por correção. |
+| `corrections` | id, essay_id, rubric_version_id, grading_profile_id, theme_id, theme_version, theme_grading_notes_id, zero_reason, zero_explanation, score, max_score, strengths, main_issue, main_issue_criterion, next_steps (jsonb: `[{text, criterion}]`), model, raw_response (jsonb), created_at | `score` calculado pelo backend. Uma por redação. O critério do problema principal e de cada passo é a posição na grade; nulo com nota zero. |
+| `correction_criteria` | id, correction_id, criterion_id, position, level, points, justification, guidance, lines (int[]) | `points` = level × weight. |
+| `correction_marks` | id, correction_id, criterion_id, criterion_position, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note, rule_code, fix | Apontamentos na redação. `fix` é a forma correta do trecho e só existe em desvio de escrita (marca `issue` com `rule_code`). |
+| `correction_feedback` | id, correction_id, rating (`helped_a_lot`, `helped_partly`, `did_not_help`), comment (até 1.000 caracteres), created_at | 1 por correção (índice único em `correction_id`). |
 | `assets` | id, user_id, provider (`cloudinary`), public_id, bytes, mime, purge_after | Fotos privadas. |
 
 **Créditos e pagamentos**
@@ -199,9 +199,9 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 | `GET /v1/essays?status=&cursor=` | Lista do painel, com título no formato "Vestibular – Tipo – Tema". |
 | `GET /v1/essays/{id}` | Status, prazo de revisão e, se houver, palavras ilegíveis. |
 | `PUT /v1/essays/{id}/illegible` | Corpo: `[{wordId, value}]`. Só aceito em `awaiting_review`, antes do prazo e com todas as palavras preenchidas; muda para `queued` e cria job `grade`. |
-| `GET /v1/essays/{id}/correction` | Correção completa: nota, critérios, marcas, transcrição com as palavras do aluno, próximos passos. |
+| `GET /v1/essays/{id}/correction` | Correção completa, com tudo já calculado (o front só exibe): `rubric` (`maxLevel`, `maxScore`, `versionLabel`); `score`, `scoreDelta` e `previousVersionScore`; `zero` (`applies`, `ruleCode`, `ruleLabel`, `ruleNote`, `explanation`); `strengths`; `mainIssue` e `nextSteps` (`text`, `criterion`, `potentialGain` = (nível máximo − nível) × peso; os passos saem do maior ganho para o menor); `lines` (transcrição com as palavras do aluno); `annotations` (`id` sequencial em ordem de linha, `kind`, `criterion`, linhas e posições, `quote` recortado pelo backend, `note`, `ruleName`, `fix`); `criteria` (`shortName`, `fullName`, `weight`, `level`, `points`, `maxPoints`, `pointsLost`, `currentDescriptor`, `nextDescriptor`, `justification`, `guidance`, `annotationIds`); `feedback`, se o aluno já avaliou. |
 | `GET /v1/essays/{id}/photo` | URL assinada da foto, válida por 5 min. |
-| `POST /v1/corrections/{id}/feedback` | Avaliação (3 opções) + comentário opcional. |
+| `POST /v1/corrections/{id}/feedback` | Avaliação (3 opções) + comentário opcional. Corpo: `{rating, comment?}`. Uma por correção: a segunda responde `INVALID_STATE` (409). Correção de outro aluno → 404. |
 | `GET /v1/me/progress` | Notas por data e critério que mais tirou pontos nas últimas 3 correções. |
 
 **Pagamentos**
@@ -358,17 +358,21 @@ O tema não faz parte do perfil: tem versão própria, porque muda a cada tema n
      "guidance": "Troque o parágrafo das linhas 11 a 13 por ..."}
   ],
   "marks": [{"criterion": 4, "kind": "issue", "line": 14, "start": 0, "end": 8,
-             "note": "\"A partir\", sem crase", "rule": "Crase antes de verbo"}],
-  "strengths": "...", "main_issue": "...", "next_steps": ["...", "...", "..."]
+             "note": "Não há crase antes de verbo", "rule": "CRASE_VERBO", "fix": "A partir"}],
+  "strengths": "...",
+  "main_issue": {"text": "...", "criterion": 3},
+  "next_steps": [{"text": "...", "criterion": 3}, {"text": "...", "criterion": 4}]
 }
 ```
 
+`fix` é a forma correta do trecho marcado e só vem nos desvios de escrita (critério 4); nos demais é nulo. Em `main_issue` e em cada próximo passo, `criterion` é a posição do critério a que o texto se refere: é com ele que o backend calcula quantos pontos aquele passo pode render. Com nota zero, `criterion` é nulo.
+
 **Validação no backend** (falha → nova tentativa; repetida → GRADING_FAILED)
 
-1. JSON válido contra o schema.
-2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão.
+1. JSON válido contra o schema. Aspas que o modelo escreve já com a barra de escape (`\"assim\"`) são gravadas sem a barra em todos os campos de texto; `raw_response` guarda a resposta como veio.
+2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão. Sem nota zero, `main_issue.criterion` é um critério da grade que não está no nível máximo (a não ser que todos estejam); o `criterion` de um próximo passo é um critério da grade ou nulo.
 3. Linhas e posições citadas existem na transcrição.
-4. Nenhuma orientação ou próximo passo termina com ponto de interrogação.
+4. Nenhuma orientação, próximo passo ou problema principal termina com ponto de interrogação nem traz "?" fora de um trecho entre aspas.
 5. No máximo 3 próximos passos.
 6. Se `zero.applies`, `reason` é uma das hipóteses da grade e a nota gravada é 0.
 7. A transcrição indicou identificação na folha e a correção não aplicou nota zero → inconsistência, nova tentativa.

@@ -121,5 +121,6 @@ internal sealed class GradingSeedService(
             now,
             FuvestKnowledgeBaseV1.ZeroRules,
             FuvestKnowledgeBaseV1.Criteria,
-            FuvestKnowledgeBaseV1.RubricSource);
+            FuvestKnowledgeBaseV1.RubricSource,
+            FuvestKnowledgeBaseV1.RubricLabel);
 }

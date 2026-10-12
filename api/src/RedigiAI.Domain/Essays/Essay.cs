@@ -40,6 +40,9 @@ public sealed class Essay
     public Guid? ParentEssayId { get; private set; }
     public DateTimeOffset? ReviewDeadlineAt { get; private set; }
     public string? FailureCode { get; private set; }
+
+    /// <summary>Perfil de correção fixado quando a correção começa; uma nova tentativa usa o mesmo.</summary>
+    public Guid? GradingProfileId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     /// <param name="rewriteOf">Redação que está sendo reescrita, se for o caso.</param>
@@ -113,6 +116,9 @@ public sealed record EssayTransition
 
     public string? FailureCode { get; private init; }
 
+    /// <summary>Perfil de correção que passa a valer para a redação; nulo mantém o que já está gravado.</summary>
+    public Guid? GradingProfileId { get; private init; }
+
     /// <summary>Transcrição sem palavras ilegíveis: vai para a fila de correção.</summary>
     public static EssayTransition TranscribedClean() => new(EssayStatus.Uploaded, EssayStatus.Queued);
 
@@ -133,6 +139,18 @@ public sealed record EssayTransition
     /// <summary>24 h sem preencher: cancelada pelo sistema.</summary>
     public static EssayTransition ReviewExpired() =>
         new(EssayStatus.AwaitingReview, EssayStatus.Cancelled) { FailureCode = "REVIEW_EXPIRED" };
+
+    /// <summary>O worker pegou o job de correção: o perfil ativo fica fixado na redação.</summary>
+    public static EssayTransition GradingStarted(Guid gradingProfileId) =>
+        new(EssayStatus.Queued, EssayStatus.Processing) { GradingProfileId = gradingProfileId };
+
+    /// <summary>Correção validada e gravada.</summary>
+    public static EssayTransition Graded() => new(EssayStatus.Processing, EssayStatus.Completed);
+
+    /// <summary>Falha definitiva da correção.</summary>
+    /// <param name="started">A correção chegou a começar (<c>processing</c>) ou falhou ainda na fila.</param>
+    public static EssayTransition GradingFailed(bool started) =>
+        new(started ? EssayStatus.Processing : EssayStatus.Queued, EssayStatus.Failed) { FailureCode = "GRADING_FAILED" };
 }
 
 public static class EssayTitle
