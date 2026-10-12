@@ -53,7 +53,9 @@ Monólito modular em camadas: `Api → Application → Domain` e `Infrastructure
 ## Comandos
 
 ```bash
-docker compose up -d db                     # PostgreSQL local (DB_PORT muda a porta, se a 5432 estiver ocupada)
+docker compose up -d db                     # PostgreSQL local, na porta de DB_PORT (padrão 5432)
+# Porta 5432 ocupada ou bloqueada: ponha no .env DB_PORT=55432 e a mesma porta em ConnectionStrings__Default
+# (Host=localhost;Port=55432;Database=redigiai;Username=redigiai;Password=redigiai). O docker compose lê o .env da raiz.
 dotnet tool restore                         # dotnet-ef na versão do projeto
 dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
 dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
