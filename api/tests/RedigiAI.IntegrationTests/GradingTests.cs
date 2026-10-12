@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Billing;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Domain.Grading;
@@ -99,6 +100,8 @@ public class GradingTests(ApiFixture api)
     [InlineData("score-sent", 1)]
     [InlineData("points-sent", 1)]
     [InlineData("four-next-steps", 5)]
+    [InlineData("plain-next-steps", 1)]
+    [InlineData("main-issue-without-criterion", 2)]
     [InlineData("no-tool", 1)]
     public async Task Bad_response_is_rejected_and_asked_again(string problem, int rule)
     {
@@ -166,9 +169,17 @@ public class GradingTests(ApiFixture api)
 
         var shown = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction");
         Assert.Equal(0, shown.GetProperty("score").GetInt32());
-        Assert.Equal("candidate_identification", shown.GetProperty("zeroReason").GetString());
-        Assert.False(string.IsNullOrEmpty(shown.GetProperty("zeroRule").GetString()));
+        var zero = shown.GetProperty("zero");
+        Assert.Equal((true, "candidate_identification", "Há um nome escrito no fim da folha."),
+            (zero.GetProperty("applies").GetBoolean(), zero.GetProperty("ruleCode").GetString(), zero.GetProperty("explanation").GetString()));
+        Assert.StartsWith("Nome, assinatura", zero.GetProperty("ruleLabel").GetString());
+        // O texto para o aluno vem da grade, não do front.
+        Assert.StartsWith("Folha com nome, assinatura", zero.GetProperty("ruleNote").GetString());
         Assert.Equal(0, shown.GetProperty("criteria").GetArrayLength());
+        // Sem critério pontuado, nada tem pontos a ganhar.
+        Assert.Equal((JsonValueKind.Null, JsonValueKind.Null),
+            (shown.GetProperty("mainIssue").GetProperty("criterion").ValueKind, shown.GetProperty("mainIssue").GetProperty("potentialGain").ValueKind));
+        Assert.Equal(JsonValueKind.Null, shown.GetProperty("nextSteps")[0].GetProperty("potentialGain").ValueKind);
     }
 
     [Fact]
@@ -316,29 +327,244 @@ public class GradingTests(ApiFixture api)
         Assert.Equal((27, 40), (shown.GetProperty("score").GetInt32(), shown.GetProperty("maxScore").GetInt32()));
         Assert.Equal("Fuvest – Dissertação – Algoritmos e o debate público", shown.GetProperty("title").GetString());
         Assert.Equal((1, "Fuvest", 30), (shown.GetProperty("version").GetInt32(), shown.GetProperty("examName").GetString(), shown.GetProperty("sheetLines").GetInt32()));
-        Assert.Equal(JsonValueKind.Null, shown.GetProperty("scoreDelta").ValueKind);
+        Assert.Equal((JsonValueKind.Null, JsonValueKind.Null, JsonValueKind.Null), (
+            shown.GetProperty("scoreDelta").ValueKind, shown.GetProperty("previousVersionScore").ValueKind, shown.GetProperty("feedback").ValueKind));
+        var rubric = shown.GetProperty("rubric");
+        Assert.Equal((1, 4, 40, "Fuvest 2027 (v1)"), (
+            rubric.GetProperty("version").GetInt32(), rubric.GetProperty("maxLevel").GetInt32(),
+            rubric.GetProperty("maxScore").GetInt32(), rubric.GetProperty("versionLabel").GetString()));
+        Assert.False(shown.GetProperty("zero").GetProperty("applies").GetBoolean());
 
+        // Critérios: pontos, perdas e descritores do nível atual e do seguinte, tudo calculado aqui.
         var criteria = shown.GetProperty("criteria");
-        Assert.Equal(4, criteria.GetArrayLength());
+        Assert.Equal(
+            ["Tema e autoria", "Tipo e gênero", "Coesão e progressão", "Escrita e vocabulário"],
+            criteria.EnumerateArray().Select(c => c.GetProperty("shortName").GetString()));
         var third = criteria[2];
-        Assert.Equal((3, 3, 2, 4, 6, 12), (
+        Assert.Equal((3, 3, 2, 6, 12, 6), (
             third.GetProperty("position").GetInt32(), third.GetProperty("weight").GetInt32(), third.GetProperty("level").GetInt32(),
-            third.GetProperty("maxLevel").GetInt32(), third.GetProperty("points").GetInt32(), third.GetProperty("maxPoints").GetInt32()));
-        Assert.StartsWith("Satisfatória articulação", third.GetProperty("descriptor").GetString());
-        Assert.Equal("Linha 1", third.GetProperty("linesLabel").GetString());
-        var deviation = criteria[3].GetProperty("deviations")[0];
-        Assert.Equal(("Crase antes de verbo", 1), (deviation.GetProperty("rule").GetString(), deviation.GetProperty("line").GetInt32()));
+            third.GetProperty("points").GetInt32(), third.GetProperty("maxPoints").GetInt32(), third.GetProperty("pointsLost").GetInt32()));
+        Assert.StartsWith("Recursos linguísticos", third.GetProperty("fullName").GetString());
+        Assert.StartsWith("Satisfatória articulação", third.GetProperty("currentDescriptor").GetString());
+        Assert.StartsWith("Boa articulação", third.GetProperty("nextDescriptor").GetString());
+        Assert.Equal([2], criteria[0].GetProperty("annotationIds").EnumerateArray().Select(id => id.GetInt32()));
+        Assert.Equal([1], criteria[3].GetProperty("annotationIds").EnumerateArray().Select(id => id.GetInt32()));
+        Assert.Empty(third.GetProperty("annotationIds").EnumerateArray());
 
-        var marks = shown.GetProperty("marks");
-        Assert.Equal(2, marks.GetArrayLength());
-        Assert.Contains(marks.EnumerateArray(), mark => mark.GetProperty("kind").GetString() == "issue" && mark.GetProperty("tagged").GetBoolean());
-        Assert.Equal(2, shown.GetProperty("nextSteps").GetArrayLength());
+        // Apontamentos numerados em ordem de linha, com o trecho recortado pelo backend.
+        var annotations = shown.GetProperty("annotations");
+        Assert.Equal(2, annotations.GetArrayLength());
+        var deviation = annotations[0];
+        Assert.Equal((1, "issue", 4, 1, 1, 0, 1), (
+            deviation.GetProperty("id").GetInt32(), deviation.GetProperty("kind").GetString(), deviation.GetProperty("criterion").GetInt32(),
+            deviation.GetProperty("lineStart").GetInt32(), deviation.GetProperty("lineEnd").GetInt32(),
+            deviation.GetProperty("charStart").GetInt32(), deviation.GetProperty("charEnd").GetInt32()));
+        Assert.Equal(("A", "\"A partir\", sem crase", "Crase antes de verbo", "A partir"), (
+            deviation.GetProperty("quote").GetString(), deviation.GetProperty("note").GetString(),
+            deviation.GetProperty("ruleName").GetString(), deviation.GetProperty("fix").GetString()));
+        var good = annotations[1];
+        Assert.Equal((2, "good", "tecnologia"), (good.GetProperty("id").GetInt32(), good.GetProperty("kind").GetString(), good.GetProperty("quote").GetString()));
+        Assert.Equal((JsonValueKind.Null, JsonValueKind.Null), (good.GetProperty("ruleName").ValueKind, good.GetProperty("fix").ValueKind));
+
+        // Por onde começar e o plano: o ganho é (nível máximo − nível) × peso, e o plano sai do maior para o menor.
+        var mainIssue = shown.GetProperty("mainIssue");
+        Assert.Equal(("O segundo parágrafo repete o primeiro.", 3, 6), (
+            mainIssue.GetProperty("text").GetString(), mainIssue.GetProperty("criterion").GetInt32(), mainIssue.GetProperty("potentialGain").GetInt32()));
+        Assert.Equal(
+            [(3, 6), (4, 2)],
+            shown.GetProperty("nextSteps").EnumerateArray().Select(step => (step.GetProperty("criterion").GetInt32(), step.GetProperty("potentialGain").GetInt32())));
 
         // O painel passa a mostrar a nota.
         var list = await student.Client.GetFromJsonAsync<JsonElement>("/v1/essays");
         var item = list.GetProperty("items").EnumerateArray().Single(e => e.GetProperty("id").GetGuid() == student.EssayId);
         Assert.Equal(("completed", 27, 40), (item.GetProperty("status").GetString(), item.GetProperty("score").GetInt32(), item.GetProperty("maxScore").GetInt32()));
     }
+
+    [Fact]
+    public async Task Quotes_escaped_by_the_model_are_shown_without_the_backslash()
+    {
+        var student = await QueuedEssayAsync();
+        // O modelo escreve a barra de escape dentro do próprio texto, em todos os campos.
+        const string escaped = "Cite \\\"A vida é bela\\\" na linha 1.";
+        api.Grader.Script.Enqueue(() =>
+        {
+            var response = FakeGrader.Good();
+            response["strengths"] = escaped;
+            response["main_issue"] = FakeGrader.Point(escaped, 3);
+            response["next_steps"] = new JsonArray(FakeGrader.Point(escaped, 3));
+            foreach (var criterion in response["criteria"]!.AsArray())
+            {
+                criterion!["justification"] = escaped;
+                criterion["guidance"] = escaped;
+            }
+
+            foreach (var mark in response["marks"]!.AsArray())
+            {
+                mark!["note"] = escaped;
+                mark["fix"] = escaped;
+            }
+
+            return response.ToJsonString();
+        });
+
+        await RunAsync(JobTypes.Grade);
+
+        var shown = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction");
+        var texts = Strings(shown).ToList();
+        Assert.Equal(14, texts.Count(text => text == "Cite \"A vida é bela\" na linha 1."));
+        Assert.DoesNotContain(texts, text => text.Contains("\\\"", StringComparison.Ordinal));
+
+        // No banco também; a resposta da IA fica guardada como veio.
+        var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Criteria).Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
+        Assert.DoesNotContain('\\', correction.Strengths + correction.MainIssue + correction.NextSteps[0].Text
+            + string.Concat(correction.Criteria.Select(c => c.Justification + c.Guidance))
+            + string.Concat(correction.Marks.Select(m => m.Note + m.Fix)));
+        Assert.Contains("\\\\\\\"A vida é bela", correction.RawResponse);
+    }
+
+    [Fact]
+    public async Task Zero_explanation_with_escaped_quotes_is_shown_without_the_backslash()
+    {
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(() =>
+        {
+            var response = FakeGrader.Zero("theme_not_addressed");
+            response["zero"]!["explanation"] = "O texto fala de \\\"cinema\\\", não do tema.";
+            return response.ToJsonString();
+        });
+
+        await RunAsync(JobTypes.Grade);
+
+        var zero = (await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction")).GetProperty("zero");
+        Assert.Equal("O texto fala de \"cinema\", não do tema.", zero.GetProperty("explanation").GetString());
+        Assert.Equal(
+            "Texto que não aborda o tema recebe nota zero, e os quatro critérios não são pontuados. Isso é diferente de tangenciar o tema, que só reduz o nível do critério 1.",
+            zero.GetProperty("ruleNote").GetString());
+    }
+
+    [Fact]
+    public async Task Rewrite_shows_the_score_of_the_previous_version()
+    {
+        var student = await QueuedEssayAsync();
+        await RunAsync(JobTypes.Grade);
+        var rewrite = await QueuedEssayAsync(student);
+        api.Grader.Script.Enqueue(() =>
+        {
+            var response = FakeGrader.Good();
+            response["criteria"] = new JsonArray(
+                FakeGrader.Criterion(1, 3), FakeGrader.Criterion(2, 3), FakeGrader.Criterion(3, 4), FakeGrader.Criterion(4, 3));
+            return response.ToJsonString();
+        });
+
+        await RunAsync(JobTypes.Grade);
+
+        var shown = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{rewrite.EssayId}/correction");
+        Assert.Equal((2, 33, 27, 6, 1), (
+            shown.GetProperty("version").GetInt32(), shown.GetProperty("score").GetInt32(), shown.GetProperty("previousVersionScore").GetInt32(),
+            shown.GetProperty("scoreDelta").GetInt32(), shown.GetProperty("previousVersion").GetInt32()));
+        // No nível máximo não há descritor seguinte nem pontos a ganhar.
+        var third = shown.GetProperty("criteria")[2];
+        Assert.Equal((0, JsonValueKind.Null), (third.GetProperty("pointsLost").GetInt32(), third.GetProperty("nextDescriptor").ValueKind));
+        Assert.Equal(0, shown.GetProperty("mainIssue").GetProperty("potentialGain").GetInt32());
+    }
+
+    [Fact]
+    public async Task Annotations_are_numbered_in_reading_order_and_a_quote_can_span_lines()
+    {
+        var student = await QueuedEssayAsync("A tecnologia mudou a forma de debater.", "Os algoritmos escolhem o que cada um vê.", "Isso empobrece o debate.");
+        // A IA manda as marcas fora da ordem da folha.
+        api.Grader.Script.Enqueue(() =>
+        {
+            var response = FakeGrader.Good();
+            response["marks"] = new JsonArray(Mark(3, 0, 4), Mark(1, 2, 12), Mark(2, 3, 13), Mark(1, 0, 1));
+            return response.ToJsonString();
+        });
+        await RunAsync(JobTypes.Grade);
+
+        var path = $"/v1/essays/{student.EssayId}/correction";
+        var annotations = (await student.Client.GetFromJsonAsync<JsonElement>(path)).GetProperty("annotations");
+        Assert.Equal(
+            [(1, 1, "A"), (2, 1, "tecnologia"), (3, 2, "algoritmos"), (4, 3, "Isso")],
+            annotations.EnumerateArray().Select(a => (a.GetProperty("id").GetInt32(), a.GetProperty("lineStart").GetInt32(), a.GetProperty("quote").GetString()!)));
+
+        // A IA ainda marca dentro de uma linha; um trecho que termina em outra linha já é recortado inteiro.
+        await api.QueryAsync(db => db.Set<CorrectionMark>()
+            .Where(m => m.LineStart == 2 && db.Corrections.Any(c => c.Id == m.CorrectionId && c.EssayId == student.EssayId))
+            .ExecuteUpdateAsync(m => m.SetProperty(x => x.LineEnd, 3).SetProperty(x => x.CharEnd, 4)));
+
+        var spanning = (await student.Client.GetFromJsonAsync<JsonElement>(path)).GetProperty("annotations")[2];
+        Assert.Equal((2, 3, "algoritmos escolhem o que cada um vê. Isso"), (
+            spanning.GetProperty("lineStart").GetInt32(), spanning.GetProperty("lineEnd").GetInt32(), spanning.GetProperty("quote").GetString()));
+
+        static JsonObject Mark(int line, int start, int end) =>
+            new()
+            {
+                ["criterion"] = 1, ["kind"] = "good", ["line"] = line, ["start"] = start, ["end"] = end,
+                ["note"] = "Bom trecho.", ["rule"] = null, ["fix"] = null,
+            };
+    }
+
+    [Fact]
+    public async Task Feedback_is_recorded_once_and_only_by_the_owner()
+    {
+        var other = await QueuedEssayAsync();
+        var student = await QueuedEssayAsync();
+        await RunAsync(JobTypes.Grade);
+        var correctionId = await api.QueryAsync(db => db.Corrections.Where(c => c.EssayId == student.EssayId).Select(c => c.Id).SingleAsync());
+        var path = $"/v1/corrections/{correctionId}/feedback";
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await api.CreateClient().PostAsJsonAsync(path, new { rating = "helped_a_lot" })).StatusCode);
+        await AccountTests.AssertErrorAsync(await other.Client.PostAsJsonAsync(path, new { rating = "helped_a_lot" }), HttpStatusCode.NotFound, "NOT_FOUND");
+        await AccountTests.AssertErrorAsync(
+            await student.Client.PostAsJsonAsync($"/v1/corrections/{Guid.CreateVersion7()}/feedback", new { rating = "helped_a_lot" }),
+            HttpStatusCode.NotFound, "NOT_FOUND");
+        await AccountTests.AssertErrorAsync(await student.Client.PostAsJsonAsync(path, new { comment = "Sem opção." }), HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        await AccountTests.AssertErrorAsync(await student.Client.PostAsJsonAsync(path, new { rating = "loved_it" }), HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        await AccountTests.AssertErrorAsync(
+            await student.Client.PostAsJsonAsync(path, new { rating = "helped_partly", comment = new string('a', 1001) }),
+            HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        await AccountTests.AssertErrorAsync(await student.Client.PostAsJsonAsync(path, new { rating = 7 }), HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        // Caractere que o banco não guarda: recusado na entrada, não como erro interno.
+        await AccountTests.AssertErrorAsync(
+            await student.Client.PostAsJsonAsync(path, new { rating = "helped_partly", comment = "a\0b" }),
+            HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        Assert.False(await api.QueryAsync(db => db.CorrectionFeedback.AnyAsync(f => f.CorrectionId == correctionId)));
+
+        var sent = await student.Client.PostAsJsonAsync(path, new { rating = "helped_partly", comment = "  Faltou explicar a linha 3.  " });
+        Assert.Equal(HttpStatusCode.NoContent, sent.StatusCode);
+        await AccountTests.AssertErrorAsync(await student.Client.PostAsJsonAsync(path, new { rating = "did_not_help" }), HttpStatusCode.Conflict, "INVALID_STATE");
+
+        var feedback = await api.QueryAsync(db => db.CorrectionFeedback.SingleAsync(f => f.CorrectionId == correctionId));
+        Assert.Equal((FeedbackRating.HelpedPartly, "Faltou explicar a linha 3."), (feedback.Rating, feedback.Comment));
+        var shown = (await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction")).GetProperty("feedback");
+        Assert.Equal(("helped_partly", "Faltou explicar a linha 3."), (shown.GetProperty("rating").GetString(), shown.GetProperty("comment").GetString()));
+    }
+
+    [Fact]
+    public async Task Two_feedbacks_sent_at_the_same_time_record_one()
+    {
+        var student = await QueuedEssayAsync();
+        await RunAsync(JobTypes.Grade);
+        var correctionId = await api.QueryAsync(db => db.Corrections.Where(c => c.EssayId == student.EssayId).Select(c => c.Id).SingleAsync());
+        var path = $"/v1/corrections/{correctionId}/feedback";
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
+            Task.Run(() => student.Client.PostAsJsonAsync(path, new { rating = "helped_a_lot" }))));
+
+        Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.NoContent));
+        Assert.Equal(5, responses.Count(response => response.StatusCode == HttpStatusCode.Conflict));
+        Assert.Equal(1, await api.QueryAsync(db => db.CorrectionFeedback.CountAsync(f => f.CorrectionId == correctionId)));
+    }
+
+    /// <summary>Todos os textos de uma resposta JSON, em qualquer nível.</summary>
+    private static IEnumerable<string> Strings(JsonElement element) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.String => [element.GetString()!],
+            JsonValueKind.Array => element.EnumerateArray().SelectMany(Strings),
+            JsonValueKind.Object => element.EnumerateObject().SelectMany(property => Strings(property.Value)),
+            _ => [],
+        };
 
     private static string? Bad(string problem)
     {
@@ -361,7 +587,15 @@ public class GradingTests(ApiFixture api)
                 response["criteria"]![0]!["points"] = 12;
                 break;
             case "four-next-steps":
-                response["next_steps"] = new JsonArray("Um.", "Dois.", "Três.", "Quatro.");
+                response["next_steps"] = new JsonArray(
+                    FakeGrader.Point("Um.", 1), FakeGrader.Point("Dois.", 2), FakeGrader.Point("Três.", 3), FakeGrader.Point("Quatro.", 4));
+                break;
+            case "plain-next-steps":
+                // O formato antigo, só com o texto, não é mais aceito.
+                response["next_steps"] = new JsonArray("Um.", "Dois.");
+                break;
+            case "main-issue-without-criterion":
+                response["main_issue"] = FakeGrader.Point("O segundo parágrafo repete o primeiro.", null);
                 break;
             case "no-tool":
                 return null;
@@ -407,16 +641,33 @@ public class GradingTests(ApiFixture api)
     /// Um aluno com uma redação já transcrita, na fila de correção. Se a leitura tiver <c>[?]</c>, o aluno
     /// preenche com "algoritmos".
     /// </summary>
-    private async Task<Student> QueuedEssayAsync(params string[] lines) => await QueuedEssayAsync(false, lines);
+    private async Task<Student> QueuedEssayAsync(params string[] lines) => await QueuedEssayAsync(false, null, lines);
 
-    private async Task<Student> QueuedEssayAsync(bool identificationFound, params string[] lines)
+    private async Task<Student> QueuedEssayAsync(bool identificationFound, params string[] lines) =>
+        await QueuedEssayAsync(identificationFound, null, lines);
+
+    /// <summary>A reescrita de uma redação já corrigida, do mesmo aluno, na fila de correção.</summary>
+    private async Task<Student> QueuedEssayAsync(Student rewriteOf) => await QueuedEssayAsync(false, rewriteOf, []);
+
+    private async Task<Student> QueuedEssayAsync(bool identificationFound, Student? rewriteOf, string[] lines)
     {
         // Jobs deixados por outros testes rodam antes, com as respostas padrão, para não consumir o roteiro deste.
         await RunAsync(JobTypes.Transcribe);
         await RunAsync(JobTypes.Grade);
 
-        var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
-        await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true });
+        var client = rewriteOf?.Client ?? api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
+        if (rewriteOf is null)
+        {
+            await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true });
+        }
+        else
+        {
+            // O teste grátis foi usado na primeira versão.
+            var userId = await api.QueryAsync(db => db.Essays.Where(e => e.Id == rewriteOf.EssayId).Select(e => e.UserId).SingleAsync());
+            await using var scope = api.Factory.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<ICreditService>()
+                .GrantAsync(new GrantCreditsCommand(userId, CreditSource.Single, 1, null, "test"), CancellationToken.None);
+        }
         var theme = (await client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes"))[0];
         var dissertacao = theme.GetProperty("essayTypes").EnumerateArray().Single(type => type.GetProperty("slug").GetString() == "dissertacao");
 
@@ -429,7 +680,16 @@ public class GradingTests(ApiFixture api)
         {
             Content = JsonContent.Create(new
             {
-                essays = new[] { new { themeId = theme.GetProperty("id").GetGuid(), essayTypeId = dissertacao.GetProperty("id").GetGuid(), assetId } },
+                essays = new[]
+                {
+                    new
+                    {
+                        themeId = theme.GetProperty("id").GetGuid(),
+                        essayTypeId = dissertacao.GetProperty("id").GetGuid(),
+                        assetId,
+                        parentEssayId = rewriteOf?.EssayId,
+                    },
+                },
                 aiNoticeAccepted = true,
             }),
         };

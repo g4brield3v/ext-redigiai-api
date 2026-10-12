@@ -769,7 +769,7 @@
         "tags": [
           "Essays"
         ],
-        "summary": "Correção completa: nota calculada pelo backend, nível e orientação de cada critério, marcas na redação e\r\npróximos passos. Só existe depois que a redação chega a `completed`; antes disso responde 409.",
+        "summary": "Correção completa: nota calculada pelo backend, nível e orientação de cada critério, apontamentos na\r\nredação, por onde começar e o plano de reescrita, com os pontos que cada passo pode render. Só existe\r\ndepois que a redação chega a `completed`; antes disso responde 409.",
         "operationId": "getCorrection",
         "parameters": [
           {
@@ -815,6 +815,99 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/corrections/{id}/feedback": {
+      "post": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Avaliação do aluno sobre a correção, com comentário opcional. Uma por correção: a segunda responde 409.",
+        "operationId": "sendCorrectionFeedback",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionFeedbackRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionFeedbackRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionFeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -1012,21 +1105,87 @@
           }
         }
       },
+      "CorrectionAnnotationDto": {
+        "required": [
+          "id",
+          "kind",
+          "criterion",
+          "lineStart",
+          "lineEnd",
+          "charStart",
+          "charEnd",
+          "quote",
+          "note",
+          "ruleName",
+          "fix"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MarkKind"
+          },
+          "criterion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lineStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lineEnd": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "charStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "charEnd": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ruleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "CorrectionCriterionDto": {
         "required": [
           "position",
-          "name",
+          "shortName",
+          "fullName",
           "weight",
           "level",
-          "maxLevel",
           "points",
           "maxPoints",
-          "descriptor",
+          "pointsLost",
+          "currentDescriptor",
+          "nextDescriptor",
           "justification",
-          "lines",
-          "linesLabel",
           "guidance",
-          "deviations"
+          "annotationIds"
         ],
         "type": "object",
         "properties": {
@@ -1034,7 +1193,10 @@
             "type": "integer",
             "format": "int32"
           },
-          "name": {
+          "shortName": {
+            "type": "string"
+          },
+          "fullName": {
             "type": "string"
           },
           "weight": {
@@ -1042,10 +1204,6 @@
             "format": "int32"
           },
           "level": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxLevel": {
             "type": "integer",
             "format": "int32"
           },
@@ -1057,20 +1215,20 @@
             "type": "integer",
             "format": "int32"
           },
-          "descriptor": {
+          "pointsLost": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentDescriptor": {
             "type": "string"
+          },
+          "nextDescriptor": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "justification": {
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          "linesLabel": {
             "type": "string"
           },
           "guidance": {
@@ -1079,10 +1237,11 @@
               "string"
             ]
           },
-          "deviations": {
+          "annotationIds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleDeviationDto"
+              "type": "integer",
+              "format": "int32"
             }
           }
         }
@@ -1097,21 +1256,21 @@
           "sentAt",
           "version",
           "examName",
-          "rubricVersion",
+          "rubric",
           "score",
           "maxScore",
           "scoreDelta",
           "previousVersion",
-          "zeroReason",
-          "zeroRule",
-          "zeroExplanation",
+          "previousVersionScore",
+          "zero",
           "strengths",
           "mainIssue",
           "sheetLines",
           "lines",
-          "marks",
+          "annotations",
           "criteria",
-          "nextSteps"
+          "nextSteps",
+          "feedback"
         ],
         "type": "object",
         "properties": {
@@ -1145,9 +1304,8 @@
           "examName": {
             "type": "string"
           },
-          "rubricVersion": {
-            "type": "integer",
-            "format": "int32"
+          "rubric": {
+            "$ref": "#/components/schemas/CorrectionRubricDto"
           },
           "score": {
             "type": "integer",
@@ -1171,29 +1329,21 @@
             ],
             "format": "int32"
           },
-          "zeroReason": {
+          "previousVersionScore": {
             "type": [
               "null",
-              "string"
-            ]
+              "integer"
+            ],
+            "format": "int32"
           },
-          "zeroRule": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "zeroExplanation": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "zero": {
+            "$ref": "#/components/schemas/CorrectionZeroDto"
           },
           "strengths": {
             "type": "string"
           },
           "mainIssue": {
-            "type": "string"
+            "$ref": "#/components/schemas/CorrectionPointDto"
           },
           "sheetLines": {
             "type": "integer",
@@ -1205,10 +1355,10 @@
               "$ref": "#/components/schemas/TranscriptionLineDto"
             }
           },
-          "marks": {
+          "annotations": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CorrectionMarkDto"
+              "$ref": "#/components/schemas/CorrectionAnnotationDto"
             }
           },
           "criteria": {
@@ -1220,50 +1370,154 @@
           "nextSteps": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/CorrectionPointDto"
             }
+          },
+          "feedback": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CorrectionFeedbackDto"
+              }
+            ]
           }
         }
       },
-      "CorrectionMarkDto": {
+      "CorrectionFeedbackDto": {
         "required": [
-          "criterion",
-          "kind",
-          "line",
-          "start",
-          "end",
-          "note",
-          "tagged"
+          "rating",
+          "comment"
         ],
         "type": "object",
         "properties": {
+          "rating": {
+            "$ref": "#/components/schemas/FeedbackRating"
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CorrectionFeedbackRequest": {
+        "required": [
+          "rating"
+        ],
+        "type": "object",
+        "properties": {
+          "rating": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Uma das três opções da avaliação.",
+                "$ref": "#/components/schemas/FeedbackRating"
+              }
+            ]
+          },
+          "comment": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Comentário opcional, com até 1.000 caracteres."
+          }
+        }
+      },
+      "CorrectionPointDto": {
+        "required": [
+          "text",
+          "criterion",
+          "potentialGain"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
           "criterion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "potentialGain": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CorrectionRubricDto": {
+        "required": [
+          "version",
+          "maxLevel",
+          "maxScore",
+          "versionLabel"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
             "type": "integer",
             "format": "int32"
           },
-          "kind": {
-            "$ref": "#/components/schemas/MarkKind"
-          },
-          "line": {
+          "maxLevel": {
             "type": "integer",
             "format": "int32"
           },
-          "start": {
+          "maxScore": {
             "type": "integer",
             "format": "int32"
           },
-          "end": {
-            "type": "integer",
-            "format": "int32"
+          "versionLabel": {
+            "type": "string"
+          }
+        }
+      },
+      "CorrectionZeroDto": {
+        "required": [
+          "applies",
+          "ruleCode",
+          "ruleLabel",
+          "ruleNote",
+          "explanation"
+        ],
+        "type": "object",
+        "properties": {
+          "applies": {
+            "type": "boolean"
           },
-          "note": {
+          "ruleCode": {
             "type": [
               "null",
               "string"
             ]
           },
-          "tagged": {
-            "type": "boolean"
+          "ruleLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ruleNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "explanation": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1643,6 +1897,13 @@
           "coming_soon"
         ]
       },
+      "FeedbackRating": {
+        "enum": [
+          "helped_a_lot",
+          "helped_partly",
+          "did_not_help"
+        ]
+      },
       "HealthResponse": {
         "required": [
           "status"
@@ -1877,26 +2138,6 @@
             "format": "int32"
           },
           "descriptor": {
-            "type": "string"
-          }
-        }
-      },
-      "RuleDeviationDto": {
-        "required": [
-          "rule",
-          "line",
-          "correction"
-        ],
-        "type": "object",
-        "properties": {
-          "rule": {
-            "type": "string"
-          },
-          "line": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "correction": {
             "type": "string"
           }
         }

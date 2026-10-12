@@ -168,7 +168,7 @@ internal sealed class CorrectionConfiguration : IEntityTypeConfiguration<Correct
         builder.Property(c => c.RawResponse).HasColumnType("jsonb");
         builder.Property(c => c.NextSteps)
             .HasColumnType("jsonb")
-            .HasConversion<JsonConverter<IReadOnlyList<string>>, JsonComparer<IReadOnlyList<string>>>();
+            .HasConversion<JsonConverter<IReadOnlyList<NextStep>>, JsonComparer<IReadOnlyList<NextStep>>>();
         builder.HasOne<Essay>().WithMany().HasForeignKey(c => c.EssayId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RubricVersion>().WithMany().HasForeignKey(c => c.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<GradingProfile>().WithMany().HasForeignKey(c => c.GradingProfileId).OnDelete(DeleteBehavior.Restrict);
@@ -203,5 +203,19 @@ internal sealed class CorrectionMarkConfiguration : IEntityTypeConfiguration<Cor
         builder.Property(m => m.RuleCode).HasMaxLength(40);
         builder.HasOne<RubricCriterion>().WithMany().HasForeignKey(m => m.CriterionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(m => m.CorrectionId);
+    }
+}
+
+internal sealed class CorrectionFeedbackConfiguration : IEntityTypeConfiguration<CorrectionFeedback>
+{
+    public void Configure(EntityTypeBuilder<CorrectionFeedback> builder)
+    {
+        builder.ToTable("correction_feedback");
+        builder.Property(f => f.Rating).HasMaxLength(20);
+        builder.Property(f => f.Comment).HasMaxLength(CorrectionFeedback.MaxCommentLength);
+        builder.HasOne<Correction>().WithMany().HasForeignKey(f => f.CorrectionId).OnDelete(DeleteBehavior.Cascade);
+
+        // Uma avaliação por correção: é o que impede dois envios simultâneos de gravarem duas.
+        builder.HasIndex(f => f.CorrectionId).IsUnique();
     }
 }

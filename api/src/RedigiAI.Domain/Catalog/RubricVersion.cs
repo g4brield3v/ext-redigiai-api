@@ -1,8 +1,12 @@
 namespace RedigiAI.Domain.Catalog;
 
-public sealed record ZeroRule(string Code, string Description);
+/// <param name="Description">Texto da hipótese, como está na grade.</param>
+/// <param name="StudentNote">O que a regra significa, escrito para o aluno; aparece na correção com nota zero.</param>
+public sealed record ZeroRule(string Code, string Description, string StudentNote = "");
 
-public sealed record CriterionSpec(string Name, int Weight, IReadOnlyDictionary<int, string> LevelDescriptors);
+/// <param name="ShortName">Nome curto do critério, como "Tema e autoria"; sem ele, vale o nome completo.</param>
+public sealed record CriterionSpec(
+    string Name, int Weight, IReadOnlyDictionary<int, string> LevelDescriptors, string? ShortName = null);
 
 /// <summary>
 /// Grade de correção. Imutável depois de publicada: editar é publicar uma versão nova.
@@ -29,6 +33,9 @@ public sealed class RubricVersion
 
     /// <summary>De onde veio o texto da grade, como "Simulado Fuvest 2027 – 2ª edição".</summary>
     public string? Source { get; private set; }
+
+    /// <summary>Como a grade é chamada para o aluno, como "Fuvest 2027"; a versão entra ao lado.</summary>
+    public string? Label { get; private set; }
     public IReadOnlyList<ZeroRule> ZeroRules { get; private set; } = [];
     public IReadOnlyList<RubricCriterion> Criteria => _criteria;
 
@@ -39,7 +46,8 @@ public sealed class RubricVersion
         DateTimeOffset publishedAt,
         IReadOnlyList<ZeroRule> zeroRules,
         IReadOnlyList<CriterionSpec> criteria,
-        string? source = null)
+        string? source = null,
+        string? label = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(version, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxLevel, 2);
@@ -56,6 +64,7 @@ public sealed class RubricVersion
             MaxLevel = maxLevel,
             PublishedAt = publishedAt,
             Source = source,
+            Label = label,
             ZeroRules = [.. zeroRules],
         };
 
@@ -79,6 +88,9 @@ public sealed class RubricCriterion
     public Guid RubricVersionId { get; private set; }
     public int Position { get; private set; }
     public string Name { get; private set; } = null!;
+
+    /// <summary>Nome curto, usado nos títulos e filtros da correção.</summary>
+    public string ShortName { get; private set; } = null!;
     public int Weight { get; private set; }
 
     /// <summary>Nível máximo da versão × peso.</summary>
@@ -87,6 +99,9 @@ public sealed class RubricCriterion
 
     /// <summary>A nota do critério é sempre esta conta, feita pelo backend (regra 6).</summary>
     public int PointsFor(int level) => level * Weight;
+
+    /// <summary>Pontos que faltam para o nível máximo: é também o quanto o critério ainda pode render.</summary>
+    public int PointsLostAt(int level) => MaxPoints - PointsFor(level);
 
     internal static RubricCriterion Create(Guid rubricVersionId, int position, int maxLevel, CriterionSpec spec)
     {
@@ -106,6 +121,7 @@ public sealed class RubricCriterion
             RubricVersionId = rubricVersionId,
             Position = position,
             Name = spec.Name,
+            ShortName = string.IsNullOrWhiteSpace(spec.ShortName) ? spec.Name : spec.ShortName,
             Weight = spec.Weight,
             MaxPoints = maxLevel * spec.Weight,
             LevelDescriptors = new Dictionary<int, string>(spec.LevelDescriptors),

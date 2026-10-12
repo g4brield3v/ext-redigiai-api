@@ -33,7 +33,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
             ["tools"] = new JsonArray(new JsonObject
             {
                 ["name"] = ToolName,
-                ["description"] = "Registra a correção da redação: nota zero, nível de cada critério, marcas e próximos passos.",
+                ["description"] = "Registra a correção da redação: nota zero, nível de cada critério, marcas, problema principal e próximos passos.",
                 ["input_schema"] = Schema(request.Schema),
             }),
             // Os modelos atuais não aceitam forçar a ferramenta; a instrução exige o uso e a resposta sem ela é recusada.
@@ -74,6 +74,22 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
         JsonObject OptionalText() => new() { ["type"] = new JsonArray("string", "null") };
         JsonObject Line() => Integer(1, schema.SheetLines);
         JsonObject Criterion() => Integer(1, schema.CriteriaCount);
+
+        // Problema principal e próximos passos: o critério é nulo com nota zero ou quando o passo é geral.
+        JsonObject Point() => new()
+        {
+            ["type"] = "object",
+            ["additionalProperties"] = false,
+            ["required"] = new JsonArray("text", "criterion"),
+            ["properties"] = new JsonObject
+            {
+                ["text"] = Text(),
+                ["criterion"] = new JsonObject
+                {
+                    ["type"] = new JsonArray("integer", "null"), ["minimum"] = 1, ["maximum"] = schema.CriteriaCount,
+                },
+            },
+        };
 
         var reasons = new JsonArray();
         foreach (var reason in schema.ZeroReasons)
@@ -137,7 +153,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                     {
                         ["type"] = "object",
                         ["additionalProperties"] = false,
-                        ["required"] = new JsonArray("criterion", "kind", "line", "start", "end", "note", "rule"),
+                        ["required"] = new JsonArray("criterion", "kind", "line", "start", "end", "note", "rule", "fix"),
                         ["properties"] = new JsonObject
                         {
                             ["criterion"] = Criterion(),
@@ -147,12 +163,13 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                             ["end"] = Integer(1),
                             ["note"] = OptionalText(),
                             ["rule"] = new JsonObject { ["enum"] = rules },
+                            ["fix"] = OptionalText(),
                         },
                     },
                 },
                 ["strengths"] = Text(),
-                ["main_issue"] = Text(),
-                ["next_steps"] = new JsonObject { ["type"] = "array", ["maxItems"] = Correction.MaxNextSteps, ["items"] = Text() },
+                ["main_issue"] = Point(),
+                ["next_steps"] = new JsonObject { ["type"] = "array", ["maxItems"] = Correction.MaxNextSteps, ["items"] = Point() },
             },
         };
     }

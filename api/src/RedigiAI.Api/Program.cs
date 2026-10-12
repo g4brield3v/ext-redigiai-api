@@ -5,7 +5,11 @@ string[] modes = ["api", "worker", "migrate", "seed"];
 var mode = args.Length > 0 && modes.Contains(args[0]) ? args[0] : "api";
 var rest = args.Length > 0 && args[0] == mode ? args[1..] : args;
 
-DotEnv.LoadIfPresent();
+// A geração do openapi.json no build sobe a aplicação fora do ambiente Development: o .env local não vale para ela.
+if (System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name != "GetDocument.Insider")
+{
+    DotEnv.LoadIfPresent();
+}
 
 return mode switch
 {

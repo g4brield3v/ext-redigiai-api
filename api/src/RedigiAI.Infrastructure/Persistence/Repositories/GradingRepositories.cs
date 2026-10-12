@@ -63,6 +63,14 @@ internal sealed class CorrectionRepository(AppDbContext db) : ICorrectionReposit
             .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.EssayId == essayId, ct);
 
+    public Task<Correction?> FindAsync(Guid id, CancellationToken ct) =>
+        db.Corrections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+
+    public void AddFeedback(CorrectionFeedback feedback) => db.CorrectionFeedback.Add(feedback);
+
+    public Task<CorrectionFeedback?> FindFeedbackAsync(Guid correctionId, CancellationToken ct) =>
+        db.CorrectionFeedback.AsNoTracking().FirstOrDefaultAsync(f => f.CorrectionId == correctionId, ct);
+
     public async Task<IReadOnlyDictionary<Guid, (int Score, int MaxScore)>> ScoresAsync(
         IReadOnlyCollection<Guid> essayIds, CancellationToken ct)
     {

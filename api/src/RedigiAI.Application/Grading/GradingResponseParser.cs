@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using RedigiAI.Domain.Grading;
@@ -39,8 +40,8 @@ internal static class GradingResponseParser
             || response.Marks is null
             || response.NextSteps is null
             || string.IsNullOrWhiteSpace(response.Strengths)
-            || string.IsNullOrWhiteSpace(response.MainIssue)
-            || response.NextSteps.Any(string.IsNullOrWhiteSpace))
+            || string.IsNullOrWhiteSpace(response.MainIssue?.Text)
+            || response.NextSteps.Any(step => string.IsNullOrWhiteSpace(step?.Text)))
         {
             return null;
         }
@@ -54,7 +55,7 @@ internal static class GradingResponseParser
                 return null;
             }
 
-            criteria.Add(new GradedCriterion(position, level, item.Justification, item.Lines, item.Guidance));
+            criteria.Add(new GradedCriterion(position, level, Unescaped(item.Justification), item.Lines, Unescaped(item.Guidance)));
         }
 
         var marks = new List<GradedMark>(response.Marks.Count);
@@ -78,17 +79,24 @@ internal static class GradingResponseParser
                 return null;
             }
 
-            marks.Add(new GradedMark(criterion, kind, line, start, end, item.Note, item.Rule));
+            marks.Add(new GradedMark(criterion, kind, line, start, end, Unescaped(item.Note), item.Rule, Unescaped(item.Fix)));
         }
 
         return new GradingOutput(
-            new GradedZero(applies, response.Zero.Reason, response.Zero.Explanation),
+            new GradedZero(applies, response.Zero.Reason, Unescaped(response.Zero.Explanation)),
             criteria,
             marks,
-            response.Strengths,
-            response.MainIssue,
-            response.NextSteps!);
+            Unescaped(response.Strengths),
+            new GradedPoint(Unescaped(response.MainIssue.Text), response.MainIssue.Criterion),
+            [.. response.NextSteps.Select(step => new GradedPoint(Unescaped(step!.Text!), step.Criterion))]);
     }
+
+    /// <summary>
+    /// O modelo às vezes escreve as aspas já com a barra de escape (<c>\"A vida é bela\"</c>) dentro do texto.
+    /// A barra sai aqui, antes de qualquer validação; a resposta como veio continua em <c>raw_response</c>.
+    /// </summary>
+    [return: NotNullIfNotNull(nameof(text))]
+    internal static string? Unescaped(string? text) => text?.Replace("\\\"", "\"");
 
     private sealed class Response
     {
@@ -96,8 +104,14 @@ internal static class GradingResponseParser
         public List<Criterion?>? Criteria { get; init; }
         public List<Mark?>? Marks { get; init; }
         public string? Strengths { get; init; }
-        public string? MainIssue { get; init; }
-        public List<string>? NextSteps { get; init; }
+        public Point? MainIssue { get; init; }
+        public List<Point?>? NextSteps { get; init; }
+    }
+
+    private sealed class Point
+    {
+        public string? Text { get; init; }
+        public int? Criterion { get; init; }
     }
 
     private sealed class Zero
@@ -125,5 +139,6 @@ internal static class GradingResponseParser
         public int? End { get; init; }
         public string? Note { get; init; }
         public string? Rule { get; init; }
+        public string? Fix { get; init; }
     }
 }

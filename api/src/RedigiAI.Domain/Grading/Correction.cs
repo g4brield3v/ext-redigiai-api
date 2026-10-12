@@ -16,15 +16,25 @@ public sealed record GradedCriterion(int Position, int Level, string Justificati
 
 /// <param name="Start">Posição no texto da linha: início incluído, fim excluído.</param>
 /// <param name="Rule">Código da regra de escrita, nas marcas do critério de correção gramatical.</param>
-public sealed record GradedMark(int Criterion, MarkKind Kind, int Line, int Start, int End, string? Note, string? Rule);
+/// <param name="Fix">A forma correta do trecho, nos desvios de escrita.</param>
+public sealed record GradedMark(
+    int Criterion, MarkKind Kind, int Line, int Start, int End, string? Note, string? Rule, string? Fix = null);
+
+/// <summary>O problema principal ou um próximo passo, com o critério a que se refere.</summary>
+/// <param name="Criterion">Posição do critério na grade; nulo quando o texto não é de um critério só.</param>
+public sealed record GradedPoint(string Text, int? Criterion);
 
 public sealed record GradingOutput(
     GradedZero Zero,
     IReadOnlyList<GradedCriterion> Criteria,
     IReadOnlyList<GradedMark> Marks,
     string Strengths,
-    string MainIssue,
-    IReadOnlyList<string> NextSteps);
+    GradedPoint MainIssue,
+    IReadOnlyList<GradedPoint> NextSteps);
+
+/// <summary>Próximo passo da correção.</summary>
+/// <param name="Criterion">Posição do critério a que o passo se refere; nulo com nota zero ou em passo geral.</param>
+public sealed record NextStep(string Text, int? Criterion);
 
 /// <summary>Linha da redação como foi para a correção: a transcrição com as palavras que o aluno digitou.</summary>
 public sealed record EssayLine(int Number, string Text, bool Indent);
@@ -80,7 +90,10 @@ public sealed class Correction
     public int MaxScore { get; private set; }
     public string Strengths { get; private set; } = null!;
     public string MainIssue { get; private set; } = null!;
-    public IReadOnlyList<string> NextSteps { get; private set; } = [];
+
+    /// <summary>Posição do critério do problema principal; nulo quando a nota é zero.</summary>
+    public int? MainIssueCriterion { get; private set; }
+    public IReadOnlyList<NextStep> NextSteps { get; private set; } = [];
     public string Model { get; private set; } = null!;
 
     /// <summary>O que a IA devolveu, como veio, para auditoria.</summary>
@@ -116,9 +129,20 @@ public sealed class Correction
             throw new InvalidGradingException(5, "More than 3 next steps.");
         }
 
-        if (output.NextSteps.Any(Feedback.IsQuestion))
+        if (output.NextSteps.Any(step => Feedback.IsQuestion(step.Text)))
         {
             throw new InvalidGradingException(4, "A next step is a question.");
+        }
+
+        // Com nota zero nenhum critério é pontuado: o problema principal e os passos não ficam ligados a critério.
+        if (!zero && (output.MainIssue.Criterion is not { } mainCriterion || !HasCriterion(rubric, mainCriterion)))
+        {
+            throw new InvalidGradingException(2, "The main issue does not point to a criterion of the rubric.");
+        }
+
+        if (!zero && output.NextSteps.Any(step => step.Criterion is { } position && !HasCriterion(rubric, position)))
+        {
+            throw new InvalidGradingException(2, "A next step points to a criterion that is not in the rubric.");
         }
 
         var correction = new Correction
@@ -134,8 +158,9 @@ public sealed class Correction
             ZeroExplanation = zero ? output.Zero.Explanation : null,
             MaxScore = rubric.MaxScore,
             Strengths = output.Strengths,
-            MainIssue = output.MainIssue,
-            NextSteps = [.. output.NextSteps],
+            MainIssue = output.MainIssue.Text,
+            MainIssueCriterion = zero ? null : output.MainIssue.Criterion,
+            NextSteps = [.. output.NextSteps.Select(step => new NextStep(step.Text, zero ? null : step.Criterion))],
             Model = model,
             RawResponse = rawResponse,
             CreatedAt = now,
@@ -153,6 +178,9 @@ public sealed class Correction
         correction.Score = correction._criteria.Sum(criterion => criterion.Points);
         return correction;
     }
+
+    private static bool HasCriterion(RubricVersion rubric, int position) =>
+        rubric.Criteria.Any(criterion => criterion.Position == position);
 
     private void AddCriteria(
         RubricVersion rubric, IReadOnlyList<GradedCriterion> graded, Dictionary<int, string> textByLine)
@@ -260,6 +288,9 @@ public sealed class CorrectionMark
         CharEnd = mark.End;
         Note = string.IsNullOrWhiteSpace(mark.Note) ? null : mark.Note;
         RuleCode = string.IsNullOrWhiteSpace(mark.Rule) ? null : mark.Rule;
+
+        // A forma correta só existe para desvio de escrita; fora disso o que a IA mandar é descartado.
+        Fix = Kind == MarkKind.Issue && RuleCode is not null && !string.IsNullOrWhiteSpace(mark.Fix) ? mark.Fix : null;
     }
 
     public Guid Id { get; private set; }
@@ -274,11 +305,61 @@ public sealed class CorrectionMark
     public int CharStart { get; private set; }
     public int CharEnd { get; private set; }
 
-    /// <summary>Nota de margem, exibida na mesma linha da marca.</summary>
+    /// <summary>Comentário do apontamento.</summary>
     public string? Note { get; private set; }
 
     /// <summary>Código da regra de escrita (<c>writing_rules</c>), quando a marca é um desvio de escrita.</summary>
     public string? RuleCode { get; private set; }
+
+    /// <summary>A forma correta do trecho, quando a marca é um desvio de escrita.</summary>
+    public string? Fix { get; private set; }
+}
+
+public enum FeedbackRating
+{
+    HelpedALot,
+    HelpedPartly,
+    DidNotHelp,
+}
+
+/// <summary>Avaliação que o aluno faz da correção: uma por correção.</summary>
+public sealed class CorrectionFeedback
+{
+    public const int MaxCommentLength = 1000;
+
+    private CorrectionFeedback() { }
+
+    public Guid Id { get; private set; }
+    public Guid CorrectionId { get; private set; }
+    public FeedbackRating Rating { get; private set; }
+    public string? Comment { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>O comentário cabe no limite e só tem texto: nenhum caractere de controle além de quebra de linha e tabulação.</summary>
+    public static bool AcceptsComment(string? comment) =>
+        comment is null
+        || (comment.Trim().Length <= MaxCommentLength
+            && !comment.Any(character => char.IsControl(character) && character is not ('\n' or '\r' or '\t')));
+
+    /// <exception cref="ArgumentException">Comentário acima do limite ou com caractere de controle.</exception>
+    public static CorrectionFeedback Create(Guid correctionId, FeedbackRating rating, string? comment, DateTimeOffset now)
+    {
+        if (!AcceptsComment(comment))
+        {
+            throw new ArgumentException("Comment is too long or has control characters.", nameof(comment));
+        }
+
+        var text = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
+
+        return new CorrectionFeedback
+        {
+            Id = Guid.CreateVersion7(),
+            CorrectionId = correctionId,
+            Rating = rating,
+            Comment = text,
+            CreatedAt = now,
+        };
+    }
 }
 
 /// <summary>Feedback é sempre afirmação, nunca pergunta (regra 7 do produto).</summary>
@@ -344,6 +425,13 @@ public interface ICorrectionRepository
 
     /// <summary>A correção da redação, com critérios e marcas; <c>null</c> se ainda não existe.</summary>
     Task<Correction?> FindByEssayAsync(Guid essayId, CancellationToken ct);
+
+    /// <summary>A correção pelo id, sem critérios nem marcas; <c>null</c> se não existe.</summary>
+    Task<Correction?> FindAsync(Guid id, CancellationToken ct);
+
+    void AddFeedback(CorrectionFeedback feedback);
+
+    Task<CorrectionFeedback?> FindFeedbackAsync(Guid correctionId, CancellationToken ct);
 
     /// <summary>Nota e nota máxima de cada redação já corrigida.</summary>
     Task<IReadOnlyDictionary<Guid, (int Score, int MaxScore)>> ScoresAsync(

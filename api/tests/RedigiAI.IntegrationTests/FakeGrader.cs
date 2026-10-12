@@ -24,7 +24,7 @@ public sealed class FakeGrader : IEssayGrader
 
     /// <summary>
     /// Correção válida para qualquer redação com texto na linha 1: níveis 3, 3, 2 e 3, que na grade da Fuvest
-    /// (pesos 3, 2, 3 e 2) somam 27 de 40.
+    /// (pesos 3, 2, 3 e 2) somam 27 de 40. A linha 1 precisa ter ao menos 12 caracteres.
     /// </summary>
     public static JsonObject Good() =>
         new()
@@ -35,16 +35,18 @@ public sealed class FakeGrader : IEssayGrader
                 new JsonObject
                 {
                     ["criterion"] = 4, ["kind"] = "issue", ["line"] = 1, ["start"] = 0, ["end"] = 1,
-                    ["note"] = "\"A partir\", sem crase", ["rule"] = "CRASE_VERBO",
+                    ["note"] = "\"A partir\", sem crase", ["rule"] = "CRASE_VERBO", ["fix"] = "A partir",
                 },
                 new JsonObject
                 {
-                    ["criterion"] = 1, ["kind"] = "good", ["line"] = 1, ["start"] = 0, ["end"] = 1,
-                    ["note"] = null, ["rule"] = null,
+                    ["criterion"] = 1, ["kind"] = "good", ["line"] = 1, ["start"] = 2, ["end"] = 12,
+                    ["note"] = null, ["rule"] = null, ["fix"] = null,
                 }),
             ["strengths"] = "A posição está clara desde a introdução.",
-            ["main_issue"] = "O segundo parágrafo repete o primeiro.",
-            ["next_steps"] = new JsonArray("Troque o segundo parágrafo por um argumento novo.", "Corrija a crase da linha 1."),
+            ["main_issue"] = Point("O segundo parágrafo repete o primeiro.", 3),
+            // Fora da ordem de ganho: quem ordena é o backend.
+            ["next_steps"] = new JsonArray(
+                Point("Corrija a crase da linha 1.", 4), Point("Troque o segundo parágrafo por um argumento novo.", 3)),
         };
 
     public static JsonObject Zero(string reason) =>
@@ -54,9 +56,12 @@ public sealed class FakeGrader : IEssayGrader
             ["criteria"] = new JsonArray(),
             ["marks"] = new JsonArray(),
             ["strengths"] = "O texto tem começo, meio e fim.",
-            ["main_issue"] = "A folha identifica quem escreveu.",
-            ["next_steps"] = new JsonArray("Não escreva o seu nome na folha."),
+            ["main_issue"] = Point("A folha identifica quem escreveu.", null),
+            ["next_steps"] = new JsonArray(Point("Não escreva o seu nome na folha.", null)),
         };
+
+    public static JsonObject Point(string text, int? criterion) =>
+        new() { ["text"] = text, ["criterion"] = criterion };
 
     public static JsonObject Criterion(int position, int level) =>
         new()

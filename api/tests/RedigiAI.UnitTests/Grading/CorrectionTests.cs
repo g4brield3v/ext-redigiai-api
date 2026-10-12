@@ -38,14 +38,16 @@ public class CorrectionTests
         IReadOnlyList<GradedCriterion>? criteria = null,
         IReadOnlyList<GradedMark>? marks = null,
         IReadOnlyList<string>? nextSteps = null,
-        GradedZero? zero = null) =>
+        GradedZero? zero = null,
+        GradedPoint? mainIssue = null,
+        int? stepCriterion = 3) =>
         new(
             zero ?? new GradedZero(false, null, null),
             criteria ?? [Criterion(1, 3), Criterion(2, 3), Criterion(3, 2), Criterion(4, 3)],
             marks ?? [new GradedMark(4, MarkKind.Issue, 2, 0, 8, "\"A partir\", sem crase", "CRASE_VERBO")],
             "Tese clara.",
-            "Poucos argumentos próprios.",
-            nextSteps ?? ["Releia a coletânea.", "Reescreva o segundo parágrafo."]);
+            mainIssue ?? new GradedPoint("Poucos argumentos próprios.", 1),
+            [.. (nextSteps ?? ["Releia a coletânea.", "Reescreva o segundo parágrafo."]).Select(text => new GradedPoint(text, stepCriterion))]);
 
     private static Correction Grade(GradingOutput output, GradingContext? context = null) =>
         Correction.Grade(context ?? Context(), output, "test-model", "{}", Now);
@@ -124,6 +126,44 @@ public class CorrectionTests
     }
 
     [Fact]
+    public void Correct_form_is_kept_only_for_writing_deviations()
+    {
+        var correction = Grade(Output(marks:
+        [
+            new GradedMark(4, MarkKind.Issue, 2, 0, 8, "sem crase", "CRASE_VERBO", "A partir"),
+            new GradedMark(3, MarkKind.Issue, 1, 0, 1, "repete a ideia", null, "Outra frase"),
+            new GradedMark(1, MarkKind.Good, 1, 2, 12, "bom repertório", "CRASE_VERBO", "tecnologia"),
+            new GradedMark(4, MarkKind.Issue, 2, 9, 14, "vago", "OUTRO", "  "),
+        ]));
+
+        Assert.Equal(["A partir", null, null, null], correction.Marks.Select(mark => mark.Fix));
+    }
+
+    [Fact]
+    public void Main_issue_and_next_steps_point_to_criteria_of_the_rubric()
+    {
+        AssertRejected(2, Output(mainIssue: new GradedPoint("Poucos argumentos próprios.", null)));
+        AssertRejected(2, Output(mainIssue: new GradedPoint("Poucos argumentos próprios.", 5)));
+        AssertRejected(2, Output(stepCriterion: 9));
+
+        // Um passo pode ser geral, sem critério.
+        var correction = Grade(Output(stepCriterion: null));
+        Assert.Equal(1, correction.MainIssueCriterion);
+        Assert.All(correction.NextSteps, step => Assert.Null(step.Criterion));
+        Assert.Equal([3, 3], Grade(Output()).NextSteps.Select(step => step.Criterion));
+    }
+
+    [Fact]
+    public void Points_lost_are_what_is_missing_for_the_top_level()
+    {
+        var third = Rubric.Criteria.Single(criterion => criterion.Position == 3);
+
+        Assert.Equal((6, 0, 9), (third.PointsLostAt(2), third.PointsLostAt(4), third.PointsLostAt(1)));
+        // Sem nome curto, vale o nome completo.
+        Assert.Equal("Critério 3", third.ShortName);
+    }
+
+    [Fact]
     public void More_than_3_next_steps_is_rejected() =>
         AssertRejected(5, Output(nextSteps: ["Um.", "Dois.", "Três.", "Quatro."]));
 
@@ -138,6 +178,9 @@ public class CorrectionTests
         Assert.Equal((0, 40, "theme_not_addressed"), (correction.Score, correction.MaxScore, correction.ZeroReason));
         // Com nota zero os critérios não são pontuados, mesmo que a IA os envie.
         Assert.Empty(correction.Criteria);
+        // E nada fica ligado a critério: não há pontos a ganhar em um só.
+        Assert.Null(correction.MainIssueCriterion);
+        Assert.All(correction.NextSteps, step => Assert.Null(step.Criterion));
     }
 
     [Fact]

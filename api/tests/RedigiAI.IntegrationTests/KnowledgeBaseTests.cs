@@ -46,6 +46,17 @@ public class KnowledgeBaseTests(ApiFixture api)
         Assert.Equal((1, 4, 40, "Simulado Fuvest 2027 – 2ª edição"), (rubric.Version, rubric.MaxLevel, rubric.MaxScore, rubric.Source));
         Assert.Equal([12, 8, 12, 8], rubric.Criteria.OrderBy(c => c.Position).Select(c => c.MaxPoints));
 
+        // O que a tela da correção mostra da grade: rótulo, nomes curtos e a explicação de cada hipótese de nota zero.
+        Assert.Equal("Fuvest 2027", rubric.Label);
+        Assert.Equal(
+            ["Tema e autoria", "Tipo e gênero", "Coesão e progressão", "Escrita e vocabulário"],
+            rubric.Criteria.OrderBy(c => c.Position).Select(c => c.ShortName));
+        Assert.Equal(4, rubric.ZeroRules.Count);
+        Assert.All(rubric.ZeroRules, rule => Assert.Contains("recebe nota zero", rule.StudentNote));
+        Assert.EndsWith(
+            "Isso é diferente de tangenciar o tema, que só reduz o nível do critério 1.",
+            rubric.ZeroRules.Single(rule => rule.Code == "theme_not_addressed").StudentNote);
+
         // Nenhuma grade nasce com 3 níveis por omissão: a coluna não tem valor padrão.
         var columnDefault = await api.QueryAsync(db => db.Database
             .SqlQueryRaw<string?>(

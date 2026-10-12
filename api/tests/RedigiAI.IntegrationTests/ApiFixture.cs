@@ -80,6 +80,8 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("RateLimit:PerIpPerMinute", "10000");
             builder.UseSetting("RateLimit:EssayBatchPerHour", "10000");
             builder.UseSetting("Proxy:TrustForwardedHeaders", "false");
+            // O .env da máquina de desenvolvimento pode ligar o acesso sem login; nos testes ele fica desligado.
+            builder.UseSetting("DevAuth:Enabled", "false");
             configure?.Invoke(builder);
 
             builder.ConfigureTestServices(services =>
