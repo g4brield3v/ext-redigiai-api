@@ -764,6 +764,73 @@
         ]
       }
     },
+    "/v1/essays/{id}/correction": {
+      "get": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Correção completa: nota calculada pelo backend, nível e orientação de cada critério, marcas na redação e\r\npróximos passos. Só existe depois que a redação chega a `completed`; antes disso responde 409.",
+        "operationId": "getCorrection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/v1/essays/{id}/photo": {
       "get": {
         "tags": [
@@ -942,6 +1009,261 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        }
+      },
+      "CorrectionCriterionDto": {
+        "required": [
+          "position",
+          "name",
+          "weight",
+          "level",
+          "maxLevel",
+          "points",
+          "maxPoints",
+          "descriptor",
+          "justification",
+          "lines",
+          "linesLabel",
+          "guidance",
+          "deviations"
+        ],
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLevel": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxPoints": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "descriptor": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "linesLabel": {
+            "type": "string"
+          },
+          "guidance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deviations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleDeviationDto"
+            }
+          }
+        }
+      },
+      "CorrectionDto": {
+        "required": [
+          "id",
+          "essayId",
+          "title",
+          "themeId",
+          "essayTypeId",
+          "sentAt",
+          "version",
+          "examName",
+          "rubricVersion",
+          "score",
+          "maxScore",
+          "scoreDelta",
+          "previousVersion",
+          "zeroReason",
+          "zeroRule",
+          "zeroExplanation",
+          "strengths",
+          "mainIssue",
+          "sheetLines",
+          "lines",
+          "marks",
+          "criteria",
+          "nextSteps"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "essayId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "themeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "essayTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "examName": {
+            "type": "string"
+          },
+          "rubricVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scoreDelta": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "previousVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "zeroReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "zeroRule": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "zeroExplanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "strengths": {
+            "type": "string"
+          },
+          "mainIssue": {
+            "type": "string"
+          },
+          "sheetLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranscriptionLineDto"
+            }
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrectionMarkDto"
+            }
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrectionCriterionDto"
+            }
+          },
+          "nextSteps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CorrectionMarkDto": {
+        "required": [
+          "criterion",
+          "kind",
+          "line",
+          "start",
+          "end",
+          "note",
+          "tagged"
+        ],
+        "type": "object",
+        "properties": {
+          "criterion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MarkKind"
+          },
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tagged": {
+            "type": "boolean"
           }
         }
       },
@@ -1386,6 +1708,12 @@
           }
         }
       },
+      "MarkKind": {
+        "enum": [
+          "good",
+          "issue"
+        ]
+      },
       "PhotoUrlDto": {
         "required": [
           "url"
@@ -1549,6 +1877,26 @@
             "format": "int32"
           },
           "descriptor": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleDeviationDto": {
+        "required": [
+          "rule",
+          "line",
+          "correction"
+        ],
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "correction": {
             "type": "string"
           }
         }

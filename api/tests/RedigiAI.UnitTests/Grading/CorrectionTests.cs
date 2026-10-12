@@ -61,7 +61,7 @@ public class CorrectionTests
         Assert.Equal([9, 6, 6, 6], correction.Criteria.Select(c => c.Points));
         Assert.Null(correction.ZeroReason);
         var mark = Assert.Single(correction.Marks);
-        Assert.Equal((4, 2, 0, 8, "CRASE_VERBO"), (mark.CriterionPosition, mark.Line, mark.CharStart, mark.CharEnd, mark.RuleCode));
+        Assert.Equal((4, 2, 0, 8, "CRASE_VERBO"), (mark.CriterionPosition, mark.LineStart, mark.CharStart, mark.CharEnd, mark.RuleCode));
     }
 
     [Fact]

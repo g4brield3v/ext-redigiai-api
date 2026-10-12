@@ -44,6 +44,9 @@ public sealed class ApiFixture : IAsyncLifetime
     /// <summary>Faz o papel do Claude na transcrição: devolve o que o teste roteirizar.</summary>
     public FakeTranscriber Transcriber { get; } = new();
 
+    /// <summary>Faz o papel do Claude na correção: devolve o JSON que o teste roteirizar.</summary>
+    public FakeGrader Grader { get; } = new();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
     public async Task InitializeAsync()
@@ -83,6 +86,7 @@ public sealed class ApiFixture : IAsyncLifetime
             {
                 services.AddSingleton<IPhotoStorage>(Photos);
                 services.AddSingleton<IEssayTranscriber>(Transcriber);
+                services.AddSingleton<IEssayGrader>(Grader);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };

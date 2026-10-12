@@ -67,7 +67,10 @@ internal sealed class ThemeConfiguration : IEntityTypeConfiguration<Theme>
         builder.HasOne<Exam>().WithMany().HasForeignKey(t => t.ExamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(t => t.Texts).WithOne().HasForeignKey(x => x.ThemeId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(t => t.AcceptedTypes).WithOne().HasForeignKey(x => x.ThemeId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Theme>().WithMany().HasForeignKey(t => t.SupersedesThemeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(t => new { t.ExamId, t.Status });
+        // Cada versão publicada tem no máximo uma revisão.
+        builder.HasIndex(t => t.SupersedesThemeId).IsUnique();
     }
 }
 

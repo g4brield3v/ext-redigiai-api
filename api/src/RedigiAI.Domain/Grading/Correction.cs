@@ -224,7 +224,7 @@ public sealed class CorrectionCriterion
 
     /// <summary>O que corrigir, sempre como afirmação; nulo quando o nível é o máximo.</summary>
     public string? Guidance { get; private set; }
-    public IReadOnlyList<int> Lines { get; private set; } = [];
+    public int[] Lines { get; private set; } = [];
 }
 
 public sealed class CorrectionMark
@@ -238,7 +238,8 @@ public sealed class CorrectionMark
         CriterionId = criterion.Id;
         CriterionPosition = criterion.Position;
         Kind = mark.Kind;
-        Line = mark.Line;
+        LineStart = mark.Line;
+        LineEnd = mark.Line;
         CharStart = mark.Start;
         CharEnd = mark.End;
         Note = string.IsNullOrWhiteSpace(mark.Note) ? null : mark.Note;
@@ -250,7 +251,10 @@ public sealed class CorrectionMark
     public Guid CriterionId { get; private set; }
     public int CriterionPosition { get; private set; }
     public MarkKind Kind { get; private set; }
-    public int Line { get; private set; }
+    public int LineStart { get; private set; }
+
+    /// <summary>Igual à linha inicial: a IA marca um trecho dentro de uma linha.</summary>
+    public int LineEnd { get; private set; }
     public int CharStart { get; private set; }
     public int CharEnd { get; private set; }
 
@@ -319,6 +323,8 @@ public static class Feedback
 public interface ICorrectionRepository
 {
     void Add(Correction correction);
+
+    Task<bool> ExistsAsync(Guid essayId, CancellationToken ct);
 
     /// <summary>A correção da redação, com critérios e marcas; <c>null</c> se ainda não existe.</summary>
     Task<Correction?> FindByEssayAsync(Guid essayId, CancellationToken ct);

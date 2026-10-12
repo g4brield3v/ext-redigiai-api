@@ -29,6 +29,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<WritingRulesVersion> WritingRulesVersions => Set<WritingRulesVersion>();
     public DbSet<ThemeGradingNotes> ThemeGradingNotes => Set<ThemeGradingNotes>();
     public DbSet<GradingProfile> GradingProfiles => Set<GradingProfile>();
+    public DbSet<Correction> Corrections => Set<Correction>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<AccessLogEntry> AccessLogs => Set<AccessLogEntry>();
@@ -43,6 +44,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<JobStatus>().HaveConversion<SnakeCaseEnumConverter<JobStatus>>();
         configuration.Properties<PromptKind>().HaveConversion<SnakeCaseEnumConverter<PromptKind>>();
         configuration.Properties<GradingProfileStatus>().HaveConversion<SnakeCaseEnumConverter<GradingProfileStatus>>();
+        configuration.Properties<MarkKind>().HaveConversion<SnakeCaseEnumConverter<MarkKind>>();
         configuration.Properties<BirthDate>().HaveConversion<BirthDateConverter>();
     }
 

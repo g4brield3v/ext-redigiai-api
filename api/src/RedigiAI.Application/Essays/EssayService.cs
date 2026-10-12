@@ -5,6 +5,7 @@ using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
+using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Application.Essays;
@@ -43,6 +44,7 @@ internal sealed class EssayService(
     IEssayBatchRepository batches,
     IAssetRepository assets,
     ITranscriptionRepository transcriptions,
+    ICorrectionRepository corrections,
     IThemeRepository themes,
     IExamRepository exams,
     IEssayTypeRepository essayTypes,
@@ -136,9 +138,10 @@ internal sealed class EssayService(
         var ids = page.Select(e => e.Id).ToList();
         var rewritten = await essays.RewrittenAsync(ids, ct);
         var illegible = await transcriptions.IllegibleCountsAsync(ids, ct);
+        var scores = await corrections.ScoresAsync(ids, ct);
 
         return new EssayListDto(
-            [.. page.Select(e => ToSummary(e, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id)))],
+            [.. page.Select(e => ToSummary(e, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id), scores))],
             found.Count > PageSize ? page[^1].Id.ToString("N") : null);
     }
 
@@ -149,7 +152,8 @@ internal sealed class EssayService(
         var exam = await exams.FindByIdAsync(essay.ExamId, ct) ?? throw Errors.Internal();
         var rewritten = await essays.RewrittenAsync([essay.Id], ct);
         var transcription = await transcriptions.FindByEssayAsync(essay.Id, ct);
-        var summary = ToSummary(essay, rewritten.Contains(essay.Id), transcription?.IllegibleCount ?? 0);
+        var summary = ToSummary(
+            essay, rewritten.Contains(essay.Id), transcription?.IllegibleCount ?? 0, await corrections.ScoresAsync([essay.Id], ct));
         var lines = transcription?.Lines ?? [];
         var textByLine = lines.ToDictionary(line => line.Number, line => line.Text);
 
@@ -334,7 +338,8 @@ internal sealed class EssayService(
             lineText[Math.Max(0, word.CharStart - ContextLength)..word.CharStart],
             lineText[word.CharEnd..Math.Min(lineText.Length, word.CharEnd + ContextLength)]);
 
-    private static EssaySummaryDto ToSummary(Essay essay, bool rewritten, int illegibleCount) =>
+    private static EssaySummaryDto ToSummary(
+        Essay essay, bool rewritten, int illegibleCount, IReadOnlyDictionary<Guid, (int Score, int MaxScore)> scores) =>
         new(
             essay.Id,
             essay.Title,
@@ -346,8 +351,8 @@ internal sealed class EssayService(
             essay.CreatedAt,
             essay.ReviewDeadlineAt,
             illegibleCount,
-            Score: null,
-            MaxScore: null,
+            Score: scores.TryGetValue(essay.Id, out var graded) ? graded.Score : null,
+            MaxScore: scores.TryGetValue(essay.Id, out graded) ? graded.MaxScore : null,
             essay.FailureCode);
 
     private sealed record PreparedEssay(

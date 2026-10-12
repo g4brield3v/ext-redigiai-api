@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<IGuidelinesRepository, GuidelinesRepository>();
         services.AddScoped<IWritingRulesRepository, WritingRulesRepository>();
         services.AddScoped<IThemeGradingNotesRepository, ThemeGradingNotesRepository>();
+        services.AddScoped<ICorrectionRepository, CorrectionRepository>();
         services.AddScoped<IJobQueue, JobQueue>();
         services.AddSingleton<IJobRunner, JobRunner>();
         services.AddSingleton<JobSignal>();
@@ -53,7 +54,9 @@ public static class DependencyInjection
         services.AddScoped<IClerkWebhookVerifier, ClerkWebhookVerifier>();
 
         services.AddSingleton<IPhotoStorage, CloudinaryPhotoStorage>();
+        services.AddSingleton<ClaudeMessagesApi>();
         services.AddSingleton<IEssayTranscriber, ClaudeEssayTranscriber>();
+        services.AddSingleton<IEssayGrader, ClaudeEssayGrader>();
 
         return services;
     }

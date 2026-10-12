@@ -129,7 +129,7 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | `exams` | id, slug (`fuvest`), name, status (`active`, `coming_soon`), sheet_lines (30) | Vestibular. |
 | `rubric_versions` | id, exam_id, version, published_at, max_level, max_score, source, zero_rules (jsonb) | Imutável depois de publicada. |
 | `rubric_criteria` | id, rubric_version_id, position (1–4), name, weight, level_descriptors (jsonb: um por nível, de 1 a `max_level`) | Peso e descritores oficiais por nível. |
-| `themes` | id, exam_id, title, statement (texto do enunciado), status, published_at | Tema da proposta. Sem ano no título. |
+| `themes` | id, exam_id, title, statement (texto do enunciado), status, published_at, version, supersedes_theme_id | Tema da proposta. Sem ano no título. Depois de publicado não é editado: mudar o enunciado ou a coletânea cria uma linha nova, com a versão seguinte, e a anterior fica arquivada. |
 | `theme_texts` | id, theme_id, position, kind (`text`, `image`), title, source, body, image_asset_id | Coletânea. |
 | `essay_types` | id, exam_id, slug (`dissertacao`, `narrativa`), name, description | Tipos do vestibular. |
 | `theme_essay_types` | theme_id, essay_type_id, rubric_version_id | Tipos aceitos por tema e a grade de cada um. |
@@ -139,12 +139,12 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | Tabela | Campos principais | Regras |
 |---|---|---|
 | `users` | id, clerk_user_id (único), email, name, birth_date, last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. |
-| `essays` | id, user_id, batch_id, theme_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, created_at | `parent_essay_id` liga a reescrita à versão anterior. |
+| `essays` | id, user_id, batch_id, theme_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, grading_profile_id, created_at | `parent_essay_id` liga a reescrita à versão anterior. |
 | `transcriptions` | id, essay_id, lines (jsonb: número + texto), illegible_count, model, created_at | Texto fiel, nunca editado. |
 | `illegible_words` | id, transcription_id, line_number, char_start, char_end, student_value, filled_at | O que o aluno digitou fica separado da transcrição. |
-| `corrections` | id, essay_id, rubric_version_id, zero_reason, score, max_score, strengths, main_issue, next_steps (jsonb), model, raw_response (jsonb), created_at | `score` calculado pelo backend. |
-| `correction_criteria` | id, correction_id, criterion_id, level, points, justification, guidance, lines (int[]) | `points` = level × weight. |
-| `correction_marks` | id, correction_id, criterion_id, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note | Marcas na redação e nota de margem. |
+| `corrections` | id, essay_id, rubric_version_id, grading_profile_id, theme_id, theme_version, theme_grading_notes_id, zero_reason, zero_explanation, score, max_score, strengths, main_issue, next_steps (jsonb), model, raw_response (jsonb), created_at | `score` calculado pelo backend. Uma por redação. |
+| `correction_criteria` | id, correction_id, criterion_id, position, level, points, justification, guidance, lines (int[]) | `points` = level × weight. |
+| `correction_marks` | id, correction_id, criterion_id, criterion_position, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note, rule_code | Marcas na redação e nota de margem. |
 | `correction_feedback` | id, correction_id, rating (`helped_a_lot`, `helped_partly`, `did_not_help`), comment, created_at | 1 por correção. |
 | `assets` | id, user_id, provider (`cloudinary`), public_id, bytes, mime, purge_after | Fotos privadas. |
 
@@ -368,7 +368,7 @@ O tema não faz parte do perfil: tem versão própria, porque muda a cada tema n
 1. JSON válido contra o schema.
 2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão.
 3. Linhas e posições citadas existem na transcrição.
-4. Nenhuma orientação ou próximo passo termina com ponto de interrogação.
+4. Nenhuma orientação ou próximo passo termina com ponto de interrogação nem traz "?" fora de um trecho entre aspas.
 5. No máximo 3 próximos passos.
 6. Se `zero.applies`, `reason` é uma das hipóteses da grade e a nota gravada é 0.
 7. A transcrição indicou identificação na folha e a correção não aplicou nota zero → inconsistência, nova tentativa.

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using RedigiAI.Api.Auth;
 using RedigiAI.Api.Http;
 using RedigiAI.Application.Essays;
+using RedigiAI.Application.Grading;
 
 namespace RedigiAI.Api.Controllers;
 
@@ -16,7 +17,7 @@ public sealed record BatchEssayRequest(IReadOnlyList<BatchEssayItem>? Essays, bo
 [Tags("Essays")]
 [Produces("application/json")]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
-public sealed class EssaysController(IUploadService uploads, IEssayService essays) : ControllerBase
+public sealed class EssaysController(IUploadService uploads, IEssayService essays, ICorrectionService corrections) : ControllerBase
 {
     /// <summary>
     /// Assinatura para o navegador enviar 1 foto JPG direto ao Cloudinary, em área privada.
@@ -83,6 +84,17 @@ public sealed class EssaysController(IUploadService uploads, IEssayService essay
         await essays.FillIllegibleAsync(User.GetClerkIdentity().UserId, id, answers, ct);
         return NoContent();
     }
+
+    /// <summary>
+    /// Correção completa: nota calculada pelo backend, nível e orientação de cada critério, marcas na redação e
+    /// próximos passos. Só existe depois que a redação chega a <c>completed</c>; antes disso responde 409.
+    /// </summary>
+    [HttpGet("essays/{id:guid}/correction", Name = "getCorrection")]
+    [ProducesResponseType<CorrectionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> GetCorrection(Guid id, CancellationToken ct) =>
+        Ok(await corrections.GetAsync(User.GetClerkIdentity().UserId, id, ct));
 
     /// <summary>Endereço temporário da foto enviada, válido por 5 minutos.</summary>
     [HttpGet("essays/{id:guid}/photo", Name = "getEssayPhoto")]

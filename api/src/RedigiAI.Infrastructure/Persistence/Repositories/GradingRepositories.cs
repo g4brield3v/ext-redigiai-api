@@ -10,6 +10,9 @@ internal sealed class GradingProfileRepository(AppDbContext db) : IGradingProfil
     public Task<GradingProfile?> FindActiveAsync(Guid examId, Guid essayTypeId, CancellationToken ct) =>
         db.GradingProfiles.AsNoTracking().FirstOrDefaultAsync(
             p => p.ExamId == examId && p.EssayTypeId == essayTypeId && p.Status == GradingProfileStatus.Active, ct);
+
+    public Task<GradingProfile?> FindAsync(Guid id, CancellationToken ct) =>
+        db.GradingProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
 }
 
 internal sealed class PromptTemplateRepository(AppDbContext db) : IPromptTemplateRepository
@@ -43,6 +46,39 @@ internal sealed class WritingRulesRepository(AppDbContext db) : IWritingRulesRep
 
     public Task<WritingRulesVersion?> FindLatestAsync(CancellationToken ct) =>
         db.WritingRulesVersions.AsNoTracking().OrderByDescending(v => v.Version).FirstOrDefaultAsync(ct);
+}
+
+internal sealed class CorrectionRepository(AppDbContext db) : ICorrectionRepository
+{
+    public void Add(Correction correction) => db.Corrections.Add(correction);
+
+    public Task<bool> ExistsAsync(Guid essayId, CancellationToken ct) =>
+        db.Corrections.AsNoTracking().AnyAsync(c => c.EssayId == essayId, ct);
+
+    public Task<Correction?> FindByEssayAsync(Guid essayId, CancellationToken ct) =>
+        db.Corrections
+            .AsNoTracking()
+            .Include(c => c.Criteria)
+            .Include(c => c.Marks)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(c => c.EssayId == essayId, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, (int Score, int MaxScore)>> ScoresAsync(
+        IReadOnlyCollection<Guid> essayIds, CancellationToken ct)
+    {
+        if (essayIds.Count == 0)
+        {
+            return new Dictionary<Guid, (int, int)>();
+        }
+
+        var scores = await db.Corrections
+            .AsNoTracking()
+            .Where(c => essayIds.Contains(c.EssayId))
+            .Select(c => new { c.EssayId, c.Score, c.MaxScore })
+            .ToListAsync(ct);
+
+        return scores.ToDictionary(c => c.EssayId, c => (c.Score, c.MaxScore));
+    }
 }
 
 internal sealed class ThemeGradingNotesRepository(AppDbContext db) : IThemeGradingNotesRepository

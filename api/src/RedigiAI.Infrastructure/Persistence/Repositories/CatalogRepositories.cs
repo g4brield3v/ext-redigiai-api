@@ -73,6 +73,14 @@ internal sealed class ThemeRepository(AppDbContext db) : IThemeRepository
     public Task<Theme?> FindActiveAsync(Guid themeId, CancellationToken ct) =>
         Active().FirstOrDefaultAsync(t => t.Id == themeId, ct);
 
+    public Task<Theme?> FindAsync(Guid themeId, CancellationToken ct) =>
+        db.Themes
+            .AsNoTracking()
+            .Include(t => t.Texts)
+            .Include(t => t.AcceptedTypes)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(t => t.Id == themeId, ct);
+
     public void Add(Theme theme) => db.Themes.Add(theme);
 
     private IQueryable<Theme> Active() =>

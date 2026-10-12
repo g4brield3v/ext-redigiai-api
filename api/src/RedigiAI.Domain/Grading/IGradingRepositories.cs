@@ -6,6 +6,9 @@ public interface IGradingProfileRepository
 
     /// <summary>O perfil que corrige os alunos desse vestibular e tipo agora; <c>null</c> se não há perfil ativo.</summary>
     Task<GradingProfile?> FindActiveAsync(Guid examId, Guid essayTypeId, CancellationToken ct);
+
+    /// <summary>Um perfil pelo id, em qualquer situação: a redação termina com o perfil com que começou.</summary>
+    Task<GradingProfile?> FindAsync(Guid id, CancellationToken ct);
 }
 
 public interface IPromptTemplateRepository
