@@ -187,11 +187,7 @@ internal sealed class ClaudeEssayTranscriber(IOptions<AnthropicOptions> options,
                     }
 
                     return new TranscriptionReading(
-                        [.. output.Lines.Select(line => new ReadLine(
-                            line.Number!.Value,
-                            line.Text!,
-                            line.Indent ?? false,
-                            [.. (line.Illegible ?? []).Select(range => new TextRange(range.Start, range.End))]))],
+                        [.. output.Lines.Select(line => new ReadLine(line.Number!.Value, line.Text!, line.Indent ?? false))],
                         output.IdentificationFound.Value,
                         output.Readable.Value);
                 }
@@ -259,7 +255,6 @@ internal sealed class ClaudeEssayTranscriber(IOptions<AnthropicOptions> options,
         public bool? Readable { get; init; }
     }
 
-    private sealed record ToolLine(int? Number, string? Text, bool? Indent, List<ToolRange>? Illegible);
-
-    private sealed record ToolRange(int Start, int End);
+    // O campo "illegible" da ferramenta é ignorado: as palavras ilegíveis são localizadas pelo marcador [?].
+    private sealed record ToolLine(int? Number, string? Text, bool? Indent);
 }

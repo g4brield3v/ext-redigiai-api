@@ -5,9 +5,8 @@ namespace RedigiAI.Domain.Essays;
 /// <param name="Indent">A linha começa com recuo de parágrafo.</param>
 public sealed record TranscribedLine(int Number, string Text, bool Indent);
 
-/// <summary>Uma linha como a IA leu, com os trechos que ela não conseguiu ler.</summary>
-/// <param name="Illegible">Posições no texto da linha: início incluído, fim excluído.</param>
-public sealed record ReadLine(int Number, string Text, bool Indent, IReadOnlyList<TextRange> Illegible);
+/// <summary>Uma linha como a IA leu; cada palavra que ela não conseguiu ler vem como <c>[?]</c> no texto.</summary>
+public sealed record ReadLine(int Number, string Text, bool Indent);
 
 public readonly record struct TextRange(int Start, int End);
 
@@ -46,7 +45,7 @@ public sealed class Transcription
 
     public bool IsUnreadable => IllegibleCount > MaxIllegibleWords;
 
-    /// <exception cref="InvalidTranscriptionException">Linha fora da folha, repetida ou trecho fora do texto.</exception>
+    /// <exception cref="InvalidTranscriptionException">Linha fora da folha, repetida ou com texto inválido.</exception>
     public static Transcription Create(
         Guid essayId,
         int sheetLines,
@@ -92,8 +91,8 @@ public sealed class Transcription
     }
 
     /// <summary>
-    /// Os marcadores <c>[?]</c> no texto dizem onde estão as palavras ilegíveis; modelos de linguagem erram
-    /// contagem de caracteres, então a posição informada só vale quando a linha não tem marcador.
+    /// Só os marcadores <c>[?]</c> no texto dizem onde estão as palavras ilegíveis; modelos de linguagem erram
+    /// contagem de caracteres, então a posição que o modelo informa não é usada.
     /// </summary>
     private static List<TextRange> RangesOf(ReadLine line)
     {
@@ -103,23 +102,6 @@ public sealed class Transcription
              at = line.Text.IndexOf(IllegibleMarker, at + IllegibleMarker.Length, StringComparison.Ordinal))
         {
             ranges.Add(new TextRange(at, at + IllegibleMarker.Length));
-        }
-
-        if (ranges.Count > 0)
-        {
-            return ranges;
-        }
-
-        var previousEnd = 0;
-        foreach (var range in line.Illegible.OrderBy(r => r.Start))
-        {
-            if (range.Start < previousEnd || range.End <= range.Start || range.End > line.Text.Length)
-            {
-                throw new InvalidTranscriptionException($"Line {line.Number} has an illegible range outside its text.");
-            }
-
-            ranges.Add(range);
-            previousEnd = range.End;
         }
 
         return ranges;

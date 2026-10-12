@@ -132,7 +132,7 @@ public class TranscriptionTests(ApiFixture api)
         api.Transcriber.Script.Enqueue(FakeTranscriber.Invalid);
         api.Transcriber.Script.Enqueue(() => FakeTranscriber.Reading(lines: ["texto"]) with
         {
-            Reading = new TranscriptionReading([new ReadLine(31, "linha fora da folha", false, [])], false, true),
+            Reading = new TranscriptionReading([new ReadLine(31, "linha fora da folha", false)], false, true),
         });
 
         await RunTranscriptionsAsync();

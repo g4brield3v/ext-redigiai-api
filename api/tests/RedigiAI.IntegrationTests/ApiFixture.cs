@@ -200,7 +200,7 @@ public sealed class FakeTranscriber : IEssayTranscriber
     public static TranscriptionCall Reading(bool readable = true, bool identificationFound = false, params string[] lines) =>
         new(
             new TranscriptionReading(
-                [.. lines.Select((text, index) => new ReadLine(index + 1, text, Indent: index == 0, Illegible: []))],
+                [.. lines.Select((text, index) => new ReadLine(index + 1, text, Indent: index == 0))],
                 identificationFound,
                 readable),
             Model,
