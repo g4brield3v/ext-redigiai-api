@@ -26,10 +26,11 @@ public class CorrectionTests
         new(3, "", false),
     ];
 
-    private static GradingContext Context(bool identificationFound = false) =>
+    private static GradingContext Context(
+        bool identificationFound = false, IReadOnlyList<CopiedPassage>? copied = null, bool copyRequiresZero = false) =>
         new(
             Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Lines, identificationFound,
-            new HashSet<string> { "CRASE_VERBO", WritingRulesVersion.OtherCode });
+            new HashSet<string> { "CRASE_VERBO", WritingRulesVersion.OtherCode }, copied ?? [], copyRequiresZero);
 
     private static GradedCriterion Criterion(int position, int level = 3, string? guidance = "Troque o parágrafo da linha 2 por um argumento próprio.") =>
         new(position, level, "Justificativa com as linhas 1 e 2.", [1, 2], guidance);
@@ -196,6 +197,26 @@ public class CorrectionTests
         // E nada fica ligado a critério: não há pontos a ganhar em um só.
         Assert.Null(correction.MainIssueCriterion);
         Assert.All(correction.NextSteps, step => Assert.Null(step.Criterion));
+    }
+
+    [Fact]
+    public void Essay_mostly_copied_from_the_collection_without_zero_is_rejected()
+    {
+        CopiedPassage[] copied = [new("Texto 2", 1, 2, 40, "Somente numa sociedade onde exista um clima cultural")];
+
+        AssertRejected(8, Output(), Context(copied: copied, copyRequiresZero: true));
+
+        var zeroed = Grade(
+            Output(zero: new GradedZero(true, "theme_not_addressed", "O texto é cópia da coletânea.")),
+            Context(copied: copied, copyRequiresZero: true));
+        Assert.Equal(0, zeroed.Score);
+        Assert.Equal(copied, zeroed.CollectionCopy);
+
+        // Cópia abaixo do limite: a correção vale, e os trechos ficam gravados.
+        var graded = Grade(Output(), Context(copied: copied));
+        Assert.Equal(27, graded.Score);
+        Assert.Equal("Texto 2", Assert.Single(graded.CollectionCopy).Label);
+        Assert.Empty(Grade(Output()).CollectionCopy);
     }
 
     [Fact]

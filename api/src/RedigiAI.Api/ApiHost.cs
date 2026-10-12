@@ -14,6 +14,7 @@ using RedigiAI.Application.Catalog;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
 using RedigiAI.Application.Essays;
+using RedigiAI.Application.Grading;
 using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Cloudinary;
 
@@ -35,7 +36,8 @@ internal static class ApiHost
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.Section));
-        services.Configure<SeedOptions>(seed => seed.ExamplePrompt = builder.Environment.IsDevelopment());
+        services.Configure<SeedOptions>(seed =>
+            seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.
@@ -47,6 +49,7 @@ internal static class ApiHost
             }
         });
         services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
+        services.Configure<CollectionCopyOptions>(builder.Configuration.GetSection(CollectionCopyOptions.Section));
         var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
         services.AddClerkAuthentication(builder.Configuration, devAccess);
         if (devAccess)

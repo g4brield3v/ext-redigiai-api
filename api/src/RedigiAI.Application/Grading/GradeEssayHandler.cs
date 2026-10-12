@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Essays;
 using RedigiAI.Domain.Billing;
@@ -37,6 +38,7 @@ internal sealed class GradeEssayHandler(
     IUnitOfWork unitOfWork,
     EssayOutcomes outcomes,
     AiSpending spending,
+    IOptions<CollectionCopyOptions> copyOptions,
     TimeProvider time) : IJobHandler
 {
     public const string CorrectionReadyTemplate = "correction_ready";
@@ -70,6 +72,9 @@ internal sealed class GradeEssayHandler(
         var layers = await LoadLayersAsync(essay, profile, ct);
         var transcription = await transcriptions.FindByEssayAsync(essay.Id, ct) ?? throw Errors.AiFailed("TRANSCRIPTION_MISSING");
         var lines = transcription.FinalLines();
+
+        // Antes da chamada: o que o aluno copiou da coletânea vai para a IA e fica gravado na correção.
+        var copy = CollectionCopyDetector.Find(layers.Proposal, lines, copyOptions.Value.MinWords);
         var context = new GradingContext(
             essay.Id,
             layers.Rubric,
@@ -78,9 +83,11 @@ internal sealed class GradeEssayHandler(
             layers.Proposal.GradingNotes.Id,
             [.. lines.Select(line => new EssayLine(line.Number, line.Text, line.Indent))],
             transcription.IdentificationFound,
-            layers.WritingRules.Rules.Select(rule => rule.Code).ToHashSet(StringComparer.Ordinal));
+            layers.WritingRules.Rules.Select(rule => rule.Code).ToHashSet(StringComparer.Ordinal),
+            copy.Passages,
+            CopyRequiresZero: copy.CopiedWords > 0 && copy.Share >= copyOptions.Value.ZeroShare);
 
-        var request = GradingPromptBuilder.Build(layers, lines, transcription.IdentificationFound, profile.GradingModel);
+        var request = GradingPromptBuilder.Build(layers, lines, transcription.IdentificationFound, copy.Passages, profile.GradingModel);
         var correction = await GradeAsync(essay.Id, context, request, ct);
 
         await unitOfWork.InTransactionAsync(

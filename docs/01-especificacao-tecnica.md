@@ -379,6 +379,7 @@ A proposta não faz parte do perfil: tem versão própria, porque muda a cada pr
 5. No máximo 3 próximos passos.
 6. Se `zero.applies`, `reason` é uma das hipóteses da grade e a nota gravada é 0.
 7. A transcrição indicou identificação na folha e a correção não aplicou nota zero → inconsistência, nova tentativa.
+8. A verificação automática achou 30% ou mais das palavras da redação copiadas da coletânea e a correção não aplicou nota zero → inconsistência, nova tentativa. Os limites (8 palavras em sequência, 30%) ficam em configuração (`CollectionCopy__MinWords`, `CollectionCopy__ZeroShare`); ver `docs/07-propostas-de-redacao.md`, A6.
 
 A nota é sempre calculada pelo backend: soma de `level × weight`; o modelo nunca envia a nota.
 

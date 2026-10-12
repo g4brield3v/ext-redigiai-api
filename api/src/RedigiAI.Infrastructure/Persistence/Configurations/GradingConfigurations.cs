@@ -156,6 +156,10 @@ internal sealed class CorrectionConfiguration : IEntityTypeConfiguration<Correct
         builder.Property(c => c.ZeroReason).HasMaxLength(60);
         builder.Property(c => c.Model).HasMaxLength(80);
         builder.Property(c => c.RawResponse).HasColumnType("jsonb");
+        builder.Property(c => c.CollectionCopy)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
+            .HasConversion<JsonConverter<IReadOnlyList<CopiedPassage>>, JsonComparer<IReadOnlyList<CopiedPassage>>>();
         builder.Property(c => c.NextSteps)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<NextStep>>, JsonComparer<IReadOnlyList<NextStep>>>();

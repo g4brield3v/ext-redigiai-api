@@ -3,6 +3,7 @@ using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
 using RedigiAI.Infrastructure;
 using RedigiAI.Application.Essays;
+using RedigiAI.Application.Grading;
 using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Cloudinary;
 
@@ -29,7 +30,8 @@ internal static class WorkerHost
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure();
         builder.Services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
-        builder.Services.Configure<SeedOptions>(seed => seed.ExamplePrompt = builder.Environment.IsDevelopment());
+        builder.Services.Configure<SeedOptions>(seed =>
+            seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.
@@ -41,6 +43,7 @@ internal static class WorkerHost
             }
         });
         builder.Services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
+        builder.Services.Configure<CollectionCopyOptions>(builder.Configuration.GetSection(CollectionCopyOptions.Section));
         return builder;
     }
 }

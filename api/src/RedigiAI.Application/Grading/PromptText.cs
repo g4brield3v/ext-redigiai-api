@@ -8,13 +8,24 @@ namespace RedigiAI.Application.Grading;
 /// </summary>
 internal static class PromptText
 {
-    /// <summary>Os textos da coletânea, um por linha: <c>[Texto 2] corpo — Fonte</c>.</summary>
-    public static string Collection(Prompt prompt) =>
-        string.Join("\n", prompt.Blocks.Where(block => block.Kind == PromptBlockKind.CollectionItem).Select(block => CollectionItem(block.Data)));
+    /// <summary>
+    /// Os blocos na ordem da página: <c>[Texto 2] corpo — Fonte</c>, <c>[Comando] corpo</c>,
+    /// <c>[Instruções] Tipo de redação: …; item; item</c>.
+    /// </summary>
+    public static string Blocks(Prompt prompt) =>
+        string.Join("\n", prompt.Blocks
+            .Select(block => block.Kind == PromptBlockKind.CollectionItem ? CollectionItem(block.Data) : Statement(prompt, block))
+            .OfType<string>());
 
-    /// <summary>O comando, os parágrafos livres e as instruções, com o tipo de redação como primeiro item.</summary>
-    public static string Statement(Prompt prompt) =>
-        string.Join("\n", prompt.Blocks.Select(block => Statement(prompt, block)).OfType<string>());
+    /// <summary>Os trechos copiados da coletânea, um por linha, ou "nenhum".</summary>
+    public static string CopiedPassages(IReadOnlyList<Domain.Grading.CopiedPassage> passages) =>
+        passages.Count == 0
+            ? "nenhum"
+            : "\n" + string.Join("\n", passages.Select(passage =>
+                $"{Lines(passage)}, igual ao {passage.Label}, {passage.Words} palavras: {GradingPromptBuilder.AsData(passage.Text)}")) + "\n";
+
+    private static string Lines(Domain.Grading.CopiedPassage passage) =>
+        passage.LineStart == passage.LineEnd ? $"Linha {passage.LineStart}" : $"Linhas {passage.LineStart} a {passage.LineEnd}";
 
     /// <summary>As abordagens esperadas do tema.</summary>
     public static string GradingNotes(PromptGradingNotes notes)

@@ -9,6 +9,12 @@ public interface IGradingProfileRepository
 
     /// <summary>Um perfil pelo id, em qualquer situação: a redação termina com o perfil com que começou.</summary>
     Task<GradingProfile?> FindAsync(Guid id, CancellationToken ct);
+
+    /// <summary><c>active → retired</c>. Devolve se a linha mudou (regra 10).</summary>
+    Task<bool> TryRetireAsync(Guid profileId, CancellationToken ct);
+
+    /// <summary>A maior versão de perfil que existe para esse vestibular e tipo; 0 se não há nenhum.</summary>
+    Task<int> MaxVersionAsync(Guid examId, Guid essayTypeId, CancellationToken ct);
 }
 
 public interface IPromptTemplateRepository

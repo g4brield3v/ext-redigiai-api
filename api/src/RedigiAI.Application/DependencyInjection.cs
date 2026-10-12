@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<EssayOutcomes>();
         services.AddScoped<ICorrectionService, CorrectionService>();
         services.AddOptions<AiBudgetOptions>();
+        services.AddOptions<CollectionCopyOptions>();
         services.AddSingleton<AiBudget>();
         services.AddScoped<AiSpending>();
         services.AddScoped<Abstractions.IJobHandler, TranscribeEssayHandler>();

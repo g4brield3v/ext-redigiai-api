@@ -24,6 +24,13 @@ public sealed class SeedOptions
     /// <c>Development</c>: não é lido de configuração. Em staging e produção as propostas vêm só do admin.
     /// </summary>
     public bool ExamplePrompt { get; set; }
+
+    /// <summary>
+    /// Quando as instruções da IA do programa são diferentes das que estão no banco, grava a versão seguinte e troca
+    /// os perfis de correção ativos por perfis novos que apontam para ela. Também só em <c>Development</c>: em
+    /// staging e produção um perfil novo passa pelos testes antes de ser ativado.
+    /// </summary>
+    public bool ReplaceOutdatedInstructions { get; set; }
 }
 
 internal sealed class CatalogSeedService(
@@ -49,6 +56,11 @@ internal sealed class CatalogSeedService(
         if (gradingCreated)
         {
             await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        if (options.Value.ReplaceOutdatedInstructions && await grading.ReplaceOutdatedInstructionsAsync(ct))
+        {
+            gradingCreated = true;
         }
 
         // Depois da base de conhecimento: a proposta só é publicada com perfil de correção ativo.

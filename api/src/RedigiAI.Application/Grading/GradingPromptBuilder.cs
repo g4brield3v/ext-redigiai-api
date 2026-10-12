@@ -26,8 +26,13 @@ internal static class GradingPromptBuilder
     private const string EssayTag = "<redacao";
 
     /// <param name="identificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
+    /// <param name="copiedPassages">Trechos copiados da coletânea que a verificação automática encontrou.</param>
     public static GradingRequest Build(
-        GradingLayers layers, IReadOnlyList<TranscribedLine> lines, bool identificationFound, string model)
+        GradingLayers layers,
+        IReadOnlyList<TranscribedLine> lines,
+        bool identificationFound,
+        IReadOnlyList<CopiedPassage> copiedPassages,
+        string model)
     {
         var rubric = layers.Rubric;
         var system = Fill(layers.Prompt.SystemText, new Dictionary<string, string>
@@ -44,12 +49,16 @@ internal static class GradingPromptBuilder
         var proposal = layers.Proposal;
         var user = Fill(layers.Prompt.UserText ?? "", new Dictionary<string, string>
         {
-            ["theme_title"] = proposal.Title,
-            ["essay_type_name"] = PromptText.Genre(proposal, layers.EssayType),
-            ["theme_statement"] = PromptText.Statement(proposal),
-            ["theme_texts"] = "\n" + PromptText.Collection(proposal) + "\n",
-            ["theme_grading_notes"] = "\n" + PromptText.GradingNotes(proposal.GradingNotes) + "\n",
-            ["line_count"] = Number(lines.Count),
+            ["prompt_title"] = proposal.Title,
+            ["genre_label"] = PromptText.Genre(proposal, layers.EssayType),
+            ["min_lines"] = proposal.SheetLinesMin is { } min ? Number(min) : "",
+            ["max_lines"] = proposal.SheetLinesMax is { } max ? Number(max) : "",
+            ["title_required"] = proposal.TitleRequired ? "sim" : "não",
+            ["prompt_blocks"] = PromptText.Blocks(proposal),
+            ["expected_approaches"] = PromptText.GradingNotes(proposal.GradingNotes),
+            ["collection_copy"] = PromptText.CopiedPassages(copiedPassages),
+            // Linhas escritas: as que ficaram em branco não contam para o mínimo da proposta.
+            ["line_count"] = Number(lines.Count(line => !string.IsNullOrWhiteSpace(line.Text))),
             ["identification_found"] = identificationFound ? "sim" : "nao",
             ["numbered_lines"] = string.Join("\n", lines.Select(line => $"{Number(line.Number)}| {AsData(line.Text)}")),
         });
