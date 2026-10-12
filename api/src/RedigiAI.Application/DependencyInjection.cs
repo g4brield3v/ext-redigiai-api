@@ -3,6 +3,7 @@ using RedigiAI.Application.Accounts;
 using RedigiAI.Application.Billing;
 using RedigiAI.Application.Catalog;
 using RedigiAI.Application.Essays;
+using RedigiAI.Application.Grading;
 
 namespace RedigiAI.Application;
 
@@ -19,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
+        services.AddScoped<GradingSeedService>();
         services.AddScoped<IUploadService, UploadService>();
         services.AddScoped<IEssayService, EssayService>();
         services.AddScoped<EssayOutcomes>();

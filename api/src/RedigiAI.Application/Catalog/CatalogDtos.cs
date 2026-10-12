@@ -36,6 +36,7 @@ public sealed record RubricDto(
     string ExamSlug,
     string ExamName,
     int Version,
+    int MaxLevel,
     int MaxScore,
     IReadOnlyList<RubricCriterionDto> Criteria,
     IReadOnlyList<ZeroRuleDto> ZeroRules);

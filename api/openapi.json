@@ -1494,6 +1494,7 @@
           "examSlug",
           "examName",
           "version",
+          "maxLevel",
           "maxScore",
           "criteria",
           "zeroRules"
@@ -1511,6 +1512,10 @@
             "type": "string"
           },
           "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLevel": {
             "type": "integer",
             "format": "int32"
           },

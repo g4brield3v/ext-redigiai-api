@@ -155,6 +155,6 @@ public class EssayTests
     private static RubricVersion Rubric(Guid examId)
     {
         var levels = new Dictionary<int, string> { [1] = "um", [2] = "dois", [3] = "três" };
-        return RubricVersion.Publish(examId, 1, Now, [], [new CriterionSpec("Tema, coletânea e autoria", 3, levels)]);
+        return RubricVersion.Publish(examId, 1, 3, Now, [], [new CriterionSpec("Tema, coletânea e autoria", 3, levels)]);
     }
 }

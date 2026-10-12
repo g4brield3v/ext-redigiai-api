@@ -24,6 +24,9 @@ public interface IRubricRepository
     /// <summary>A versão da grade, com os critérios.</summary>
     Task<RubricVersion?> FindAsync(Guid rubricVersionId, CancellationToken ct);
 
+    /// <summary>A versão publicada mais recente do vestibular, com os critérios.</summary>
+    Task<RubricVersion?> FindLatestAsync(Guid examId, CancellationToken ct);
+
     /// <summary>Id da versão publicada mais recente de cada vestibular que tem grade.</summary>
     Task<IReadOnlyDictionary<Guid, Guid>> LatestVersionIdsAsync(CancellationToken ct);
 
@@ -35,6 +38,9 @@ public interface IThemeRepository
     /// <summary>Temas ativos do vestibular, do mais recente para o mais antigo, com textos e tipos aceitos.</summary>
     /// <param name="titleSearch">Trecho do título, comparado literalmente e sem diferenciar maiúsculas.</param>
     Task<IReadOnlyList<Theme>> ListActiveAsync(Guid examId, string? titleSearch, CancellationToken ct);
+
+    /// <summary>Todos os temas do vestibular, com os tipos aceitos, prontos para serem alterados.</summary>
+    Task<IReadOnlyList<Theme>> ListForUpdateAsync(Guid examId, CancellationToken ct);
 
     /// <summary>O tema ativo, com textos e tipos aceitos.</summary>
     Task<Theme?> FindActiveAsync(Guid themeId, CancellationToken ct);

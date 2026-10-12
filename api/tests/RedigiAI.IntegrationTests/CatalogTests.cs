@@ -100,14 +100,18 @@ public class CatalogTests(ApiFixture api)
         var rubric = await _client.GetFromJsonAsync<JsonElement>($"/v1/rubrics/{rubricId}");
 
         Assert.Equal(1, rubric.GetProperty("version").GetInt32());
-        Assert.Equal(30, rubric.GetProperty("maxScore").GetInt32());
+        Assert.Equal((4, 40), (rubric.GetProperty("maxLevel").GetInt32(), rubric.GetProperty("maxScore").GetInt32()));
         var criteria = rubric.GetProperty("criteria").EnumerateArray().ToList();
         Assert.Equal([3, 2, 3, 2], criteria.Select(c => c.GetProperty("weight").GetInt32()));
-        Assert.Equal([9, 6, 9, 6], criteria.Select(c => c.GetProperty("maxPoints").GetInt32()));
+        Assert.Equal([12, 8, 12, 8], criteria.Select(c => c.GetProperty("maxPoints").GetInt32()));
+        Assert.Equal("Correção gramatical, convenção da escrita e adequação vocabular", criteria[3].GetProperty("name").GetString());
+        Assert.StartsWith(
+            "Ótima articulação formal e de sentido",
+            criteria[2].GetProperty("levels")[3].GetProperty("descriptor").GetString());
         Assert.All(criteria, c => Assert.Equal(
-            [1, 2, 3], c.GetProperty("levels").EnumerateArray().Select(l => l.GetProperty("level").GetInt32())));
+            [1, 2, 3, 4], c.GetProperty("levels").EnumerateArray().Select(l => l.GetProperty("level").GetInt32())));
         Assert.Equal(
-            ["theme_not_developed", "type_not_met", "full_copy", "candidate_identified"],
+            ["theme_not_addressed", "modality_not_met", "collection_copy", "candidate_identification"],
             rubric.GetProperty("zeroRules").EnumerateArray().Select(z => z.GetProperty("code").GetString()));
     }
 

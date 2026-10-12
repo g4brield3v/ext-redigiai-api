@@ -210,7 +210,16 @@ public sealed class FakeTranscriber : IEssayTranscriber
 
     public static TranscriptionCall Unavailable() => throw Errors.AiUnavailable();
 
-    public Task<TranscriptionCall> TranscribeAsync(byte[] jpeg, int sheetLines, CancellationToken ct) =>
+    /// <summary>O último pedido recebido, para conferir instruções e modelo.</summary>
+    public TranscriptionRequest? LastRequest { get; private set; }
+
+    public Task<TranscriptionCall> TranscribeAsync(TranscriptionRequest request, CancellationToken ct)
+    {
+        LastRequest = request;
+        return Respond();
+    }
+
+    private Task<TranscriptionCall> Respond() =>
         Task.FromResult(Script.TryDequeue(out var next)
             ? next()
             : Reading(lines: ["A tecnologia mudou a forma de debater.", "Os algoritmos escolhem o que cada um vê."]));

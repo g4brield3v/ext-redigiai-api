@@ -86,6 +86,7 @@ internal sealed class CatalogService(
             exam.Slug,
             exam.Name,
             rubric.Version,
+            rubric.MaxLevel,
             rubric.MaxScore,
             [.. rubric.Criteria.OrderBy(c => c.Position).Select(c => new RubricCriterionDto(
                 c.Position,

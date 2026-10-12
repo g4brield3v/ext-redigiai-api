@@ -3,6 +3,7 @@ using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
+using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Application.Essays;
@@ -15,6 +16,8 @@ internal sealed class TranscribeEssayHandler(
     IEssayRepository essays,
     IAssetRepository assets,
     IExamRepository exams,
+    IGradingProfileRepository profiles,
+    IPromptTemplateRepository prompts,
     ITranscriptionRepository transcriptions,
     IAiUsageRepository usages,
     IPhotoStorage storage,
@@ -46,9 +49,18 @@ internal sealed class TranscribeEssayHandler(
 
         var photo = await assets.FindByIdAsync(essay.PhotoAssetId, ct) ?? throw Errors.AiFailed("PHOTO_MISSING");
         var exam = await exams.FindByIdAsync(essay.ExamId, ct) ?? throw Errors.AiFailed("EXAM_MISSING");
-        var jpeg = await storage.DownloadForReadingAsync(photo.PublicId, ct);
 
-        var transcription = await ReadAsync(essay, jpeg, exam.SheetLines, ct);
+        // As instruções e o modelo vêm do perfil de correção ativo do vestibular e tipo, nunca do código.
+        var profile = await profiles.FindActiveAsync(essay.ExamId, essay.EssayTypeId, ct)
+            ?? throw Errors.AiFailed("GRADING_PROFILE_MISSING");
+        var prompt = await prompts.FindAsync(profile.TranscriptionPromptId, ct) ?? throw Errors.AiFailed("PROMPT_MISSING");
+        var request = new TranscriptionRequest(
+            await storage.DownloadForReadingAsync(photo.PublicId, ct),
+            exam.SheetLines,
+            prompt.SystemText.Replace("{{sheet_lines}}", exam.SheetLines.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            profile.TranscriptionModel);
+
+        var transcription = await ReadAsync(essay, request, ct);
         if (transcription is null || transcription.IsUnreadable)
         {
             await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.PhotoUnreadable(), ct);
@@ -90,7 +102,7 @@ internal sealed class TranscribeEssayHandler(
     }
 
     /// <returns><c>null</c> quando a IA diz que a foto não dá para ler.</returns>
-    private async Task<Transcription?> ReadAsync(Essay essay, byte[] jpeg, int sheetLines, CancellationToken ct)
+    private async Task<Transcription?> ReadAsync(Essay essay, TranscriptionRequest request, CancellationToken ct)
     {
         for (var attempt = 1; attempt <= InvalidResponseAttempts; attempt++)
         {
@@ -99,7 +111,7 @@ internal sealed class TranscribeEssayHandler(
                 throw Errors.AiFailed("AI_BUDGET_EXCEEDED");
             }
 
-            var call = await transcriber.TranscribeAsync(jpeg, sheetLines, ct);
+            var call = await transcriber.TranscribeAsync(request, ct);
             await RecordUsageAsync(essay.Id, call, ct);
 
             if (call.Reading is not { } reading)
@@ -115,7 +127,7 @@ internal sealed class TranscribeEssayHandler(
             try
             {
                 return Transcription.Create(
-                    essay.Id, sheetLines, reading.Lines, reading.IdentificationFound, call.Model, time.GetUtcNow());
+                    essay.Id, request.SheetLines, reading.Lines, reading.IdentificationFound, call.Model, time.GetUtcNow());
             }
             catch (InvalidTranscriptionException)
             {

@@ -1,13 +1,14 @@
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Grading;
 using RedigiAI.Domain.Catalog;
 
 namespace RedigiAI.Application.Catalog;
 
-/// <summary>Carga inicial do catálogo (no MVP não há painel administrativo).</summary>
+/// <summary>Carga inicial do catálogo e da base de conhecimento da correção (no MVP não há painel administrativo).</summary>
 public interface ICatalogSeedService
 {
-    /// <summary>Idempotente: não faz nada se a Fuvest já existe.</summary>
-    /// <returns><c>true</c> se o catálogo foi criado agora.</returns>
+    /// <summary>Idempotente: só cria o que ainda não existe.</summary>
+    /// <returns><c>true</c> se algo foi criado agora.</returns>
     Task<bool> SeedAsync(CancellationToken ct);
 }
 
@@ -16,14 +17,29 @@ internal sealed class CatalogSeedService(
     IEssayTypeRepository essayTypes,
     IRubricRepository rubrics,
     IThemeRepository themes,
+    GradingSeedService grading,
     IUnitOfWork unitOfWork,
     TimeProvider time) : ICatalogSeedService
 {
-    // TODO(conteúdo): os descritores oficiais de cada nível e o enunciado e a coletânea do tema ainda não
-    // foram fornecidos. Os textos entre colchetes são marcadores; substitua-os publicando a grade v2 e o tema real.
-    private const string MissingDescriptor = "[Descritor oficial do nível {0}: preencher com o texto da grade do Simulado Fuvest 2025.]";
-
     public async Task<bool> SeedAsync(CancellationToken ct)
+    {
+        var catalogCreated = await SeedCatalogAsync(ct);
+        if (catalogCreated)
+        {
+            // A base de conhecimento lê o catálogo do banco.
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        var gradingCreated = await grading.EnsureAsync(ct);
+        if (gradingCreated)
+        {
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        return catalogCreated || gradingCreated;
+    }
+
+    private async Task<bool> SeedCatalogAsync(CancellationToken ct)
     {
         if (await exams.FindBySlugAsync("fuvest", ct) is not null)
         {
@@ -42,26 +58,11 @@ internal sealed class CatalogSeedService(
         essayTypes.Add(dissertacao);
         essayTypes.Add(narrativa);
 
-        var rubric = RubricVersion.Publish(
-            fuvest.Id,
-            version: 1,
-            publishedAt: now,
-            zeroRules:
-            [
-                new ZeroRule("theme_not_developed", "Tema não desenvolvido"),
-                new ZeroRule("type_not_met", "Tipo de texto não atendido"),
-                new ZeroRule("full_copy", "Cópia integral da coletânea"),
-                new ZeroRule("candidate_identified", "Identificação do candidato, como nome ou assinatura na folha"),
-            ],
-            criteria:
-            [
-                new CriterionSpec("Tema, coletânea e autoria", 3, Descriptors()),
-                new CriterionSpec("Gênero e tipo de texto", 2, Descriptors()),
-                new CriterionSpec("Coesão, coerência e progressão", 3, Descriptors(level2: "Boa articulação, com composição adequada.")),
-                new CriterionSpec("Convenções da escrita e vocabulário", 2, Descriptors()),
-            ]);
+        var rubric = GradingSeedService.PublishRubric(fuvest.Id, version: 1, now);
         rubrics.Add(rubric);
 
+        // TODO(conteúdo): o enunciado, a coletânea e as instruções do tema ainda não foram fornecidos.
+        // Os textos entre colchetes são marcadores, substituídos direto no banco.
         var theme = Theme.Draft(
             fuvest.Id,
             "Algoritmos e o debate público",
@@ -75,15 +76,6 @@ internal sealed class CatalogSeedService(
         theme.Publish(now);
         themes.Add(theme);
 
-        await unitOfWork.SaveChangesAsync(ct);
         return true;
     }
-
-    private static Dictionary<int, string> Descriptors(string? level2 = null) =>
-        new()
-        {
-            [1] = string.Format(MissingDescriptor, 1),
-            [2] = level2 ?? string.Format(MissingDescriptor, 2),
-            [3] = string.Format(MissingDescriptor, 3),
-        };
 }

@@ -34,6 +34,9 @@ internal sealed class RubricVersionConfiguration : IEntityTypeConfiguration<Rubr
     public void Configure(EntityTypeBuilder<RubricVersion> builder)
     {
         builder.ToTable("rubric_versions");
+        builder.Property(r => r.Source).HasMaxLength(200);
+        // Grades publicadas antes de o número de níveis ser da versão tinham 3.
+        builder.Property(r => r.MaxLevel).HasDefaultValue(3);
         builder.Property(r => r.ZeroRules)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<ZeroRule>>, JsonComparer<IReadOnlyList<ZeroRule>>>();
@@ -48,7 +51,6 @@ internal sealed class RubricCriterionConfiguration : IEntityTypeConfiguration<Ru
     public void Configure(EntityTypeBuilder<RubricCriterion> builder)
     {
         builder.ToTable("rubric_criteria");
-        builder.Ignore(c => c.MaxPoints);
         builder.Property(c => c.Name).HasMaxLength(120);
         builder.Property(c => c.LevelDescriptors)
             .HasColumnType("jsonb")

@@ -30,6 +30,14 @@ internal sealed class RubricRepository(AppDbContext db) : IRubricRepository
     public Task<RubricVersion?> FindAsync(Guid rubricVersionId, CancellationToken ct) =>
         db.RubricVersions.AsNoTracking().Include(r => r.Criteria).FirstOrDefaultAsync(r => r.Id == rubricVersionId, ct);
 
+    public Task<RubricVersion?> FindLatestAsync(Guid examId, CancellationToken ct) =>
+        db.RubricVersions
+            .AsNoTracking()
+            .Include(r => r.Criteria)
+            .Where(r => r.ExamId == examId)
+            .OrderByDescending(r => r.Version)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<IReadOnlyDictionary<Guid, Guid>> LatestVersionIdsAsync(CancellationToken ct)
     {
         var versions = await db.RubricVersions
@@ -58,6 +66,9 @@ internal sealed class ThemeRepository(AppDbContext db) : IThemeRepository
 
         return await themes.OrderByDescending(t => t.PublishedAt).ThenBy(t => t.Title).ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<Theme>> ListForUpdateAsync(Guid examId, CancellationToken ct) =>
+        await db.Themes.Include(t => t.AcceptedTypes).Where(t => t.ExamId == examId).ToListAsync(ct);
 
     public Task<Theme?> FindActiveAsync(Guid themeId, CancellationToken ct) =>
         Active().FirstOrDefaultAsync(t => t.Id == themeId, ct);

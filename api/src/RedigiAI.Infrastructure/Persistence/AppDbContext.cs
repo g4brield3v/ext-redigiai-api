@@ -4,6 +4,7 @@ using RedigiAI.Domain.Auditing;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Essays;
+using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Infrastructure.Persistence;
@@ -23,6 +24,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Transcription> Transcriptions => Set<Transcription>();
     public DbSet<IllegibleWord> IllegibleWords => Set<IllegibleWord>();
     public DbSet<AiUsage> AiUsages => Set<AiUsage>();
+    public DbSet<PromptTemplate> PromptTemplates => Set<PromptTemplate>();
+    public DbSet<GuidelinesVersion> GuidelinesVersions => Set<GuidelinesVersion>();
+    public DbSet<WritingRulesVersion> WritingRulesVersions => Set<WritingRulesVersion>();
+    public DbSet<ThemeGradingNotes> ThemeGradingNotes => Set<ThemeGradingNotes>();
+    public DbSet<GradingProfile> GradingProfiles => Set<GradingProfile>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<AccessLogEntry> AccessLogs => Set<AccessLogEntry>();
@@ -35,6 +41,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<CreditSource>().HaveConversion<SnakeCaseEnumConverter<CreditSource>>();
         configuration.Properties<EssayStatus>().HaveConversion<SnakeCaseEnumConverter<EssayStatus>>();
         configuration.Properties<JobStatus>().HaveConversion<SnakeCaseEnumConverter<JobStatus>>();
+        configuration.Properties<PromptKind>().HaveConversion<SnakeCaseEnumConverter<PromptKind>>();
+        configuration.Properties<GradingProfileStatus>().HaveConversion<SnakeCaseEnumConverter<GradingProfileStatus>>();
         configuration.Properties<BirthDate>().HaveConversion<BirthDateConverter>();
     }
 

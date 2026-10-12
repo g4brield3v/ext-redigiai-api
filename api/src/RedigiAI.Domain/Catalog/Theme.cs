@@ -66,6 +66,20 @@ public sealed class Theme
         _acceptedTypes.Add(new ThemeEssayType(Id, essayType.Id, rubric.Id, instruction));
     }
 
+    /// <summary>Passa a usar uma versão mais nova da grade em todos os tipos aceitos. Redações já enviadas guardam a versão delas.</summary>
+    public void UseRubric(RubricVersion rubric)
+    {
+        if (rubric.ExamId != ExamId)
+        {
+            throw new InvalidOperationException("A grade precisa ser do mesmo vestibular do tema.");
+        }
+
+        foreach (var accepted in _acceptedTypes)
+        {
+            accepted.UseRubric(rubric.Id);
+        }
+    }
+
     public void Publish(DateTimeOffset now)
     {
         if (_acceptedTypes.Count == 0)
@@ -121,4 +135,6 @@ public sealed class ThemeEssayType
     public Guid EssayTypeId { get; private set; }
     public Guid RubricVersionId { get; private set; }
     public string Instruction { get; private set; } = "";
+
+    internal void UseRubric(Guid rubricVersionId) => RubricVersionId = rubricVersionId;
 }
