@@ -48,6 +48,9 @@ public sealed class ApiFixture : IAsyncLifetime
     /// <summary>Faz o papel do Claude na correção: devolve o JSON que o teste roteirizar.</summary>
     public FakeGrader Grader { get; } = new();
 
+    /// <summary>Faz o papel da pasta pública do Cloudinary, onde ficam as imagens das propostas.</summary>
+    public FakePromptImageStorage PromptImages { get; } = new();
+
     /// <summary>Faz o papel da Backend API do Clerk: o e-mail principal de cada conta e se está verificado.</summary>
     public FakeIdentityDirectory Directory { get; } = new();
 
@@ -96,6 +99,7 @@ public sealed class ApiFixture : IAsyncLifetime
                 services.AddSingleton<IEssayTranscriber>(Transcriber);
                 services.AddSingleton<IEssayGrader>(Grader);
                 services.AddSingleton<IIdentityDirectory>(Directory);
+                services.AddSingleton<IPromptImageStorage>(PromptImages);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
@@ -197,6 +201,20 @@ public sealed class FakeIdentityDirectory : IIdentityDirectory
         Lookups.Enqueue(clerkUserId);
         return Task.FromResult(Accounts.TryGetValue(clerkUserId, out var email) ? email : null);
     }
+}
+
+public sealed class FakePromptImageStorage : IPromptImageStorage
+{
+    /// <summary>O que foi enviado, pelo identificador: o tipo detectado e o conteúdo.</summary>
+    public ConcurrentDictionary<string, (string ContentType, byte[] Content)> Uploaded { get; } = new();
+
+    public Task<StoredImage> UploadAsync(string publicId, byte[] content, string contentType, CancellationToken ct)
+    {
+        Uploaded[publicId] = (contentType, content);
+        return Task.FromResult(new StoredImage(content.Length, 800, 240));
+    }
+
+    public string PublicUrl(string publicId) => $"https://res.cloudinary.com/test/image/upload/{publicId}";
 }
 
 public sealed class FakePhotoStorage : IPhotoStorage

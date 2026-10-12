@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddSingleton<IIdentityDirectory>(provider => provider.GetRequiredService<ClerkBackendApi>());
 
         services.AddSingleton<IPhotoStorage, CloudinaryPhotoStorage>();
+        services.AddSingleton<IPromptImageStorage, CloudinaryPromptImageStorage>();
         services.AddSingleton<ClaudeMessagesApi>();
         services.AddSingleton<IEssayTranscriber, ClaudeEssayTranscriber>();
         services.AddSingleton<IEssayGrader, ClaudeEssayGrader>();

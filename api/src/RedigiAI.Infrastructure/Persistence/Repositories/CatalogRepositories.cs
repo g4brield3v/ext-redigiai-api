@@ -66,6 +66,75 @@ internal sealed class PromptRepository(AppDbContext db) : IPromptRepository
     public Task<Prompt?> FindPublishedAsync(string slug, CancellationToken ct) =>
         Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.Slug == slug && p.Status == PromptStatus.Published, ct);
 
+    public Task LockAsync(Guid promptId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM prompts WHERE id = {promptId} FOR UPDATE", ct);
+
+    public Task<Prompt?> FindByCreationKeyAsync(Guid adminId, string creationKey, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.CreatedBy == adminId && p.CreationKey == creationKey, ct);
+
+    public async Task<IReadOnlyList<PromptListItem>> ListAsync(Guid? examId, string? titleSearch, CancellationToken ct)
+    {
+        var prompts = db.Prompts.AsNoTracking();
+        if (examId is not null)
+        {
+            prompts = prompts.Where(p => p.ExamId == examId);
+        }
+
+        if (!string.IsNullOrEmpty(titleSearch))
+        {
+            var pattern = $"%{LikePattern.Escape(titleSearch)}%";
+            prompts = prompts.Where(p => EF.Functions.ILike(p.Title, pattern, @"\"));
+        }
+
+        return await prompts
+            .OrderByDescending(p => p.UpdatedAt)
+            .ThenBy(p => p.Slug)
+            .ThenByDescending(p => p.Version)
+            .Select(p => new PromptListItem(
+                p.Id,
+                p.ExamId,
+                p.Slug,
+                p.Version,
+                p.Status,
+                p.Title,
+                p.Summary,
+                p.EssayTypeId,
+                p.GenreLabel,
+                p.Blocks.Count(b => b.Kind == PromptBlockKind.CollectionItem),
+                p.UpdatedAt))
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> MaxVersionAsync(string slug, CancellationToken ct) =>
+        await db.Prompts.Where(p => p.Slug == slug).MaxAsync(p => (int?)p.Version, ct) ?? 0;
+
+    public Task<bool> HasDraftAsync(string slug, CancellationToken ct) =>
+        db.Prompts.AnyAsync(p => p.Slug == slug && p.Status == PromptStatus.Draft, ct);
+
+    public Task<int> ArchivePublishedAsync(string slug, DateTimeOffset now, CancellationToken ct) =>
+        db.Prompts
+            .Where(p => p.Slug == slug && p.Status == PromptStatus.Published)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, PromptStatus.Archived).SetProperty(x => x.UpdatedAt, now), ct);
+
+    public async Task<bool> TryPublishAsync(Guid promptId, Guid? publishedBy, DateTimeOffset now, CancellationToken ct) =>
+        await db.Prompts
+            .Where(p => p.Id == promptId && p.Status == PromptStatus.Draft)
+            .ExecuteUpdateAsync(
+                p => p
+                    .SetProperty(x => x.Status, PromptStatus.Published)
+                    .SetProperty(x => x.PublishedAt, now)
+                    .SetProperty(x => x.PublishedBy, publishedBy)
+                    .SetProperty(x => x.UpdatedAt, now),
+                ct) == 1;
+
+    public async Task<bool> TryArchiveAsync(Guid promptId, DateTimeOffset now, CancellationToken ct) =>
+        await db.Prompts
+            .Where(p => p.Id == promptId && p.Status == PromptStatus.Published)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, PromptStatus.Archived).SetProperty(x => x.UpdatedAt, now), ct) == 1;
+
+    public async Task<bool> TryDeleteDraftAsync(Guid promptId, CancellationToken ct) =>
+        await db.Prompts.Where(p => p.Id == promptId && p.Status == PromptStatus.Draft).ExecuteDeleteAsync(ct) == 1;
+
     /// <summary>A proposta inteira, com os blocos na ordem de posição.</summary>
     private static IQueryable<Prompt> Whole(IQueryable<Prompt> prompts) =>
         prompts.Include(p => p.Blocks.OrderBy(b => b.Position)).Include(p => p.GradingNotes).AsSplitQuery();
@@ -109,6 +178,12 @@ internal sealed class ThemeRepository(AppDbContext db) : IThemeRepository
             .AsSplitQuery()
             .Where(t => t.Status == ThemeStatus.Active);
 
-    private static string EscapeLike(string value) =>
+    private static string EscapeLike(string value) => LikePattern.Escape(value);
+}
+
+internal static class LikePattern
+{
+    /// <summary>O texto procurado vale literalmente: <c>%</c> e <c>_</c> não são curingas.</summary>
+    public static string Escape(string value) =>
         value.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");
 }

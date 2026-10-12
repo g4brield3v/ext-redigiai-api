@@ -443,6 +443,18 @@ public class PromptTests
         Assert.Equal(PromptStatus.Published, published.Status);
     }
 
+    [Theory]
+    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10 }, "image/jpeg")]
+    [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0 }, "image/png")]
+    [InlineData(new byte[] { 0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50 }, "image/webp")]
+    [InlineData(new byte[] { 0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x41, 0x56, 0x45 }, null)] // RIFF de áudio
+    [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 }, null)] // GIF
+    [InlineData(new byte[] { 0x3C, 0x73, 0x76, 0x67 }, null)] // SVG
+    [InlineData(new byte[] { 0xFF, 0xD8 }, null)]
+    [InlineData(new byte[0], null)]
+    public void Image_format_comes_from_the_first_bytes(byte[] content, string? expected) =>
+        Assert.Equal(expected, RedigiAI.Application.Catalog.ImageFormat.Detect(content));
+
     [Fact]
     public void Only_a_published_prompt_is_archived()
     {

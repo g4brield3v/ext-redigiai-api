@@ -410,6 +410,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.Property<string>("CreationKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("creation_key");
+
                     b.Property<Guid?>("EssayTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("essay_type_id");
@@ -482,14 +487,15 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_prompts");
 
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_prompts_created_by");
-
                     b.HasIndex("EssayTypeId")
                         .HasDatabaseName("ix_prompts_essay_type_id");
 
                     b.HasIndex("PublishedBy")
                         .HasDatabaseName("ix_prompts_published_by");
+
+                    b.HasIndex("CreatedBy", "CreationKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_prompts_created_by_creation_key");
 
                     b.HasIndex("ExamId", "Status")
                         .HasDatabaseName("ix_prompts_exam_id_status");

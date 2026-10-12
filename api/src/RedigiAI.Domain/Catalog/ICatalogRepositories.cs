@@ -45,6 +45,36 @@ public interface IPromptRepository
 
     /// <summary>A versão publicada desse endereço; <c>null</c> se não há nenhuma.</summary>
     Task<Prompt?> FindPublishedAsync(string slug, CancellationToken ct);
+
+    /// <summary>
+    /// Segura a linha da versão até o fim da transação: dois salvamentos, ou um salvamento e uma publicação, da mesma
+    /// versão passam um de cada vez.
+    /// </summary>
+    Task LockAsync(Guid promptId, CancellationToken ct);
+
+    /// <summary>O rascunho criado por esse administrador com essa chave de idempotência.</summary>
+    Task<Prompt?> FindByCreationKeyAsync(Guid adminId, string creationKey, CancellationToken ct);
+
+    /// <summary>Todas as versões, da alterada mais recentemente para a mais antiga.</summary>
+    /// <param name="titleSearch">Trecho do título, comparado literalmente e sem diferenciar maiúsculas.</param>
+    Task<IReadOnlyList<PromptListItem>> ListAsync(Guid? examId, string? titleSearch, CancellationToken ct);
+
+    /// <summary>A maior versão que existe nesse endereço; 0 se o endereço está livre.</summary>
+    Task<int> MaxVersionAsync(string slug, CancellationToken ct);
+
+    Task<bool> HasDraftAsync(string slug, CancellationToken ct);
+
+    /// <summary>Arquiva a versão publicada desse endereço, se houver. Devolve quantas linhas mudaram.</summary>
+    Task<int> ArchivePublishedAsync(string slug, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary><c>draft → published</c>. Devolve se a linha mudou (regra 10).</summary>
+    Task<bool> TryPublishAsync(Guid promptId, Guid? publishedBy, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary><c>published → archived</c>. Devolve se a linha mudou (regra 10).</summary>
+    Task<bool> TryArchiveAsync(Guid promptId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Apaga a versão só se ela ainda é rascunho. Devolve se apagou.</summary>
+    Task<bool> TryDeleteDraftAsync(Guid promptId, CancellationToken ct);
 }
 
 public interface IThemeRepository

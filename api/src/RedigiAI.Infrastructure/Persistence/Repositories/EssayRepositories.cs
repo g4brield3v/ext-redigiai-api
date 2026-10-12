@@ -101,6 +101,20 @@ internal sealed class AssetRepository(AppDbContext db) : IAssetRepository
 
     public Task<Asset?> FindByIdAsync(Guid assetId, CancellationToken ct) =>
         db.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == assetId, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, string>> PromptImagePublicIdsAsync(
+        IReadOnlyCollection<Guid> assetIds, CancellationToken ct)
+    {
+        if (assetIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await db.Assets
+            .AsNoTracking()
+            .Where(a => assetIds.Contains(a.Id) && a.Scope == AssetScope.PromptImage)
+            .ToDictionaryAsync(a => a.Id, a => a.PublicId, ct);
+    }
 }
 
 internal sealed class TranscriptionRepository(AppDbContext db) : ITranscriptionRepository

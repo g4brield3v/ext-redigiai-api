@@ -16,6 +16,8 @@ public enum PromptStatus
 /// </summary>
 public sealed class Prompt
 {
+    public const int MaxCreationKeyLength = 100;
+
     private readonly List<PromptBlock> _blocks = [];
 
     private Prompt() { }
@@ -51,6 +53,9 @@ public sealed class Prompt
     public Guid? CreatedBy { get; private set; }
     public Guid? PublishedBy { get; private set; }
 
+    /// <summary><c>Idempotency-Key</c> do pedido que criou o rascunho: repetir o pedido devolve o mesmo rascunho.</summary>
+    public string? CreationKey { get; private set; }
+
     /// <summary>Os blocos, na ordem em que aparecem na página e vão para a IA.</summary>
     public IReadOnlyList<PromptBlock> Blocks => _blocks;
 
@@ -58,7 +63,7 @@ public sealed class Prompt
     public PromptGradingNotes GradingNotes { get; private set; } = null!;
 
     /// <exception cref="AppError"><c>VALIDATION_FAILED</c> quando o conteúdo não pode nem ser guardado.</exception>
-    public static Prompt Draft(PromptContent content, Guid? createdBy, DateTimeOffset now)
+    public static Prompt Draft(PromptContent content, Guid? createdBy, DateTimeOffset now, string? creationKey = null)
     {
         var prompt = new Prompt
         {
@@ -67,6 +72,7 @@ public sealed class Prompt
             Status = PromptStatus.Draft,
             CreatedAt = now,
             CreatedBy = createdBy,
+            CreationKey = creationKey,
         };
         prompt.GradingNotes = PromptGradingNotes.Empty(prompt.Id);
         prompt.Apply(content, now);
@@ -226,6 +232,21 @@ public sealed class Prompt
         UpdatedAt = now;
     }
 }
+
+/// <summary>Uma versão na lista da administração, sem o conteúdo.</summary>
+/// <param name="TextCount">Textos da coletânea.</param>
+public sealed record PromptListItem(
+    Guid Id,
+    Guid ExamId,
+    string Slug,
+    int Version,
+    PromptStatus Status,
+    string Title,
+    string? Summary,
+    Guid? EssayTypeId,
+    string? GenreLabel,
+    int TextCount,
+    DateTimeOffset UpdatedAt);
 
 /// <summary>Nova posição de um bloco, para a reordenação.</summary>
 public sealed record BlockPosition(Guid Id, int Position);

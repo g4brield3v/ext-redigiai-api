@@ -71,6 +71,8 @@ internal sealed class PromptConfiguration : IEntityTypeConfiguration<Prompt>
         builder.Property(p => p.Summary).HasMaxLength(PromptRules.MaxSummaryLength);
         builder.Property(p => p.SourceLabel).HasMaxLength(PromptRules.MaxSourceLabelLength);
         builder.Property(p => p.GenreLabel).HasMaxLength(PromptRules.MaxGenreLength);
+        builder.Property(p => p.CreationKey).HasMaxLength(Prompt.MaxCreationKeyLength);
+        builder.HasIndex(p => new { p.CreatedBy, p.CreationKey }).IsUnique();
         builder.HasOne<Exam>().WithMany().HasForeignKey(p => p.ExamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EssayType>().WithMany().HasForeignKey(p => p.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(p => p.CreatedBy).OnDelete(DeleteBehavior.Restrict);

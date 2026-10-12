@@ -20,6 +20,7 @@ public class DevAccessTests(ApiFixture api)
         client.DefaultRequestHeaders.Add(Header, user);
 
         await AccountTests.AssertErrorAsync(await client.GetAsync("/v1/me"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
+        await AccountTests.AssertErrorAsync(await client.GetAsync("/v1/admin/prompts"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
     }
 
     [Theory]
@@ -67,6 +68,11 @@ public class DevAccessTests(ApiFixture api)
         // Os alunos de teste continuam alunos.
         var ana = await DevClient(factory, "ana").GetFromJsonAsync<JsonElement>("/v1/me");
         Assert.Equal("student", ana.GetProperty("role").GetString());
+
+        // A exigência do segundo fator está ligada nos testes: o administrador de teste passa, a aluna não entra.
+        Assert.Equal(HttpStatusCode.OK, (await DevClient(factory, "admin").GetAsync("/v1/admin/prompts")).StatusCode);
+        await AccountTests.AssertErrorAsync(
+            await DevClient(factory, "ana").GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
     }
 
     [Fact]

@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<ITestAccountService, TestAccountService>();
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<IPromptAdminService, PromptAdminService>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
         services.AddScoped<GradingSeedService>();
         services.AddScoped<IUploadService, UploadService>();
