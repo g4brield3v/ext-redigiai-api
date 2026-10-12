@@ -11,7 +11,9 @@ using RedigiAI.Api.Http;
 using RedigiAI.Application;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
-using RedigiAI.Infrastructure.Persistence;
+using RedigiAI.Application.Essays;
+using RedigiAI.Infrastructure.Anthropic;
+using RedigiAI.Infrastructure.Cloudinary;
 
 namespace RedigiAI.Api;
 
@@ -30,7 +32,25 @@ internal static class ApiHost
         services.AddApplication();
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
-        services.AddClerkAuthentication(builder.Configuration);
+        services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
+        services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
+        // Aceita também o nome padrão da Anthropic para a chave.
+        services.PostConfigure<AnthropicOptions>(anthropic =>
+        {
+            if (anthropic.ApiKey.Length == 0)
+            {
+                anthropic.ApiKey = builder.Configuration["ANTHROPIC_API_KEY"] ?? "";
+            }
+        });
+        services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
+        var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
+        services.AddClerkAuthentication(builder.Configuration, devAccess);
+        if (devAccess)
+        {
+            services.AddHostedService<DevEnvironmentSetup>();
+            services.AddHostedService<JobWorker>();
+            services.AddHostedService<ReviewDeadlineSweeper>();
+        }
         AddControllers(services);
         AddOpenApiDocument(services);
 
@@ -38,7 +58,7 @@ internal static class ApiHost
         services.AddCors(cors => cors.AddPolicy(CorsPolicy, policy => policy
             .WithOrigins([.. CorsOrigins.From(builder.Configuration)])
             .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
-            .WithHeaders("Authorization", "Content-Type", "Idempotency-Key")
+            .WithHeaders(["Authorization", "Content-Type", "Idempotency-Key", .. devAccess ? new[] { DevAuthentication.Header } : []])
             .WithExposedHeaders("X-Trace-Id")));
 
         AddRateLimiting(services, builder.Configuration);
@@ -154,17 +174,31 @@ internal static class ApiHost
         });
     }
 
-    /// <summary>30 requisições por minuto por aluno; quem não está logado é limitado por IP.</summary>
+    public const string EssayBatchLimit = "essay-batch";
+
+    /// <summary>
+    /// 30 requisições por minuto por aluno; quem não está logado é limitado por IP.
+    /// O envio de redações tem ainda o seu limite: 10 por hora por aluno.
+    /// </summary>
     private static void AddRateLimiting(IServiceCollection services, IConfiguration configuration)
     {
         var perUser = configuration.GetValue("RateLimit:PerUserPerMinute", 30);
         var perIp = configuration.GetValue("RateLimit:PerIpPerMinute", 120);
+        var batchesPerHour = configuration.GetValue("RateLimit:EssayBatchPerHour", 10);
 
         services.AddRateLimiter(limiter =>
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             limiter.OnRejected = async (context, _) =>
                 await ErrorWriter.WriteAsync(context.HttpContext, Errors.RateLimited());
+            limiter.AddPolicy(EssayBatchLimit, http => RateLimitPartition.GetFixedWindowLimiter(
+                $"batch:{http.User.FindFirst("sub")?.Value ?? http.Connection.RemoteIpAddress?.ToString()}",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = batchesPerHour,
+                    Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0,
+                }));
             limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
             {
                 var userId = http.User.FindFirst("sub")?.Value;

@@ -1,11 +1,8 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using RedigiAI.Api.Http;
 using RedigiAI.Application.Accounts;
 using RedigiAI.Domain.Common;
-using RedigiAI.Infrastructure.Clerk;
 
 namespace RedigiAI.Api.Controllers;
 
@@ -14,11 +11,8 @@ namespace RedigiAI.Api.Controllers;
 [AllowAnonymous]
 [Route("v1/webhooks/clerk")]
 [Tags("Webhooks")]
-public sealed class ClerkWebhookController(
-    IOptions<ClerkOptions> clerk,
-    SyncClerkEmailHandler syncEmail,
-    TimeProvider time,
-    ILogger<ClerkWebhookController> logger) : ControllerBase
+public sealed class ClerkWebhookController(IClerkWebhookService webhooks, ILogger<ClerkWebhookController> logger)
+    : ControllerBase
 {
     private const int MaxBodyBytes = 256 * 1024;
 
@@ -28,41 +22,26 @@ public sealed class ClerkWebhookController(
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Receive(CancellationToken ct)
     {
-        var body = await ReadBodyAsync(Request, ct);
+        var body = await ReadBodyAsync(Request, ct) ?? throw Errors.Unauthenticated();
         var headers = Request.Headers;
 
-        // A assinatura é conferida antes de interpretar ou gravar qualquer coisa.
-        if (body is null || !SvixSignatureVerifier.IsValid(
-                clerk.Value.WebhookSecret,
-                headers["svix-id"],
-                headers["svix-timestamp"],
-                headers["svix-signature"],
-                body,
-                time.GetUtcNow()))
-        {
-            throw Errors.Unauthenticated();
-        }
+        var result = await webhooks.ReceiveAsync(
+            new ClerkWebhookMessage(headers["svix-id"], headers["svix-timestamp"], headers["svix-signature"], body), ct);
 
-        using var document = JsonDocument.Parse(body);
-        var type = document.RootElement.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
-
-        switch (type)
+        switch (result.Outcome)
         {
-            case "user.updated" when TryReadPrimaryEmail(document.RootElement, out var clerkUserId, out var email):
-                await syncEmail.HandleAsync(clerkUserId, email, ct);
-                break;
-            case "user.deleted":
-                // A exclusão e a anonimização entram com o job delete_user (etapa 5).
+            case ClerkWebhookOutcome.DeletionNotImplemented:
                 logger.LogWarning("Clerk user.deleted received; local deletion is not implemented yet");
                 break;
-            default:
-                logger.LogInformation("Clerk webhook {Type} ignored", type);
+            case ClerkWebhookOutcome.Ignored:
+                logger.LogInformation("Clerk webhook {Type} ignored", result.EventType);
                 break;
         }
 
         return NoContent();
     }
 
+    /// <returns><c>null</c> se o corpo passa do limite.</returns>
     private static async Task<byte[]?> ReadBodyAsync(HttpRequest request, CancellationToken ct)
     {
         using var buffer = new MemoryStream();
@@ -79,34 +58,5 @@ public sealed class ClerkWebhookController(
         }
 
         return buffer.ToArray();
-    }
-
-    private static bool TryReadPrimaryEmail(JsonElement root, out string clerkUserId, out string email)
-    {
-        clerkUserId = email = "";
-        if (!root.TryGetProperty("data", out var data)
-            || !data.TryGetProperty("id", out var id)
-            || !data.TryGetProperty("primary_email_address_id", out var primaryId)
-            || !data.TryGetProperty("email_addresses", out var addresses)
-            || addresses.ValueKind != JsonValueKind.Array)
-        {
-            return false;
-        }
-
-        foreach (var address in addresses.EnumerateArray())
-        {
-            if (address.TryGetProperty("id", out var addressId)
-                && addressId.ValueEquals(primaryId.GetString())
-                && address.TryGetProperty("email_address", out var value)
-                && value.GetString() is { Length: > 0 } found
-                && id.GetString() is { Length: > 0 } userId)
-            {
-                clerkUserId = userId;
-                email = found;
-                return true;
-            }
-        }
-
-        return false;
     }
 }

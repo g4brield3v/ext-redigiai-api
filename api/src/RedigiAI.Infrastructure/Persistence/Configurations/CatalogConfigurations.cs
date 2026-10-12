@@ -34,6 +34,7 @@ internal sealed class RubricVersionConfiguration : IEntityTypeConfiguration<Rubr
     public void Configure(EntityTypeBuilder<RubricVersion> builder)
     {
         builder.ToTable("rubric_versions");
+        builder.Property(r => r.Source).HasMaxLength(200);
         builder.Property(r => r.ZeroRules)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<ZeroRule>>, JsonComparer<IReadOnlyList<ZeroRule>>>();
@@ -48,7 +49,6 @@ internal sealed class RubricCriterionConfiguration : IEntityTypeConfiguration<Ru
     public void Configure(EntityTypeBuilder<RubricCriterion> builder)
     {
         builder.ToTable("rubric_criteria");
-        builder.Ignore(c => c.MaxPoints);
         builder.Property(c => c.Name).HasMaxLength(120);
         builder.Property(c => c.LevelDescriptors)
             .HasColumnType("jsonb")
@@ -89,6 +89,7 @@ internal sealed class ThemeEssayTypeConfiguration : IEntityTypeConfiguration<The
     {
         builder.ToTable("theme_essay_types");
         builder.HasKey(t => new { t.ThemeId, t.EssayTypeId });
+        builder.Property(t => t.Instruction).HasMaxLength(2000).HasDefaultValue("");
         builder.HasOne<EssayType>().WithMany().HasForeignKey(t => t.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RubricVersion>().WithMany().HasForeignKey(t => t.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
     }

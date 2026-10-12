@@ -15,6 +15,34 @@ public sealed class CreditLedgerEntry
     public DateTimeOffset? ExpiresAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>Reserva de 1 correção no envio de uma redação.</summary>
+    public static CreditLedgerEntry ForReservation(CreditBucket bucket, Guid essayId, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = -1,
+            BucketId = bucket.Id,
+            EssayId = essayId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+
+    /// <summary>Devolução da correção reservada para uma redação que falhou ou foi cancelada.</summary>
+    public static CreditLedgerEntry ForRefund(CreditBucket bucket, Guid essayId, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = CreditSource.Refund,
+            Delta = 1,
+            BucketId = bucket.Id,
+            EssayId = essayId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+
     public static CreditLedgerEntry ForGrant(CreditBucket bucket, DateTimeOffset now) =>
         new()
         {

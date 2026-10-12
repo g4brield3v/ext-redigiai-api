@@ -11,6 +11,11 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using System.Collections.Concurrent;
+using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Catalog;
+using RedigiAI.Domain.Common;
+using RedigiAI.Domain.Essays;
 using RedigiAI.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -33,6 +38,12 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public byte[] WebhookKey { get; } = RandomNumberGenerator.GetBytes(24);
 
+    /// <summary>Faz o papel do Cloudinary: o que o teste "enviou" e a assinatura devolvida ao navegador.</summary>
+    public FakePhotoStorage Photos { get; } = new();
+
+    /// <summary>Faz o papel do Claude na transcrição: devolve o que o teste roteirizar.</summary>
+    public FakeTranscriber Transcriber { get; } = new();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
     public async Task InitializeAsync()
@@ -42,7 +53,7 @@ public sealed class ApiFixture : IAsyncLifetime
 
         await using var scope = Factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
-        await scope.ServiceProvider.GetRequiredService<CatalogSeeder>().SeedAsync(CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<ICatalogSeedService>().SeedAsync(CancellationToken.None);
     }
 
     public async Task DisposeAsync()
@@ -64,16 +75,21 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("Legal:TermsVersion", "1");
             builder.UseSetting("RateLimit:PerUserPerMinute", "10000");
             builder.UseSetting("RateLimit:PerIpPerMinute", "10000");
+            builder.UseSetting("RateLimit:EssayBatchPerHour", "10000");
             builder.UseSetting("Proxy:TrustForwardedHeaders", "false");
             configure?.Invoke(builder);
 
             builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IPhotoStorage>(Photos);
+                services.AddSingleton<IEssayTranscriber>(Transcriber);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
                     configuration.SigningKeys.Add(_signingKey);
                     jwt.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
-                }));
+                });
+            });
         });
 
     public HttpClient CreateClient(string? token = null) => CreateClient(Factory, token);
@@ -151,4 +167,60 @@ public sealed class ApiFixture : IAsyncLifetime
         await using var scope = Factory.Services.CreateAsyncScope();
         return await query(scope.ServiceProvider.GetRequiredService<AppDbContext>());
     }
+}
+
+public sealed class FakePhotoStorage : IPhotoStorage
+{
+    public ConcurrentDictionary<string, StoredPhoto> Stored { get; } = new();
+
+    public SignedUpload SignUpload(string publicId, DateTimeOffset now) =>
+        new("https://api.cloudinary.com/v1_1/test/image/upload", new Dictionary<string, string>
+        {
+            ["public_id"] = publicId,
+            ["signature"] = "test-signature",
+        });
+
+    public Task<StoredPhoto?> FindAsync(string publicId, CancellationToken ct) =>
+        Task.FromResult(Stored.TryGetValue(publicId, out var photo) ? photo : null);
+
+    public string CreateDownloadUrl(string publicId, DateTimeOffset now, TimeSpan validFor) =>
+        $"https://api.cloudinary.com/v1_1/test/image/download?public_id={publicId}&expires_at={(now + validFor).ToUnixTimeSeconds()}";
+
+    public Task<byte[]> DownloadForReadingAsync(string publicId, CancellationToken ct) =>
+        Task.FromResult<byte[]>([0xFF, 0xD8, 0xFF, 0xD9]);
+}
+
+public sealed class FakeTranscriber : IEssayTranscriber
+{
+    public const string Model = "test-model";
+
+    /// <summary>Respostas das próximas chamadas, na ordem; sem roteiro, a leitura sai limpa.</summary>
+    public ConcurrentQueue<Func<TranscriptionCall>> Script { get; } = new();
+
+    public static TranscriptionCall Reading(bool readable = true, bool identificationFound = false, params string[] lines) =>
+        new(
+            new TranscriptionReading(
+                [.. lines.Select((text, index) => new ReadLine(index + 1, text, Indent: index == 0))],
+                identificationFound,
+                readable),
+            Model,
+            new AiTokens(Input: 5000, Output: 1500, CacheRead: 0, CacheWrite: 0));
+
+    public static TranscriptionCall Invalid() => new(null, Model, new AiTokens(5000, 100, 0, 0));
+
+    public static TranscriptionCall Unavailable() => throw Errors.AiUnavailable();
+
+    /// <summary>O último pedido recebido, para conferir instruções e modelo.</summary>
+    public TranscriptionRequest? LastRequest { get; private set; }
+
+    public Task<TranscriptionCall> TranscribeAsync(TranscriptionRequest request, CancellationToken ct)
+    {
+        LastRequest = request;
+        return Respond();
+    }
+
+    private Task<TranscriptionCall> Respond() =>
+        Task.FromResult(Script.TryDequeue(out var next)
+            ? next()
+            : Reading(lines: ["A tecnologia mudou a forma de debater.", "Os algoritmos escolhem o que cada um vê."]));
 }

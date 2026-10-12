@@ -392,6 +392,435 @@
         }
       }
     },
+    "/v1/uploads/sign": {
+      "post": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Assinatura para o navegador enviar 1 foto JPG direto ao Cloudinary, em área privada.\r\nO `assetId` devolvido identifica a foto no envio da redação.",
+        "operationId": "signUpload",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSignatureDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/essays/batch": {
+      "post": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Confirma o envio de uma ou várias redações (tudo ou nada): reserva 1 correção por redação e inicia a\r\ntranscrição. Exige `Idempotency-Key`; repetir a chave devolve as mesmas redações.",
+        "operationId": "submitEssays",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchEssayRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchEssayRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchEssayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchEssayResponseDto"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/essays": {
+      "get": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Redações do aluno, da mais recente para a mais antiga, com o título \"Vestibular – Tipo – Tema\".\r\n`status` filtra por situação (como `completed`) e `cursor` é o `nextCursor` da página anterior.",
+        "operationId": "listEssays",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EssayListDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/essays/{id}": {
+      "get": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Situação da redação, prazo de revisão e, se houver, as palavras ilegíveis.",
+        "operationId": "getEssay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EssayDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/essays/{id}/illegible": {
+      "put": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Palavras ilegíveis digitadas pelo aluno. Só é aceito em `awaiting_review`, antes do prazo e com todas\r\nas palavras preenchidas; a redação segue para a fila de correção.",
+        "operationId": "fillIllegibleWords",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/IllegibleAnswer"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/IllegibleAnswer"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/IllegibleAnswer"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/essays/{id}/photo": {
+      "get": {
+        "tags": [
+          "Essays"
+        ],
+        "summary": "Endereço temporário da foto enviada, válido por 5 minutos.",
+        "operationId": "getEssayPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUrlDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -447,6 +876,75 @@
   },
   "components": {
     "schemas": {
+      "BatchEssayItem": {
+        "required": [
+          "themeId",
+          "essayTypeId",
+          "assetId",
+          "parentEssayId"
+        ],
+        "type": "object",
+        "properties": {
+          "themeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "essayTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentEssayId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "BatchEssayRequest": {
+        "required": [
+          "essays",
+          "aiNoticeAccepted"
+        ],
+        "type": "object",
+        "properties": {
+          "essays": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/BatchEssayItem"
+            }
+          },
+          "aiNoticeAccepted": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "BatchEssayResponseDto": {
+        "required": [
+          "essayIds"
+        ],
+        "type": "object",
+        "properties": {
+          "essayIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "CreditBalanceDto": {
         "required": [
           "total",
@@ -541,13 +1039,225 @@
         },
         "description": "Formato único de erro da API (especificação, seção 12)."
       },
+      "EssayDetailDto": {
+        "required": [
+          "id",
+          "title",
+          "themeId",
+          "essayTypeId",
+          "status",
+          "version",
+          "hasVersions",
+          "createdAt",
+          "reviewDeadlineAt",
+          "illegibleCount",
+          "score",
+          "maxScore",
+          "failureCode",
+          "sheetLines",
+          "lines",
+          "illegibleWords"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "themeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "essayTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EssayStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasVersions": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewDeadlineAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "illegibleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxScore": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sheetLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranscriptionLineDto"
+            }
+          },
+          "illegibleWords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IllegibleWordDto"
+            }
+          }
+        }
+      },
+      "EssayListDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EssaySummaryDto"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "EssayStatus": {
+        "enum": [
+          "uploaded",
+          "awaiting_review",
+          "queued",
+          "processing",
+          "completed",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "EssaySummaryDto": {
+        "required": [
+          "id",
+          "title",
+          "themeId",
+          "essayTypeId",
+          "status",
+          "version",
+          "hasVersions",
+          "createdAt",
+          "reviewDeadlineAt",
+          "illegibleCount",
+          "score",
+          "maxScore",
+          "failureCode"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "themeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "essayTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EssayStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasVersions": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewDeadlineAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "illegibleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxScore": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "EssayTypeDto": {
         "required": [
           "id",
           "slug",
           "name",
           "description",
-          "rubricVersionId"
+          "rubricVersionId",
+          "instruction"
         ],
         "type": "object",
         "properties": {
@@ -567,6 +1277,9 @@
           "rubricVersionId": {
             "type": "string",
             "format": "uuid"
+          },
+          "instruction": {
+            "type": "string"
           }
         }
       },
@@ -615,6 +1328,71 @@
         "type": "object",
         "properties": {
           "status": {
+            "type": "string"
+          }
+        }
+      },
+      "IllegibleAnswer": {
+        "required": [
+          "wordId",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "wordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "IllegibleWordDto": {
+        "required": [
+          "id",
+          "lineNumber",
+          "start",
+          "end",
+          "contextBefore",
+          "contextAfter"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contextBefore": {
+            "type": "string"
+          },
+          "contextAfter": {
+            "type": "string"
+          }
+        }
+      },
+      "PhotoUrlDto": {
+        "required": [
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
             "type": "string"
           }
         }
@@ -716,6 +1494,7 @@
           "examSlug",
           "examName",
           "version",
+          "maxLevel",
           "maxScore",
           "criteria",
           "zeroRules"
@@ -733,6 +1512,10 @@
             "type": "string"
           },
           "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLevel": {
             "type": "integer",
             "format": "int32"
           },
@@ -890,6 +1673,26 @@
           "image"
         ]
       },
+      "TranscriptionLineDto": {
+        "required": [
+          "number",
+          "text",
+          "indent"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string"
+          },
+          "indent": {
+            "type": "boolean"
+          }
+        }
+      },
       "UpdateEmailPreferences": {
         "required": [
           "correctionReady",
@@ -943,6 +1746,29 @@
           }
         }
       },
+      "UploadSignatureDto": {
+        "required": [
+          "assetId",
+          "uploadUrl",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "ZeroRuleDto": {
         "required": [
           "code",
@@ -977,6 +1803,9 @@
     },
     {
       "name": "Webhooks"
+    },
+    {
+      "name": "Essays"
     },
     {
       "name": "Health"

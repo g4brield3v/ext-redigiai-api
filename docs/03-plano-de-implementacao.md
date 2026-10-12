@@ -24,13 +24,13 @@ Especificação: seções 2, 5, 6 (Conta e Catálogo), 11, 12, 13 e 15.
 - `AppError` + middleware de erros no formato `{code, message, retryable, traceId}`; logs JSON com `traceId`; `/health` e `/ready`.
 - `GET/POST/PATCH /v1/me` com data de nascimento, recusa de menores de 16, aceite de termos e concessão única do crédito grátis (o ledger completo entra na etapa 4; aqui basta o bucket `trial` com o lançamento no ledger).
 - Endpoints de catálogo; `openapi.json` publicado em build.
-- Script de seed: Fuvest, grade v1 do Simulado Fuvest 2025 (4 critérios, pesos 3, 2, 3, 2, máximo 30, hipóteses de nota zero), tipos Dissertação e Narrativa, 1 tema de exemplo.
+- Script de seed: Fuvest, grade v1 do Simulado Fuvest 2027, 2ª edição (4 critérios, pesos 3, 2, 3, 2, níveis de 1 a `max_level` = 4, máximo 40, hipóteses de nota zero), tipos Dissertação e Narrativa, 1 tema de exemplo.
 - Limites de requisição, CORS restrito, cabeçalhos de segurança.
 
 **Front-end**
 - Projeto Vite + React + TS estrito; tokens do design system; componentes base (botão, cartão, campo, navegação, chip, modal); cliente gerado do OpenAPI.
 - Login com Clerk no nosso visual, com data de nascimento no primeiro acesso.
-- Páginas Início (`/`) e Temas (`/temas`) com dados reais do catálogo.
+- Páginas Início (`/`), Temas (`/temas`) e Proposta e coletânea (`/temas/:themeId`) com dados reais do catálogo.
 
 **Infra**
 - GitHub Actions: build, testes, lint e tipos em todo pull request; CodeQL, gitleaks e auditoria de dependências.
@@ -53,7 +53,7 @@ Especificação: seções 3 (Seleção, Envio, Transcrição e revisão), 4, 6 (
 - Job `transcribe` com a API do Claude: ferramenta com JSON Schema, validação, regras de 0 / 1–10 / mais de 10 ilegíveis, custo por chamada gravado.
 - `PUT /v1/essays/{id}/illegible`; jobs agendados de lembrete (12 h) e cancelamento (24 h) com devolução.
 - Job `send_email` com SendGrid e os templates `illegible_words`, `illegible_reminder`, `review_expired`, `photo_unreadable`, `essay_failed`.
-- Telas: Tipo e envio, modal de confirmação, câmera no celular, rascunho antes do login, Palavras ilegíveis com modal, painel com status e polling.
+- Telas: Proposta e coletânea, Tipo e envio, modal de confirmação, câmera no celular, rascunho antes do login, Palavras ilegíveis com modal, painel com status e polling.
 - Folha pautada em PDF.
 
 **Aceite**

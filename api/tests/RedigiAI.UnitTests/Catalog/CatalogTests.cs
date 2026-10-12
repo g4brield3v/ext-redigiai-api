@@ -7,25 +7,29 @@ public class CatalogTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 11, 15, 0, 0, TimeSpan.Zero);
 
-    private static readonly Dictionary<int, string> Levels = new() { [1] = "um", [2] = "dois", [3] = "três" };
+    private static readonly Dictionary<int, string> Levels = new() { [1] = "um", [2] = "dois", [3] = "três", [4] = "quatro" };
 
     [Fact]
-    public void Fuvest_rubric_max_score_is_30()
+    public void Fuvest_rubric_max_score_is_40_with_four_levels()
     {
         var rubric = FuvestRubric(Guid.CreateVersion7());
 
-        Assert.Equal(30, rubric.MaxScore);
+        Assert.Equal((4, 40), (rubric.MaxLevel, rubric.MaxScore));
+        Assert.True(rubric.HasLevel(4));
+        Assert.False(rubric.HasLevel(5));
+        Assert.False(rubric.HasLevel(0));
         Assert.Equal([1, 2, 3, 4], rubric.Criteria.Select(c => c.Position));
-        Assert.Equal([9, 6, 9, 6], rubric.Criteria.Select(c => c.MaxPoints));
+        Assert.Equal([12, 8, 12, 8], rubric.Criteria.Select(c => c.MaxPoints));
+        Assert.Equal(9, rubric.Criteria[0].PointsFor(3));
     }
 
     [Fact]
     public void Criterion_needs_a_descriptor_for_each_level()
     {
-        var incomplete = new Dictionary<int, string> { [1] = "um", [2] = "dois" };
+        var incomplete = new Dictionary<int, string> { [1] = "um", [2] = "dois", [3] = "três" };
 
         Assert.Throws<ArgumentException>(() => RubricVersion.Publish(
-            Guid.CreateVersion7(), 1, Now, [], [new CriterionSpec("Gênero", 2, incomplete)]));
+            Guid.CreateVersion7(), 1, 4, Now, [], [new CriterionSpec("Gênero", 2, incomplete)]));
     }
 
     [Fact]
@@ -37,12 +41,12 @@ public class CatalogTests
         Assert.Throws<InvalidOperationException>(() => theme.Publish(Now));
 
         var type = EssayType.Create(examId, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
-        theme.AcceptType(type, FuvestRubric(examId));
-        theme.AcceptType(type, FuvestRubric(examId));
+        theme.AcceptType(type, FuvestRubric(examId), "Defenda um ponto de vista.");
+        theme.AcceptType(type, FuvestRubric(examId), "Defenda um ponto de vista.");
         theme.Publish(Now);
 
         Assert.Equal(ThemeStatus.Active, theme.Status);
-        Assert.Single(theme.AcceptedTypes);
+        Assert.Equal("Defenda um ponto de vista.", Assert.Single(theme.AcceptedTypes).Instruction);
     }
 
     [Fact]
@@ -52,7 +56,7 @@ public class CatalogTests
         var theme = Theme.Draft(examId, "Tema", "Enunciado");
         var foreignType = EssayType.Create(Guid.CreateVersion7(), "carta", "Carta", "Carta argumentativa");
 
-        Assert.Throws<InvalidOperationException>(() => theme.AcceptType(foreignType, FuvestRubric(examId)));
+        Assert.Throws<InvalidOperationException>(() => theme.AcceptType(foreignType, FuvestRubric(examId), "Instrução"));
     }
 
     [Fact]
@@ -83,6 +87,7 @@ public class CatalogTests
         RubricVersion.Publish(
             examId,
             1,
+            4,
             Now,
             [new ZeroRule("full_copy", "Cópia integral da coletânea")],
             [

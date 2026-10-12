@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
@@ -20,10 +21,24 @@ internal static class ClerkAuthentication
     /// O token de sessão do Clerk não traz <c>aud</c> por padrão; a parte autorizada (<c>azp</c>) é conferida
     /// contra as origens permitidas (token sem <c>azp</c> é recusado) e <c>aud</c> é exigido quando <c>Clerk__Audience</c> está configurado.
     /// </summary>
-    public static IServiceCollection AddClerkAuthentication(this IServiceCollection services, IConfiguration configuration)
+    /// <summary>Com <paramref name="devAccess"/>, aceita também os alunos de teste (ver <see cref="DevAuthentication"/>).</summary>
+    public static IServiceCollection AddClerkAuthentication(
+        this IServiceCollection services, IConfiguration configuration, bool devAccess = false)
     {
         services.Configure<ClerkOptions>(configuration.GetSection(ClerkOptions.Section));
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        var authentication = services
+            .AddAuthentication(devAccess ? DevAuthentication.SmartScheme : JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer();
+        if (devAccess)
+        {
+            authentication
+                .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>(DevAuthentication.Scheme, null)
+                .AddPolicyScheme(DevAuthentication.SmartScheme, null, scheme => scheme.ForwardDefaultSelector = http =>
+                    http.Request.Headers.ContainsKey(DevAuthentication.Header)
+                        ? DevAuthentication.Scheme
+                        : JwtBearerDefaults.AuthenticationScheme);
+        }
+
         services.AddAuthorization();
 
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)

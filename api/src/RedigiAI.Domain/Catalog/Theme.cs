@@ -50,7 +50,8 @@ public sealed class Theme
         _texts.Add(ThemeText.Create(Id, _texts.Count + 1, kind, title, source, body));
     }
 
-    public void AcceptType(EssayType essayType, RubricVersion rubric)
+    /// <param name="instruction">O que a proposta pede para esse tipo de texto.</param>
+    public void AcceptType(EssayType essayType, RubricVersion rubric, string instruction)
     {
         if (essayType.ExamId != ExamId || rubric.ExamId != ExamId)
         {
@@ -62,7 +63,21 @@ public sealed class Theme
             return;
         }
 
-        _acceptedTypes.Add(new ThemeEssayType(Id, essayType.Id, rubric.Id));
+        _acceptedTypes.Add(new ThemeEssayType(Id, essayType.Id, rubric.Id, instruction));
+    }
+
+    /// <summary>Passa a usar uma versão mais nova da grade em todos os tipos aceitos. Redações já enviadas guardam a versão delas.</summary>
+    public void UseRubric(RubricVersion rubric)
+    {
+        if (rubric.ExamId != ExamId)
+        {
+            throw new InvalidOperationException("A grade precisa ser do mesmo vestibular do tema.");
+        }
+
+        foreach (var accepted in _acceptedTypes)
+        {
+            accepted.UseRubric(rubric.Id);
+        }
     }
 
     public void Publish(DateTimeOffset now)
@@ -108,8 +123,9 @@ public sealed class ThemeEssayType
 {
     private ThemeEssayType() { }
 
-    internal ThemeEssayType(Guid themeId, Guid essayTypeId, Guid rubricVersionId)
+    internal ThemeEssayType(Guid themeId, Guid essayTypeId, Guid rubricVersionId, string instruction)
     {
+        Instruction = instruction;
         ThemeId = themeId;
         EssayTypeId = essayTypeId;
         RubricVersionId = rubricVersionId;
@@ -118,4 +134,7 @@ public sealed class ThemeEssayType
     public Guid ThemeId { get; private set; }
     public Guid EssayTypeId { get; private set; }
     public Guid RubricVersionId { get; private set; }
+    public string Instruction { get; private set; } = "";
+
+    internal void UseRubric(Guid rubricVersionId) => RubricVersionId = rubricVersionId;
 }

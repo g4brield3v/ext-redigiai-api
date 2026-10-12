@@ -63,6 +63,9 @@ public sealed class User
 
     public void Rename(string? name) => Name = NormalizeName(name);
 
+    /// <summary>Aviso de que a correção é feita por IA, aceito antes do primeiro envio. Vale o primeiro aceite.</summary>
+    public void AcceptAiNotice(DateTimeOffset now) => AiNoticeAcceptedAt ??= now;
+
     public void ChangeEmail(string email)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);

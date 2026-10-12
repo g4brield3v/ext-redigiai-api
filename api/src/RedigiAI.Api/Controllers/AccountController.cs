@@ -18,7 +18,7 @@ public sealed record UpdateProfileRequest(string? Name, UpdateEmailPreferences? 
 [Tags("Account")]
 [Produces("application/json")]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
-public sealed class AccountController : ControllerBase
+public sealed class AccountController(IAccountService accounts, ILogger<AccountController> logger) : ControllerBase
 {
     /// <summary>
     /// Primeiro acesso: cria o usuário a partir do token, grava a data de nascimento (recusa menores de 16)
@@ -28,11 +28,7 @@ public sealed class AccountController : ControllerBase
     [ProducesResponseType<ProfileDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProfileDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> Register(
-        [FromBody] RegisterRequest request,
-        [FromServices] RegisterUserHandler handler,
-        [FromServices] ILogger<AccountController> logger,
-        CancellationToken ct)
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken ct)
     {
         var identity = User.GetClerkIdentity();
         if (string.IsNullOrWhiteSpace(identity.Email))
@@ -42,7 +38,7 @@ public sealed class AccountController : ControllerBase
             throw Errors.Internal();
         }
 
-        var result = await handler.HandleAsync(
+        var result = await accounts.RegisterAsync(
             new RegisterUserCommand(
                 identity.UserId,
                 identity.Email,
@@ -59,16 +55,15 @@ public sealed class AccountController : ControllerBase
     [HttpGet(Name = "getMe")]
     [ProducesResponseType<ProfileDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Get([FromServices] GetProfileHandler handler, CancellationToken ct) =>
-        Ok(await handler.HandleAsync(User.GetClerkIdentity().UserId, HttpContext.GetRequestOrigin(), ct));
+    public async Task<IActionResult> Get(CancellationToken ct) =>
+        Ok(await accounts.GetProfileAsync(User.GetClerkIdentity().UserId, HttpContext.GetRequestOrigin(), ct));
 
     /// <summary>Altera o nome e as preferências de e-mail.</summary>
     [HttpPatch(Name = "updateMe")]
     [ProducesResponseType<ProfileDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> Update(
-        [FromBody] UpdateProfileRequest request, [FromServices] UpdateProfileHandler handler, CancellationToken ct) =>
-        Ok(await handler.HandleAsync(
+    public async Task<IActionResult> Update([FromBody] UpdateProfileRequest request, CancellationToken ct) =>
+        Ok(await accounts.UpdateProfileAsync(
             new UpdateProfileCommand(User.GetClerkIdentity().UserId, request.Name, request.EmailPreferences), ct));
 }
