@@ -168,7 +168,10 @@ internal sealed class CorrectionService(
             graded.Guidance,
             [.. marks
                 .Where(mark => mark.CriterionId == criterion.Id && mark is { Kind: MarkKind.Issue, RuleCode: not null, Note: not null })
-                .Select(mark => new RuleDeviationDto(ruleNames.GetValueOrDefault(mark.RuleCode!, mark.RuleCode!), mark.LineStart, mark.Note!))]);
+                .Select(mark => new RuleDeviationDto(ruleNames.GetValueOrDefault(mark.RuleCode!, mark.RuleCode!), mark.LineStart, mark.Note!))
+                // Agrupados pela regra, na ordem em que cada regra aparece na redação.
+                .GroupBy(deviation => deviation.Rule)
+                .SelectMany(group => group)]);
     }
 
     /// <summary>"Linha 5", "Linhas 3 a 7", "Linhas 5 e 14" ou "Linhas 3, 5 e 14".</summary>

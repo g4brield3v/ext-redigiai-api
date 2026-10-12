@@ -79,9 +79,11 @@ internal sealed class GradeEssayHandler(
             layers.Theme.Version,
             layers.ThemeNotes?.Id,
             [.. lines.Select(line => new EssayLine(line.Number, line.Text, line.Indent))],
-            transcription.IdentificationFound);
+            transcription.IdentificationFound,
+            layers.WritingRules.Rules.Select(rule => rule.Code).ToHashSet(StringComparer.Ordinal));
 
-        var correction = await GradeAsync(essay.Id, context, GradingPromptBuilder.Build(layers, lines, profile.GradingModel), ct);
+        var request = GradingPromptBuilder.Build(layers, lines, transcription.IdentificationFound, profile.GradingModel);
+        var correction = await GradeAsync(essay.Id, context, request, ct);
 
         await unitOfWork.InTransactionAsync(
             async () =>

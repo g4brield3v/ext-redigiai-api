@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Domain.Grading;
 
 namespace RedigiAI.Infrastructure.Anthropic;
 
@@ -14,8 +15,6 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
 
     /// <summary>Folga sobre os 2.500 tokens de saída estimados; resposta cortada é recusada.</summary>
     private const int MaxTokens = 4000;
-    private const int MaxMarks = 12;
-    private const int MaxNextSteps = 3;
 
     public async Task<GradingCall> GradeAsync(GradingRequest request, CancellationToken ct)
     {
@@ -73,7 +72,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
 
         JsonObject Text() => new() { ["type"] = "string" };
         JsonObject OptionalText() => new() { ["type"] = new JsonArray("string", "null") };
-        JsonObject Line() => Integer(1, Math.Max(1, schema.LastLine));
+        JsonObject Line() => Integer(1, schema.SheetLines);
         JsonObject Criterion() => Integer(1, schema.CriteriaCount);
 
         var reasons = new JsonArray();
@@ -83,6 +82,14 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
         }
 
         reasons.Add(null);
+
+        var rules = new JsonArray();
+        foreach (var code in schema.RuleCodes)
+        {
+            rules.Add(code);
+        }
+
+        rules.Add(null);
 
         return new JsonObject
         {
@@ -125,7 +132,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                 ["marks"] = new JsonObject
                 {
                     ["type"] = "array",
-                    ["maxItems"] = MaxMarks,
+                    ["maxItems"] = Correction.MaxMarks,
                     ["items"] = new JsonObject
                     {
                         ["type"] = "object",
@@ -139,13 +146,13 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                             ["start"] = Integer(0),
                             ["end"] = Integer(1),
                             ["note"] = OptionalText(),
-                            ["rule"] = OptionalText(),
+                            ["rule"] = new JsonObject { ["enum"] = rules },
                         },
                     },
                 },
                 ["strengths"] = Text(),
                 ["main_issue"] = Text(),
-                ["next_steps"] = new JsonObject { ["type"] = "array", ["maxItems"] = MaxNextSteps, ["items"] = Text() },
+                ["next_steps"] = new JsonObject { ["type"] = "array", ["maxItems"] = Correction.MaxNextSteps, ["items"] = Text() },
             },
         };
     }

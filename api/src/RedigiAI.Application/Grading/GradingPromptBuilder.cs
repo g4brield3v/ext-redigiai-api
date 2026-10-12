@@ -26,7 +26,9 @@ internal static class GradingPromptBuilder
 {
     private const string EssayTag = "<redacao";
 
-    public static GradingRequest Build(GradingLayers layers, IReadOnlyList<TranscribedLine> lines, string model)
+    /// <param name="identificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
+    public static GradingRequest Build(
+        GradingLayers layers, IReadOnlyList<TranscribedLine> lines, bool identificationFound, string model)
     {
         var rubric = layers.Rubric;
         var system = Fill(layers.Prompt.SystemText, new Dictionary<string, string>
@@ -51,6 +53,7 @@ internal static class GradingPromptBuilder
             ["theme_texts"] = "\n" + string.Join("\n", layers.Theme.Texts.OrderBy(t => t.Position).Select(Text)) + "\n",
             ["theme_grading_notes"] = layers.ThemeNotes?.Notes ?? "",
             ["line_count"] = Number(lines.Count),
+            ["identification_found"] = identificationFound ? "sim" : "nao",
             ["numbered_lines"] = string.Join("\n", lines.Select(line => $"{Number(line.Number)}| {AsData(line.Text)}")),
         });
 
@@ -69,7 +72,8 @@ internal static class GradingPromptBuilder
                 rubric.Criteria.Count,
                 rubric.MaxLevel,
                 [.. rubric.ZeroRules.Select(rule => rule.Code)],
-                lines.Count == 0 ? 0 : lines.Max(line => line.Number)),
+                layers.Exam.SheetLines,
+                [.. layers.WritingRules.Rules.OrderBy(rule => rule.Position).Select(rule => rule.Code)]),
             model);
     }
 

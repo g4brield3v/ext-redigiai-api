@@ -32,6 +32,7 @@ public sealed record EssayLine(int Number, string Text, bool Indent);
 /// <summary>Com que a correção foi feita: tudo o que é preciso para explicar e reproduzir a nota depois.</summary>
 /// <param name="ThemeGradingNotesId">Notas do tema usadas; nulo quando o tema não tem notas.</param>
 /// <param name="IdentificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
+/// <param name="WritingRuleCodes">Códigos do catálogo de regras de escrita do perfil.</param>
 public sealed record GradingContext(
     Guid EssayId,
     RubricVersion Rubric,
@@ -40,10 +41,11 @@ public sealed record GradingContext(
     int ThemeVersion,
     Guid? ThemeGradingNotesId,
     IReadOnlyList<EssayLine> Lines,
-    bool IdentificationFound);
+    bool IdentificationFound,
+    IReadOnlySet<string> WritingRuleCodes);
 
 /// <summary>A resposta da IA não passa em uma das regras de validação; vale pedir de novo.</summary>
-/// <param name="rule">Número da regra da seção 8 da especificação (2 a 7).</param>
+/// <param name="rule">Número da regra da seção 8 da especificação (1 a 7).</param>
 public sealed class InvalidGradingException(int rule, string reason) : Exception(reason)
 {
     public int Rule { get; } = rule;
@@ -56,6 +58,7 @@ public sealed class InvalidGradingException(int rule, string reason) : Exception
 public sealed class Correction
 {
     public const int MaxNextSteps = 3;
+    public const int MaxMarks = 12;
 
     private readonly List<CorrectionCriterion> _criteria = [];
     private readonly List<CorrectionMark> _marks = [];
@@ -103,6 +106,11 @@ public sealed class Correction
             throw new InvalidGradingException(7, "The sheet has an identification but the grading did not apply zero.");
         }
 
+        if (output.Marks.Count > MaxMarks)
+        {
+            throw new InvalidGradingException(1, "More than 12 marks.");
+        }
+
         if (output.NextSteps.Count > MaxNextSteps)
         {
             throw new InvalidGradingException(5, "More than 3 next steps.");
@@ -141,7 +149,7 @@ public sealed class Correction
             correction.AddCriteria(rubric, output.Criteria, textByLine);
         }
 
-        correction.AddMarks(rubric, output.Marks, textByLine);
+        correction.AddMarks(rubric, output.Marks, textByLine, context.WritingRuleCodes);
         correction.Score = correction._criteria.Sum(criterion => criterion.Points);
         return correction;
     }
@@ -177,7 +185,11 @@ public sealed class Correction
         }
     }
 
-    private void AddMarks(RubricVersion rubric, IReadOnlyList<GradedMark> marks, Dictionary<int, string> textByLine)
+    private void AddMarks(
+        RubricVersion rubric,
+        IReadOnlyList<GradedMark> marks,
+        Dictionary<int, string> textByLine,
+        IReadOnlySet<string> ruleCodes)
     {
         foreach (var mark in marks)
         {
@@ -190,7 +202,11 @@ public sealed class Correction
                 throw new InvalidGradingException(3, "A mark cites a line or a position that is not in the essay.");
             }
 
-            _marks.Add(new CorrectionMark(Id, criterion, mark));
+            // Regra fora do catálogo vira "outro desvio": o que a IA escreveu ali nunca é gravado como código.
+            var rule = string.IsNullOrWhiteSpace(mark.Rule)
+                ? null
+                : ruleCodes.Contains(mark.Rule.Trim()) ? mark.Rule.Trim() : WritingRulesVersion.OtherCode;
+            _marks.Add(new CorrectionMark(Id, criterion, mark with { Rule = rule }));
         }
     }
 }

@@ -27,6 +27,12 @@ internal sealed class AiSpending(
     public async Task RecordAsync(Guid essayId, string stage, string model, AiTokens tokens, CancellationToken ct)
     {
         var cost = budget.CostOf(model, tokens);
+        if (cost is null)
+        {
+            // Sem preço configurado para o modelo, esta chamada fica fora do teto: precisa aparecer.
+            audit.Record("system", "ai.price_missing", "essay", essayId, new { model });
+        }
+
         usages.Add(AiUsage.Record(
             essayId, stage, model, tokens.Input, tokens.Output, tokens.CacheRead, tokens.CacheWrite, cost, time.GetUtcNow()));
 

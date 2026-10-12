@@ -27,7 +27,9 @@ public class CorrectionTests
     ];
 
     private static GradingContext Context(bool identificationFound = false) =>
-        new(Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), 1, null, Lines, identificationFound);
+        new(
+            Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), 1, null, Lines, identificationFound,
+            new HashSet<string> { "CRASE_VERBO", WritingRulesVersion.OtherCode });
 
     private static GradedCriterion Criterion(int position, int level = 3, string? guidance = "Troque o parágrafo da linha 2 por um argumento próprio.") =>
         new(position, level, "Justificativa com as linhas 1 e 2.", [1, 2], guidance);
@@ -101,6 +103,24 @@ public class CorrectionTests
     {
         AssertRejected(4, Output(criteria: [Criterion(1, guidance: "Que tal rever a tese?"), Criterion(2), Criterion(3), Criterion(4)]));
         AssertRejected(4, Output(nextSteps: ["Você já pensou em reler a coletânea? Faça isso."]));
+    }
+
+    [Fact]
+    public void More_than_12_marks_is_rejected() =>
+        AssertRejected(1, Output(marks: [.. Enumerable.Repeat(new GradedMark(1, MarkKind.Good, 1, 0, 3, null, null), 13)]));
+
+    [Fact]
+    public void Rule_outside_the_catalog_is_recorded_as_other()
+    {
+        var invented = new string('X', 200);
+        var correction = Grade(Output(marks:
+        [
+            new GradedMark(4, MarkKind.Issue, 2, 0, 8, "nota", invented),
+            new GradedMark(4, MarkKind.Issue, 1, 0, 1, "nota", " CRASE_VERBO "),
+            new GradedMark(1, MarkKind.Good, 1, 0, 1, null, "  "),
+        ]));
+
+        Assert.Equal([WritingRulesVersion.OtherCode, "CRASE_VERBO", null], correction.Marks.Select(mark => mark.RuleCode));
     }
 
     [Fact]

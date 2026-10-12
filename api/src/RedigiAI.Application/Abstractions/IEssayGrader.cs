@@ -1,10 +1,15 @@
 namespace RedigiAI.Application.Abstractions;
 
-/// <summary>O que a ferramenta de saída aceita, tirado da grade e da redação: a IA não tem como sair disso.</summary>
+/// <summary>
+/// O que a ferramenta de saída aceita, tirado só do perfil e do vestibular. Nada aqui depende da redação: a
+/// definição da ferramenta vem antes de tudo na chamada e precisa ser igual para o cache valer.
+/// </summary>
 /// <param name="CriteriaCount">Critérios da grade, numerados de 1 até aqui.</param>
 /// <param name="ZeroReasons">Códigos das hipóteses de nota zero da grade.</param>
-/// <param name="LastLine">Número da última linha da redação.</param>
-public sealed record GradingSchema(int CriteriaCount, int MaxLevel, IReadOnlyList<string> ZeroReasons, int LastLine);
+/// <param name="SheetLines">Linhas da folha do vestibular.</param>
+/// <param name="RuleCodes">Códigos do catálogo de regras de escrita.</param>
+public sealed record GradingSchema(
+    int CriteriaCount, int MaxLevel, IReadOnlyList<string> ZeroReasons, int SheetLines, IReadOnlyList<string> RuleCodes);
 
 /// <summary>
 /// As partes da chamada na ordem de cache: o que é igual para todo o vestibular e tipo, o que é igual para o
