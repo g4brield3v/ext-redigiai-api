@@ -1,25 +1,28 @@
 # RedigiAI — Especificação técnica do MVP
 
 > Fonte da verdade do produto. Versão de 11/10/2026. Em conflito com qualquer outro arquivo, vale este.
+>
+> **Atualização de 12/10/2026:** o modelo de temas foi substituído pelo de propostas de redação: blocos ordenados, um único tipo por proposta, definido no cadastro, e área de administração. Modelo, validação, rotas de administração e fluxo do aluno estão em `docs/07-propostas-de-redacao.md`, que vale para tudo o que trata de proposta.
 
 ## 1. Visão geral
 
-O MVP do RedigiAI corrige redações manuscritas da Fuvest com IA: o aluno escolhe vestibular, tema e tipo, envia a foto da folha e recebe, na plataforma, a nota de cada critério com as linhas que pesaram e o que corrigir.
+O MVP do RedigiAI corrige redações manuscritas da Fuvest com IA: o aluno escolhe vestibular e proposta, envia a foto da folha e recebe, na plataforma, a nota de cada critério com as linhas que pesaram e o que corrigir.
 
 **Escopo do MVP**
 
 - Vestibular: somente Fuvest, com a grade de 4 critérios (níveis de 1 a `max_level`, pesos 3, 2, 3 e 2; na grade publicada, 4 níveis e máximo de 40 pontos).
 - Entrada: somente foto JPG da folha, até 10 MB, uma face por redação. Envio em lote permitido.
-- Fluxo: seleção (vestibular → tema → leitura da proposta e da coletânea, em página própria → tipo) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
+- Fluxo: seleção (vestibular → proposta → leitura da proposta e da coletânea, em página própria) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
 - Cobrança: 1 correção grátis por conta, plano semanal no cartão e correção avulsa por Pix ou cartão.
 - Painel do aluno: lista de correções, evolução da nota e foco de melhoria.
 - Folha pautada da plataforma para download (PDF, 30 linhas).
+- Área de administração de propostas de redação (`/admin/propostas`): cadastro, versões e publicação, só para o administrador (`docs/07-propostas-de-redacao.md`).
 
 **Fora do escopo do MVP**
 
 - Envio de texto digitado.
 - Outros vestibulares (Unicamp e Enem aparecem como "em breve").
-- Painel administrativo: temas, coletâneas e grades entram direto no banco.
+- O restante do painel administrativo: só as propostas de redação têm área de administração; grades, perfis de correção, usuários e pagamentos entram direto no banco.
 - Conversão da nota para a escala da prova.
 - Reenvio de foto ou cancelamento pelo aluno depois da confirmação.
 
@@ -46,8 +49,8 @@ Cada regra abaixo é requisito de backend e frontend; o backend é a fonte da ve
 
 **Seleção e título**
 
-1. O aluno escolhe, nesta ordem, o vestibular, um tema ativo desse vestibular e um tipo de redação aceito pelo tema. A proposta e a coletânea ficam numa página só de leitura, separada da página de envio, onde se escolhem o tipo e a foto. Cada redação responde a exatamente uma proposta (tema + tipo).
-2. O título de toda redação e correção segue o formato "Vestibular – Tipo – Tema", sem ano.
+1. O aluno escolhe, nesta ordem, o vestibular e uma proposta publicada desse vestibular. O tipo de redação é definido pelo administrador no cadastro da proposta (`genreLabel` e `essayType`); o aluno não escolhe tipo nem opção. A proposta e a coletânea ficam numa página só de leitura, separada da página de envio, onde se envia a foto. Cada redação responde a exatamente uma proposta, na versão publicada no momento do envio.
+2. O título de toda redação e correção segue o formato "Vestibular – Tipo – Tema", sem ano: nome do vestibular, nome da categoria de correção e título da proposta ("Fuvest – Dissertação – O papel da ciência no mundo contemporâneo").
 
 **Envio**
 
@@ -129,24 +132,24 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | `exams` | id, slug (`fuvest`), name, status (`active`, `coming_soon`), sheet_lines (30) | Vestibular. |
 | `rubric_versions` | id, exam_id, version, published_at, max_level, max_score, source, label ("Fuvest 2027"), zero_rules (jsonb: `code`, `description`, `studentNote`) | Imutável depois de publicada. `studentNote` é a explicação da hipótese para o aluno, exibida na correção com nota zero. |
 | `rubric_criteria` | id, rubric_version_id, position (1–4), name, short_name ("Tema e autoria"), weight, level_descriptors (jsonb: um por nível, de 1 a `max_level`) | Peso e descritores oficiais por nível. O nome curto é o que a tela da correção usa em títulos e filtros. |
-| `themes` | id, exam_id, title, statement (texto do enunciado), status, published_at, version, supersedes_theme_id | Tema da proposta. Sem ano no título. Depois de publicado não é editado: mudar o enunciado ou a coletânea cria uma linha nova, com a versão seguinte, e a anterior fica arquivada. |
-| `theme_texts` | id, theme_id, position, kind (`text`, `image`), title, source, body, image_asset_id | Coletânea. |
+| `prompts` | id, exam_id, slug, version, status (`draft`, `published`, `archived`), title, summary, source_label, essay_type_id, genre_label, sheet_lines_min, sheet_lines_max, title_required, created_at, updated_at, published_at, created_by, published_by | Proposta de redação (`docs/07-propostas-de-redacao.md`, A2). `title` é o tema, sem ano. `slug` + `version` é único; só uma versão `published` por slug. Depois de publicada não é editada: mudar cria a versão seguinte, e a anterior fica arquivada. |
+| `prompt_blocks` | id, prompt_id, position, kind, data (jsonb) | Conteúdo da página da proposta, em ordem (`docs/07-propostas-de-redacao.md`, A3). |
+| `prompt_grading_notes` | id, prompt_id, expected_focus, tangent_signals, off_topic_signals, key_data (jsonb), extra | Abordagens esperadas do tema. Uma por proposta; obrigatórias para publicar. |
 | `essay_types` | id, exam_id, slug (`dissertacao`, `narrativa`), name, description | Tipos do vestibular. |
-| `theme_essay_types` | theme_id, essay_type_id, rubric_version_id | Tipos aceitos por tema e a grade de cada um. |
 
 **Usuário, redação e correção**
 
 | Tabela | Campos principais | Regras |
 |---|---|---|
-| `users` | id, clerk_user_id (único), email, name, birth_date, last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. |
-| `essays` | id, user_id, batch_id, theme_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, grading_profile_id, created_at | `parent_essay_id` liga a reescrita à versão anterior. |
+| `users` | id, clerk_user_id (único), email, name, birth_date, role (`student`, `admin`), last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. `role` é `student` por padrão e vem da configuração (`docs/07-propostas-de-redacao.md`, A5). |
+| `essays` | id, user_id, batch_id, prompt_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, grading_profile_id, created_at | `prompt_id` é a versão exata da proposta; `essay_type_id` é copiado da proposta no envio. `parent_essay_id` liga a reescrita à versão anterior. |
 | `transcriptions` | id, essay_id, lines (jsonb: número + texto), illegible_count, model, created_at | Texto fiel, nunca editado. |
 | `illegible_words` | id, transcription_id, line_number, char_start, char_end, student_value, filled_at | O que o aluno digitou fica separado da transcrição. |
-| `corrections` | id, essay_id, rubric_version_id, grading_profile_id, theme_id, theme_version, theme_grading_notes_id, zero_reason, zero_explanation, score, max_score, strengths, main_issue, main_issue_criterion, next_steps (jsonb: `[{text, criterion}]`), model, raw_response (jsonb), created_at | `score` calculado pelo backend. Uma por redação. O critério do problema principal e de cada passo é a posição na grade; nulo com nota zero. |
+| `corrections` | id, essay_id, rubric_version_id, grading_profile_id, prompt_id, prompt_grading_notes_id, collection_copy (jsonb), zero_reason, zero_explanation, score, max_score, strengths, main_issue, main_issue_criterion, next_steps (jsonb: `[{text, criterion}]`), model, raw_response (jsonb), created_at | `score` calculado pelo backend. Uma por redação. O critério do problema principal e de cada passo é a posição na grade; nulo com nota zero. `prompt_id` é a versão da proposta usada; `collection_copy` guarda os trechos copiados da coletânea achados pela verificação automática. |
 | `correction_criteria` | id, correction_id, criterion_id, position, level, points, justification, guidance, lines (int[]) | `points` = level × weight. |
 | `correction_marks` | id, correction_id, criterion_id, criterion_position, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note, rule_code, fix | Apontamentos na redação. `fix` é a forma correta do trecho e só existe em desvio de escrita (marca `issue` com `rule_code`). |
 | `correction_feedback` | id, correction_id, rating (`helped_a_lot`, `helped_partly`, `did_not_help`), comment (até 1.000 caracteres), created_at | 1 por correção (índice único em `correction_id`). |
-| `assets` | id, user_id, provider (`cloudinary`), public_id, bytes, mime, purge_after | Fotos privadas. |
+| `assets` | id, user_id, provider (`cloudinary`), public_id, bytes, mime, purge_after, scope (`essay_photo`, `prompt_image`) | Fotos de redação privadas. Imagens de proposta ficam numa pasta pública, com URL estável. |
 
 **Créditos e pagamentos**
 
@@ -168,16 +171,16 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 
 ## 6. API
 
-API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catálogo; o resto exige o token do Clerk (`Authorization: Bearer`), validado pelo JWKS do Clerk. Todo acesso a redação filtra por `user_id` do token: um aluno nunca lê a redação de outro (resposta 404, não 403).
+API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catálogo; o resto exige o token do Clerk (`Authorization: Bearer`), validado pelo JWKS do Clerk. As rotas de administração (`/v1/admin/*`) exigem ainda o papel `admin` e o segundo fator na sessão; estão descritas em `docs/07-propostas-de-redacao.md`, A5. Todo acesso a redação filtra por `user_id` do token: um aluno nunca lê a redação de outro (resposta 404, não 403).
 
 **Catálogo (público)**
 
 | Método e rota | Faz |
 |---|---|
 | `GET /v1/exams` | Vestibulares e status (`active`, `coming_soon`). |
-| `GET /v1/exams/{slug}/themes?q=` | Temas ativos, com tipos aceitos e nº de textos. |
-| `GET /v1/themes/{id}` | Enunciado, coletânea e tipos aceitos. |
-| `GET /v1/themes/{id}/sheet.pdf` | Folha pautada em PDF. |
+| `GET /v1/exams/{slug}/prompts?q=` | Propostas publicadas, com `title`, `summary`, `genreLabel` e nº de textos. |
+| `GET /v1/prompts/{slug}` | Versão publicada da proposta: blocos em ordem, `genreLabel`, linhas e URLs públicas das imagens. Não devolve as abordagens esperadas. |
+| `GET /v1/prompts/{id}/sheet.pdf` | Folha pautada em PDF, com o título da proposta e o tipo no topo. |
 | `GET /v1/rubrics/{versionId}` | Critérios, pesos e descritores (seção "Como a nota é calculada"). |
 
 **Conta**
@@ -195,7 +198,7 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 | Método e rota | Faz |
 |---|---|
 | `POST /v1/uploads/sign` | Devolve assinatura de upload do Cloudinary para 1 JPG (pasta privada, limite de 10 MB, expira em 10 min). |
-| `POST /v1/essays/batch` | Corpo: lista de `{themeId, essayTypeId, assetId, parentEssayId?}` + `Idempotency-Key`. Valida tipo aceito, arquivo e saldo; reserva N créditos e cria N redações + jobs `transcribe` na mesma transação. Responde 202 com os ids. |
+| `POST /v1/essays/batch` | Corpo: lista de `{promptId, assetId, parentEssayId?}` + `Idempotency-Key`. Sem tipo: o backend usa o da proposta. Valida proposta publicada, arquivo e saldo; reserva N créditos e cria N redações + jobs `transcribe` na mesma transação. Responde 202 com os ids. |
 | `GET /v1/essays?status=&cursor=` | Lista do painel, com título no formato "Vestibular – Tipo – Tema". |
 | `GET /v1/essays/{id}` | Status, prazo de revisão e, se houver, palavras ilegíveis. |
 | `PUT /v1/essays/{id}/illegible` | Corpo: `[{wordId, value}]`. Só aceito em `awaiting_review`, antes do prazo e com todas as palavras preenchidas; muda para `queued` e cria job `grade`. |
@@ -276,12 +279,12 @@ A IA não "sabe" a correção da Fuvest de antemão: a cada redação, o worker 
 | 3 | Manual do corretor | `rubric_guidelines` | Por critério: o que verificar, sinais de cada nível, erros comuns de avaliação, como escrever a orientação | Experiência acumulada |
 | 4 | Regras de escrita | `writing_rules` | Catálogo dos desvios do critério 4: código, nome ("Crase antes de verbo"), explicação curta, exemplo certo e errado | Raramente |
 | 5 | Redações-âncora | `anchor_essays`, `anchor_scores` | Redações reais avaliadas por professor, com nível e justificativa por critério; uma por faixa de desempenho, por tipo de redação | Novas âncoras |
-| 6 | Tema | `themes`, `theme_texts`, `theme_grading_notes` | Enunciado, coletânea e notas do tema: recortes esperados, sinais de tangenciamento, dados-chave da coletânea | Cada tema novo |
+| 6 | Proposta | `prompts`, `prompt_blocks`, `prompt_grading_notes` | Blocos da proposta, na ordem, e abordagens esperadas do tema: recorte esperado, sinais de tangenciamento e de fuga, dados-chave da coletânea (`docs/07-propostas-de-redacao.md`, A6) | Cada proposta ou versão nova |
 | 7 | Redação | `transcriptions`, `illegible_words` | Texto final numerado por linha | Cada envio |
 
-Camadas 1 a 5 são iguais para todas as redações do mesmo vestibular e tipo; a 6, para o mesmo tema. Por isso entram no cache nessa ordem e só a 7 é cobrada pelo preço cheio.
+Camadas 1 a 5 são iguais para todas as redações do mesmo vestibular e tipo; a 6, para a mesma versão de proposta. Por isso entram no cache nessa ordem e só a 7 é cobrada pelo preço cheio.
 
-- **Perfil de correção.** `grading_profiles` reúne as versões ativas das camadas 1 a 5 e o modelo, por vestibular e tipo. Cada correção grava o `grading_profile_id` e a versão do tema usados: qualquer nota pode ser explicada e reproduzida depois.
+- **Perfil de correção.** `grading_profiles` reúne as versões ativas das camadas 1 a 5 e o modelo, por vestibular e tipo. Cada correção grava o `grading_profile_id` e a versão da proposta usados: qualquer nota pode ser explicada e reproduzida depois.
 - **Conjunto de referência.** `reference_essays` guarda redações com os níveis dados por professor; `eval_runs` guarda cada execução de um perfil sobre elas, com a diferença por critério e o custo. Um perfil só é ativado se ficar a no máximo 1 nível da referência em 90% dos critérios. Enquanto não houver correções humanas, valem três testes sem professor: redações com defeitos plantados (o defeito precisa ser apontado no critério e na linha certos), consistência (a mesma redação corrigida 3 vezes varia no máximo 1 nível por critério) e transcrição comparada à digitação manual da folha. Fontes de referência humana, em ordem de prioridade: redações do Simulado Fuvest com a nota oficial, doadas por alunos com autorização; redações corrigidas por professores contratados; amostra de correções da plataforma auditada por professor depois do lançamento.
 - **Sem âncoras ainda.** O MVP pode começar só com as camadas 1 a 4 e 6; as âncoras entram quando houver redações avaliadas por professor.
 
@@ -300,7 +303,7 @@ O perfil existe porque a grade e as instruções são editáveis no banco: sem e
 Ele resolve três requisitos de uma vez:
 
 1. **Testar antes de afetar alunos.** Uma edição gera um perfil novo em teste; os alunos continuam sendo corrigidos pelo perfil aprovado até o novo passar.
-2. **Explicar qualquer nota.** Cada correção guarda o perfil e a versão do tema usados, então dá para reconstruir exatamente com que grade, instruções e modelo ela foi feita.
+2. **Explicar qualquer nota.** Cada correção guarda o perfil e a versão da proposta usados, então dá para reconstruir exatamente com que grade, instruções e modelo ela foi feita.
 3. **Trocar e desfazer com segurança.** Todas as camadas mudam juntas, numa única troca, e a volta ao perfil anterior é imediata.
 
 **Como funciona tecnicamente**
@@ -324,10 +327,10 @@ Existe no máximo um perfil `active` por vestibular e tipo de redação; um perf
 | 4. Testes | O perfil roda sobre o conjunto de referência ou os testes sem professor; resultados e custo vão para `eval_runs` | `draft` |
 | 5. Ativação | Se passar, numa única transação o novo vira `active` e o anterior vira `retired` | `active` |
 | 6. Uso | Ao iniciar cada correção, o worker lê o perfil ativo do tipo da redação e usa só as versões dele | `active` |
-| 7. Registro | A correção grava `grading_profile_id` e a versão do tema | — |
+| 7. Registro | A correção grava `grading_profile_id` e a versão da proposta | — |
 | 8. Volta atrás | Se um perfil novo der problema, reativa-se o anterior (`retired` → `active`) sem refazer testes | `retired` / `active` |
 
-O tema não faz parte do perfil: tem versão própria, porque muda a cada tema novo e vale para qualquer perfil do mesmo vestibular. Redações que já estão em correção no momento de uma ativação terminam com o perfil com que começaram.
+A proposta não faz parte do perfil: tem versão própria, porque muda a cada proposta nova e vale para qualquer perfil do mesmo vestibular e categoria. Redações que já estão em correção no momento de uma ativação terminam com o perfil com que começaram.
 
 **Regras comuns**
 
@@ -346,7 +349,7 @@ O tema não faz parte do perfil: tem versão própria, porque muda a cada tema n
 
 **Correção**
 
-- Entrada: grade da versão (critérios, pesos, descritores por nível, hipóteses de nota zero), enunciado, tipo escolhido, coletânea e a transcrição final com o número de cada linha (com as palavras digitadas pelo aluno inseridas no lugar).
+- Entrada: grade da versão (critérios, pesos, descritores por nível, hipóteses de nota zero), a proposta (blocos em ordem, com o tipo definido no cadastro), as abordagens esperadas, os trechos copiados da coletânea e a transcrição final com o número de cada linha (com as palavras digitadas pelo aluno inseridas no lugar).
 - Instruções: avaliar como a banca; verificar nota zero primeiro; para cada critério dar nível, justificativa e linhas; orientações sempre como afirmações do que corrigir, nunca perguntas; não reescrever o texto do aluno nos critérios 1 a 3; no critério 4, agrupar desvios pela regra e indicar a forma correta.
 - Saída:
 
@@ -402,7 +405,7 @@ A saída custa 5 vezes a entrada e é a maior parte da conta; o texto fixo lido 
 Regras para manter qualidade dentro do teto:
 
 1. **Modelo por tarefa.** Transcrição e correção são configuradas separadamente. A transcrição testa primeiro o modelo mais barato; a correção usa o modelo que passar no conjunto de referência. A escolha final sai dos números do conjunto de referência, não de suposição.
-2. **Cache na ordem certa.** Instruções e grade (iguais para todos) → enunciado e coletânea (iguais por tema) → redação (única). Redações do mesmo tema em sequência reaproveitam o cache.
+2. **Cache na ordem certa.** Instruções e grade (iguais para todos) → proposta e abordagens esperadas (iguais por versão de proposta) → redação (única). Redações da mesma proposta em sequência reaproveitam o cache.
 3. **Saída curta e estruturada.** Justificativa de até 60 palavras por critério, até 12 marcas na redação, 3 próximos passos, `max_tokens` fixo por chamada.
 4. **Imagem enxuta.** Recortar a área da folha e reduzir para o menor tamanho que mantenha a leitura, medido no conjunto de referência. A imagem vai só para a transcrição; a correção recebe apenas texto.
 5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,15 é a referência; a redação nunca é bloqueada enquanto o gasto ficar até 50% acima dele (limite rígido de US$ 0,225). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
@@ -473,6 +476,7 @@ O público inclui adolescentes de 16 e 17 anos e as fotos podem conter caligrafi
 - Webhooks do Mercado Pago e do Clerk só aceitos com assinatura válida.
 - CORS restrito a `redigiai.com.br`; HTTPS em tudo; cabeçalhos de segurança (CSP, HSTS) na Vercel.
 - Prompt injection: texto do aluno delimitado como dado, saída validada (seção 8).
+- Administração: o papel `admin` vale só para o e-mail da lista `Admin__Emails`, com o e-mail principal verificado no Clerk (consultado na Backend API do Clerk, não no token) e o segundo fator na sessão (`Admin__Require2fa`). Para os demais, `/v1/admin/*` responde 404. Não existe chave de API de administração. Imagens de proposta ficam em pasta pública do Cloudinary; fotos de redação continuam privadas.
 
 **Segredos e infraestrutura**
 
@@ -496,8 +500,11 @@ Toda exceção conhecida é lançada como `AppError(code, httpStatus, userMessag
 | `UNAUTHENTICATED` | 401 | Não | Entre na sua conta para continuar. |
 | `AGE_BELOW_MINIMUM` | 422 | Não | A plataforma é destinada a pessoas com 16 anos ou mais. |
 | `QUOTA_EXCEEDED` | 402 | Não | Você não tem correções suficientes para este envio. |
-| `THEME_NOT_AVAILABLE` | 404 | Não | Esse tema não está disponível. Escolha outro. |
-| `ESSAY_TYPE_NOT_ACCEPTED` | 422 | Não | Esse tipo de redação não é aceito neste tema. |
+| `PROMPT_NOT_AVAILABLE` | 404 | Não | Essa proposta não está disponível. Escolha outra. |
+| `ADMIN_2FA_REQUIRED` | 403 | Não | Ative a verificação em duas etapas para acessar a administração. |
+| `PROMPT_NOT_DRAFT` | 409 | Não | Esta proposta já foi publicada. Crie uma nova versão para alterar. |
+| `PROMPT_CHANGED` | 409 | Não | A proposta foi alterada em outro lugar. Recarregue para continuar. |
+| `VALIDATION_FAILED` | 422 | Não | Há pendências na proposta. (Só nas rotas de administração; traz `details: [{ path, message }]`.) |
 | `INVALID_FILE` | 422 | Não | Envie uma foto JPG da folha, com até 10 MB. |
 | `ESSAY_NOT_FOUND` | 404 | Não | Não encontramos essa redação na sua conta. |
 | `REVIEW_INCOMPLETE` | 422 | Não | Preencha todas as palavras para enviar. |
@@ -544,7 +551,7 @@ Dois ambientes, `staging` e `production`, cada um com seu projeto no Railway, se
 A entrega segue o caminho do aluno, em cinco etapas; cada uma termina com algo testável em `staging`.
 
 1. **Base:** repositório, CI, Railway e Vercel, banco com migrações, login com Clerk, `POST /v1/me` com data de nascimento, catálogo da Fuvest carregado via banco.
-2. **Envio e transcrição:** seleção vestibular → tema → tipo, upload no Cloudinary, modal de confirmação, fila de jobs, transcrição, revisão de palavras ilegíveis com prazo.
+2. **Envio e transcrição:** seleção vestibular → proposta, upload no Cloudinary, modal de confirmação, fila de jobs, transcrição, revisão de palavras ilegíveis com prazo.
 3. **Correção:** job `grade`, validação, cálculo da nota, tela da correção, painel, e-mails pelo SendGrid, conjunto de referência com redações reais.
 4. **Créditos e pagamentos:** ledger, teste grátis, avulsa por Pix e cartão, plano semanal no cartão, concessões de segunda-feira e vencimento no dia 1º, webhooks.
 5. **Conta e lançamento:** perfil, exportação e exclusão, rotina de inatividade, avaliação da correção, envio em lote, página inicial, alertas e revisão de segurança.
@@ -580,21 +587,21 @@ Itens que decorrem das decisões jurídicas e de produto e que precisam existir 
 - No MVP, o pedido é feito em Perfil → Correções e compras → "Desistir da compra" (visível só dentro dos 7 dias), `POST /v1/payments/{id}/refund-request`. O backend calcula o valor, remove os créditos não usados no ledger (lançamento negativo, na mesma transação) e cria o reembolso pela API do Mercado Pago num job `process_refund`. Registro no `audit_log`.
 - Erro `REFUND_WINDOW_EXPIRED` (409): "O prazo de 7 dias para desistir desta compra terminou."
 
-**Folha pautada (`GET /v1/themes/{id}/sheet.pdf`)**
+**Folha pautada (`GET /v1/prompts/{id}/sheet.pdf`)**
 
 - A4, 30 linhas numeradas, campo de título no topo e a margem igual à da folha da Fuvest.
 - Sem código de barras, marcas de leitura, logotipo ou nome da Fuvest. Rodapé: "Folha de treino RedigiAI · não escreva seu nome".
-- Gerada no backend (QuestPDF) e guardada em cache; é igual para todos os temas do mesmo vestibular.
+- Gerada no backend (QuestPDF) e guardada em cache por versão de proposta: imprime no topo o título da proposta e o tipo.
 
 **Envio em lote (sem tela desenhada ainda)**
 
-- Na página de envio (`/temas/:themeId/enviar`), depois de escolher o tipo, o aluno pode adicionar várias fotos; cada foto é uma redação daquele tema e tipo.
+- Na página de envio (`/propostas/:slug/enviar`), o aluno pode adicionar várias fotos; cada foto é uma redação daquela proposta.
 - O modal de confirmação lista todas, mostra o custo (N correções) e o saldo depois. Se o saldo não cobre todas, o botão fica desabilitado e aparece "Comprar correções".
 - Uma chamada `POST /v1/essays/batch` com todas; tudo ou nada.
 
 **Rascunho antes do login**
 
-- O aluno escolhe tema, tipo e foto sem conta. Ao clicar "Enviar para correção" sem sessão, a foto e as escolhas ficam guardadas no navegador (IndexedDB, com fallback em memória) e o login abre. Depois de entrar, o upload e o modal de confirmação continuam de onde pararam.
+- O aluno escolhe a proposta e a foto sem conta. Ao clicar "Enviar para correção" sem sessão, a foto e as escolhas ficam guardadas no navegador (IndexedDB, com fallback em memória) e o login abre. Depois de entrar, o upload e o modal de confirmação continuam de onde pararam.
 
 **Aviso sobre IA e identificação do fornecedor**
 

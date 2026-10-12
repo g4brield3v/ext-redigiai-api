@@ -80,6 +80,27 @@ Especificação: seções 3 (Correção e nota), 8 inteira, 10 e 12.
 - Nome escrito na folha resulta em nota zero por identificação.
 - Correção igual ao design, com comentário da margem na mesma linha da marca.
 
+## Etapa 3b · Propostas de redação e área de administração
+
+Documento: `docs/07-propostas-de-redacao.md` inteiro. Substitui o modelo de temas das etapas 1 a 3. A tela de correção v2 precisa estar concluída antes.
+
+- Acesso de administrador: `users.role`, `Admin__Emails`, `Admin__Require2fa`; e-mail principal verificado consultado na Backend API do Clerk no `POST /v1/me` e a cada login; segundo fator pela claim `fva`; limite de 120 requisições por minuto e `audit_log` em toda escrita.
+- Modelo: `prompts`, `prompt_blocks`, `prompt_grading_notes`, `assets.scope`; migração que converte os temas existentes em propostas.
+- Validação de rascunho (lista de pendências) e de publicação (seção A4).
+- API de administração: as 11 rotas da seção A5, com `Idempotency-Key` na criação e `expectedUpdatedAt` no salvamento.
+- Fluxo do aluno: `GET /v1/exams/{slug}/prompts`, `GET /v1/prompts/{slug}`, `POST /v1/essays/batch` com `promptId`; saem as rotas `/themes`.
+- Correção: `<proposta>` e `<abordagens_esperadas>` na chamada, verificação automática de cópia da coletânea e contagem de linhas (seção A6).
+- Telas, no repositório do front: `/propostas`, `/propostas/:slug`, `/propostas/:slug/enviar`, `/admin/propostas` e `/admin/propostas/:id` (referências 02b, 03, 11 e 11b).
+- Fica para uma branch própria, depois desta: a folha pautada (`GET /v1/prompts/{id}/sheet.pdf`).
+
+**Aceite**
+- Todos os testes da seção A8.
+- Rota de administração sem token responde 401; com token de aluno, 404; sem segundo fator, 403.
+- O administrador de teste do ambiente local não existe fora de `Development`.
+- Publicar a versão 2 arquiva a versão 1, e uma redação feita na versão 1 continua mostrando a versão 1.
+- A redação sempre recebe o tipo da proposta; um tipo enviado pelo navegador não vale.
+- Proposta, envio e as duas telas de administração iguais ao design em 360 px e 1440 px.
+
 ## Etapa 4 · Créditos e pagamentos
 
 Especificação: seções 3 (Créditos e cobrança), 9 e 15 (arrependimento e autorização do responsável).
