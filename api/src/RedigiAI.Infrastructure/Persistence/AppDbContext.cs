@@ -40,6 +40,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<ExamStatus>().HaveConversion<SnakeCaseEnumConverter<ExamStatus>>();
         configuration.Properties<ThemeStatus>().HaveConversion<SnakeCaseEnumConverter<ThemeStatus>>();
         configuration.Properties<ThemeTextKind>().HaveConversion<SnakeCaseEnumConverter<ThemeTextKind>>();
+        configuration.Properties<UserRole>().HaveConversion<SnakeCaseEnumConverter<UserRole>>();
         configuration.Properties<CreditSource>().HaveConversion<SnakeCaseEnumConverter<CreditSource>>();
         configuration.Properties<EssayStatus>().HaveConversion<SnakeCaseEnumConverter<EssayStatus>>();
         configuration.Properties<JobStatus>().HaveConversion<SnakeCaseEnumConverter<JobStatus>>();

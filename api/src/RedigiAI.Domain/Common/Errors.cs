@@ -44,6 +44,9 @@ public static class Errors
     public static AppError AiFailed(string code) =>
         new(code, 500, "Algo deu errado do nosso lado. Tente novamente em instantes.");
 
+    public static AppError AdminSecondFactorRequired() =>
+        new("ADMIN_2FA_REQUIRED", 403, "Ative a verificação em duas etapas para acessar a administração.");
+
     public static AppError RateLimited() =>
         new("RATE_LIMITED", 429, "Muitas tentativas seguidas. Aguarde um minuto.", retryable: true);
 

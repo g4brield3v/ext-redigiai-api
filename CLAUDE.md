@@ -67,7 +67,8 @@ dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevA
 # Em desenvolvimento a IA fica desligada (Ai__Enabled=false): os jobs transcribe e grade esperam na fila e nada é
 # cobrado. Ai__Enabled=true no .env liga as chamadas reais ao Claude.
 # Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
-# carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova).
+# carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova | admin).
+# O usuário admin só existe com Admin__Emails preenchido: usa o primeiro e-mail da lista e simula o segundo fator.
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 ```
 

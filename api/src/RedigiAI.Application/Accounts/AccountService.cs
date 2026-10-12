@@ -13,6 +13,7 @@ internal sealed class AccountService(
     IAccessLog accessLog,
     IUnitOfWork unitOfWork,
     IOptions<LegalOptions> legal,
+    AdminRole adminRole,
     TimeProvider time) : IAccountService
 {
     public async Task<RegisterUserResult> RegisterAsync(RegisterUserCommand command, CancellationToken ct)
@@ -20,6 +21,7 @@ internal sealed class AccountService(
         var existing = await users.FindByClerkIdAsync(command.ClerkUserId, ct);
         if (existing is not null)
         {
+            await SyncRoleAsync(existing, command.Origin.SessionId, ct);
             return new RegisterUserResult(await ReadProfileAsync(existing, ct), Created: false);
         }
 
@@ -36,11 +38,17 @@ internal sealed class AccountService(
         var now = time.GetUtcNow();
         var user = User.Register(
             command.ClerkUserId, command.Email, command.Name, birthDate, legal.Value.TermsVersion, now);
+        user.ConfirmRole(await adminRole.ResolveAsync(user, ct), command.Origin.SessionId);
         var bucket = CreditBucket.GrantTrial(user.Id, now);
 
         users.Add(user);
         credits.AddGrant(bucket, CreditLedgerEntry.ForGrant(bucket, now));
         audit.Record($"user:{user.Id}", "user.registered", "user", user.Id);
+        if (user.Role == UserRole.Admin)
+        {
+            audit.Record("system", "user.role_changed", "user", user.Id, new { role = "admin" });
+        }
+
         audit.Record("system", "credit.granted", "credit_bucket", bucket.Id, new { source = "trial", delta = bucket.Granted });
         accessLog.Record(user.Id, command.Origin);
 
@@ -64,6 +72,7 @@ internal sealed class AccountService(
 
         await users.TouchAsync(user.Id, time.GetUtcNow(), ct);
         await accessLog.RecordSessionOnceAsync(user.Id, origin, ct);
+        await SyncRoleAsync(user, origin.SessionId, ct);
 
         return await ReadProfileAsync(user, ct);
     }
@@ -100,6 +109,30 @@ internal sealed class AccountService(
 
         user.ChangeEmail(email);
         audit.Record("clerk", "user.email_changed", "user", user.Id);
+        if (!adminRole.IsListed(email) && user.ConfirmRole(UserRole.Student, sessionId: null))
+        {
+            audit.Record("clerk", "user.role_changed", "user", user.Id, new { role = "student" });
+        }
+
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Confere o papel uma vez por sessão de login. Só quem está na lista de administradores, ou ainda tem o papel
+    /// gravado, passa pela consulta: para os demais alunos nada é lido nem gravado.
+    /// </summary>
+    private async Task SyncRoleAsync(User user, string? sessionId, CancellationToken ct)
+    {
+        if ((user.Role != UserRole.Admin && !adminRole.IsListed(user.Email)) || !user.NeedsRoleCheck(sessionId))
+        {
+            return;
+        }
+
+        if (user.ConfirmRole(await adminRole.ResolveAsync(user, ct), sessionId))
+        {
+            audit.Record("system", "user.role_changed", "user", user.Id, new { role = user.Role == UserRole.Admin ? "admin" : "student" });
+        }
+
         await unitOfWork.SaveChangesAsync(ct);
     }
 
@@ -115,6 +148,7 @@ internal sealed class AccountService(
             user.Id,
             user.Email,
             user.Name,
+            user.Role,
             TermsAcceptanceRequired: user.TermsVersion != legal.Value.TermsVersion,
             AiNoticeAccepted: user.AiNoticeAcceptedAt is not null,
             new EmailPreferencesDto(

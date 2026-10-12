@@ -1991,6 +1991,7 @@
           "id",
           "email",
           "name",
+          "role",
           "termsAcceptanceRequired",
           "aiNoticeAccepted",
           "emailPreferences",
@@ -2010,6 +2011,9 @@
               "null",
               "string"
             ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
           },
           "termsAcceptanceRequired": {
             "type": "boolean"
@@ -2357,6 +2361,12 @@
             }
           }
         }
+      },
+      "UserRole": {
+        "enum": [
+          "student",
+          "admin"
+        ]
       },
       "ZeroRuleDto": {
         "required": [

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi;
 using RedigiAI.Api.Http;
 using RedigiAI.Application;
+using RedigiAI.Application.Accounts;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
 using RedigiAI.Application.Essays;
@@ -32,6 +33,7 @@ internal static class ApiHost
         services.AddApplication();
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
+        services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.Section));
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.
@@ -47,6 +49,8 @@ internal static class ApiHost
         services.AddClerkAuthentication(builder.Configuration, devAccess);
         if (devAccess)
         {
+            services.AddSingleton<DevUsers>();
+            services.AddSingleton<ITestIdentities>(provider => provider.GetRequiredService<DevUsers>());
             services.AddHostedService<DevEnvironmentSetup>();
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();
@@ -179,12 +183,14 @@ internal static class ApiHost
     /// <summary>
     /// 30 requisições por minuto por aluno; quem não está logado é limitado por IP.
     /// O envio de redações tem ainda o seu limite: 10 por hora por aluno.
+    /// As rotas de administração têm a sua janela: 120 por minuto por usuário (o editor salva sozinho).
     /// </summary>
     private static void AddRateLimiting(IServiceCollection services, IConfiguration configuration)
     {
         var perUser = configuration.GetValue("RateLimit:PerUserPerMinute", 30);
         var perIp = configuration.GetValue("RateLimit:PerIpPerMinute", 120);
         var batchesPerHour = configuration.GetValue("RateLimit:EssayBatchPerHour", 10);
+        var adminPerUser = configuration.GetValue("RateLimit:AdminPerUserPerMinute", 120);
 
         services.AddRateLimiter(limiter =>
         {
@@ -202,6 +208,11 @@ internal static class ApiHost
             limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
             {
                 var userId = http.User.FindFirst("sub")?.Value;
+                if (userId is not null && http.Request.Path.StartsWithSegments("/v1/admin"))
+                {
+                    return Window($"admin:{userId}", adminPerUser);
+                }
+
                 return userId is not null
                     ? Window($"user:{userId}", perUser)
                     : Window($"ip:{http.Connection.RemoteIpAddress}", perIp);

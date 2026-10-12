@@ -16,6 +16,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email).HasMaxLength(320);
         builder.Property(u => u.Name).HasMaxLength(User.MaxNameLength);
         builder.Property(u => u.TermsVersion).HasMaxLength(20);
+        builder.Property(u => u.Role).HasMaxLength(20).HasDefaultValue(UserRole.Student);
+        builder.Property(u => u.RoleCheckedSessionId).HasMaxLength(64);
         builder.ComplexProperty(u => u.EmailPreferences, preferences =>
         {
             preferences.Property(p => p.CorrectionReady).HasColumnName("notify_correction_ready");

@@ -52,6 +52,8 @@ public static class DependencyInjection
         services.AddSingleton<JobSignal>();
 
         services.AddScoped<IClerkWebhookVerifier, ClerkWebhookVerifier>();
+        services.AddSingleton<ClerkBackendApi>();
+        services.AddSingleton<IIdentityDirectory>(provider => provider.GetRequiredService<ClerkBackendApi>());
 
         services.AddSingleton<IPhotoStorage, CloudinaryPhotoStorage>();
         services.AddSingleton<ClaudeMessagesApi>();

@@ -70,6 +70,19 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("student")
+                        .HasColumnName("role");
+
+                    b.Property<string>("RoleCheckedSessionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role_checked_session_id");
+
                     b.Property<DateTimeOffset>("TermsAcceptedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("terms_accepted_at");
