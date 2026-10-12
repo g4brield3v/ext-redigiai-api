@@ -29,6 +29,20 @@ public sealed class CreditLedgerEntry
             CreatedAt = now,
         };
 
+    /// <summary>Devolução da correção reservada para uma redação que falhou ou foi cancelada.</summary>
+    public static CreditLedgerEntry ForRefund(CreditBucket bucket, Guid essayId, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = CreditSource.Refund,
+            Delta = 1,
+            BucketId = bucket.Id,
+            EssayId = essayId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+
     public static CreditLedgerEntry ForGrant(CreditBucket bucket, DateTimeOffset now) =>
         new()
         {

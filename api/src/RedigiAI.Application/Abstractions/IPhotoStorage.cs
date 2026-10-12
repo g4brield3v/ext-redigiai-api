@@ -14,4 +14,10 @@ public interface IPhotoStorage
 
     /// <summary>O que de fato chegou ao provedor; <c>null</c> se nada foi enviado com esse identificador.</summary>
     Task<StoredPhoto?> FindAsync(string publicId, CancellationToken ct);
+
+    /// <summary>Endereço temporário para o próprio aluno ver a foto que enviou.</summary>
+    string CreateDownloadUrl(string publicId, DateTimeOffset now, TimeSpan validFor);
+
+    /// <summary>A foto em JPG, reduzida ao tamanho que a IA aproveita, para a transcrição.</summary>
+    Task<byte[]> DownloadForReadingAsync(string publicId, CancellationToken ct);
 }

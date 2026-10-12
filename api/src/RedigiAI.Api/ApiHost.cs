@@ -11,6 +11,8 @@ using RedigiAI.Api.Http;
 using RedigiAI.Application;
 using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
+using RedigiAI.Application.Essays;
+using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Cloudinary;
 
 namespace RedigiAI.Api;
@@ -31,12 +33,23 @@ internal static class ApiHost
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
+        services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
+        // Aceita também o nome padrão da Anthropic para a chave.
+        services.PostConfigure<AnthropicOptions>(anthropic =>
+        {
+            if (anthropic.ApiKey.Length == 0)
+            {
+                anthropic.ApiKey = builder.Configuration["ANTHROPIC_API_KEY"] ?? "";
+            }
+        });
+        services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
         var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
         services.AddClerkAuthentication(builder.Configuration, devAccess);
         if (devAccess)
         {
             services.AddHostedService<DevEnvironmentSetup>();
             services.AddHostedService<JobWorker>();
+            services.AddHostedService<ReviewDeadlineSweeper>();
         }
         AddControllers(services);
         AddOpenApiDocument(services);

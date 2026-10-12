@@ -20,6 +20,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Essay> Essays => Set<Essay>();
     public DbSet<EssayBatch> EssayBatches => Set<EssayBatch>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<Transcription> Transcriptions => Set<Transcription>();
+    public DbSet<IllegibleWord> IllegibleWords => Set<IllegibleWord>();
+    public DbSet<AiUsage> AiUsages => Set<AiUsage>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<AccessLogEntry> AccessLogs => Set<AccessLogEntry>();

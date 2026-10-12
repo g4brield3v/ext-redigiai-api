@@ -583,6 +583,64 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.ToTable("theme_texts", (string)null);
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Essays.AiUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CacheReadTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("cache_read_tokens");
+
+                    b.Property<int>("CacheWriteTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("cache_write_tokens");
+
+                    b.Property<long?>("CostMicroUsd")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cost_micro_usd");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EssayId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("essay_id");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("input_tokens");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("output_tokens");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("stage");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_usage");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_ai_usage_created_at");
+
+                    b.HasIndex("EssayId")
+                        .HasDatabaseName("ix_ai_usage_essay_id");
+
+                    b.ToTable("ai_usage", (string)null);
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Essays.Asset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -770,6 +828,89 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.ToTable("essay_batches", (string)null);
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Essays.IllegibleWord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CharEnd")
+                        .HasColumnType("integer")
+                        .HasColumnName("char_end");
+
+                    b.Property<int>("CharStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("char_start");
+
+                    b.Property<DateTimeOffset?>("FilledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("filled_at");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<string>("StudentValue")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("student_value");
+
+                    b.Property<Guid>("TranscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transcription_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_illegible_words");
+
+                    b.HasIndex("TranscriptionId")
+                        .HasDatabaseName("ix_illegible_words_transcription_id");
+
+                    b.ToTable("illegible_words", (string)null);
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Essays.Transcription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EssayId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("essay_id");
+
+                    b.Property<bool>("IdentificationFound")
+                        .HasColumnType("boolean")
+                        .HasColumnName("identification_found");
+
+                    b.Property<int>("IllegibleCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("illegible_count");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lines");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transcriptions");
+
+                    b.HasIndex("EssayId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transcriptions_essay_id");
+
+                    b.ToTable("transcriptions", (string)null);
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Jobs.Job", b =>
                 {
                     b.Property<Guid>("Id")
@@ -944,6 +1085,16 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_theme_texts_themes_theme_id");
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Essays.AiUsage", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Essays.Essay", null)
+                        .WithMany()
+                        .HasForeignKey("EssayId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_usage_essays_essay_id");
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Essays.Asset", b =>
                 {
                     b.HasOne("RedigiAI.Domain.Accounts.User", null)
@@ -1022,6 +1173,26 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_essay_batches_users_user_id");
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Essays.IllegibleWord", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Essays.Transcription", null)
+                        .WithMany("Words")
+                        .HasForeignKey("TranscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_illegible_words_transcriptions_transcription_id");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Essays.Transcription", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Essays.Essay", null)
+                        .WithMany()
+                        .HasForeignKey("EssayId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_transcriptions_essays_essay_id");
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Catalog.RubricVersion", b =>
                 {
                     b.Navigation("Criteria");
@@ -1032,6 +1203,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.Navigation("AcceptedTypes");
 
                     b.Navigation("Texts");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Essays.Transcription", b =>
+                {
+                    b.Navigation("Words");
                 });
 #pragma warning restore 612, 618
         }

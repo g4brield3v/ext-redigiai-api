@@ -37,6 +37,22 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
             .Where(b => b.Id == bucketId && b.Remaining >= 1 && (b.ExpiresAt == null || b.ExpiresAt > now))
             .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, x => x.Remaining - 1), ct) == 1;
 
+    public async Task<CreditBucket?> FindReservedBucketAsync(Guid essayId, CancellationToken ct)
+    {
+        var bucketId = await db.CreditLedger
+            .AsNoTracking()
+            .Where(e => e.EssayId == essayId && e.Delta < 0)
+            .Select(e => (Guid?)e.BucketId)
+            .FirstOrDefaultAsync(ct);
+
+        return bucketId is null ? null : await db.CreditBuckets.AsNoTracking().FirstOrDefaultAsync(b => b.Id == bucketId, ct);
+    }
+
+    public async Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct) =>
+        await db.CreditBuckets
+            .Where(b => b.Id == bucketId && b.Remaining < b.Granted)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, x => x.Remaining + 1), ct) == 1;
+
     public async Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(
         Guid userId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets

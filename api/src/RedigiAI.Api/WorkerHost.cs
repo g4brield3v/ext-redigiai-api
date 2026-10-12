@@ -2,6 +2,8 @@ using RedigiAI.Application;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
 using RedigiAI.Infrastructure;
+using RedigiAI.Application.Essays;
+using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Cloudinary;
 
 namespace RedigiAI.Api;
@@ -12,6 +14,7 @@ internal static class WorkerHost
     {
         var builder = CreateBuilder(args);
         builder.Services.AddHostedService<JobWorker>();
+        builder.Services.AddHostedService<ReviewDeadlineSweeper>();
 
         await builder.Build().RunAsync();
         return 0;
@@ -25,6 +28,16 @@ internal static class WorkerHost
         builder.Services.AddInfrastructure();
         builder.Services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
+        builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
+        // Aceita também o nome padrão da Anthropic para a chave.
+        builder.Services.PostConfigure<AnthropicOptions>(anthropic =>
+        {
+            if (anthropic.ApiKey.Length == 0)
+            {
+                anthropic.ApiKey = builder.Configuration["ANTHROPIC_API_KEY"] ?? "";
+            }
+        });
+        builder.Services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
         return builder;
     }
 }

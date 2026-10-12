@@ -58,6 +58,47 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
     }
 }
 
+internal sealed class TranscriptionConfiguration : IEntityTypeConfiguration<Transcription>
+{
+    public void Configure(EntityTypeBuilder<Transcription> builder)
+    {
+        builder.ToTable("transcriptions");
+        builder.Property(t => t.Model).HasMaxLength(80);
+        builder.Property(t => t.Lines)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<IReadOnlyList<TranscribedLine>>, JsonComparer<IReadOnlyList<TranscribedLine>>>();
+        builder.Ignore(t => t.IsUnreadable);
+        builder.HasOne<Essay>().WithMany().HasForeignKey(t => t.EssayId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(t => t.Words).WithOne().HasForeignKey(w => w.TranscriptionId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(t => t.Words).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Uma transcrição por redação.
+        builder.HasIndex(t => t.EssayId).IsUnique();
+    }
+}
+
+internal sealed class IllegibleWordConfiguration : IEntityTypeConfiguration<IllegibleWord>
+{
+    public void Configure(EntityTypeBuilder<IllegibleWord> builder)
+    {
+        builder.ToTable("illegible_words");
+        builder.Property(w => w.StudentValue).HasMaxLength(IllegibleWord.MaxValueLength);
+    }
+}
+
+internal sealed class AiUsageConfiguration : IEntityTypeConfiguration<AiUsage>
+{
+    public void Configure(EntityTypeBuilder<AiUsage> builder)
+    {
+        builder.ToTable("ai_usage");
+        builder.Property(u => u.Stage).HasMaxLength(20);
+        builder.Property(u => u.Model).HasMaxLength(80);
+        builder.HasOne<Essay>().WithMany().HasForeignKey(u => u.EssayId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(u => u.EssayId);
+        builder.HasIndex(u => u.CreatedAt);
+    }
+}
+
 internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
 {
     public void Configure(EntityTypeBuilder<Job> builder)

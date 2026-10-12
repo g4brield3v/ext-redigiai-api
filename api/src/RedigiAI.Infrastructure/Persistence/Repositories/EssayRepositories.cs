@@ -13,6 +13,28 @@ internal sealed class EssayRepository(AppDbContext db) : IEssayRepository
     public Task<Essay?> FindAsync(Guid essayId, Guid userId, CancellationToken ct) =>
         db.Essays.AsNoTracking().FirstOrDefaultAsync(e => e.Id == essayId && e.UserId == userId, ct);
 
+    public Task<Essay?> FindByIdAsync(Guid essayId, CancellationToken ct) =>
+        db.Essays.AsNoTracking().FirstOrDefaultAsync(e => e.Id == essayId, ct);
+
+    public async Task<bool> TryMoveAsync(Guid essayId, EssayTransition transition, CancellationToken ct) =>
+        await db.Essays
+            .Where(e => e.Id == essayId && e.Status == transition.From)
+            .ExecuteUpdateAsync(
+                essay => essay
+                    .SetProperty(e => e.Status, transition.To)
+                    .SetProperty(e => e.ReviewDeadlineAt, transition.ReviewDeadlineAt)
+                    .SetProperty(e => e.FailureCode, transition.FailureCode),
+                ct) == 1;
+
+    public async Task<IReadOnlyList<Guid>> ListExpiredReviewsAsync(DateTimeOffset now, int limit, CancellationToken ct) =>
+        await db.Essays
+            .AsNoTracking()
+            .Where(e => e.Status == EssayStatus.AwaitingReview && e.ReviewDeadlineAt <= now)
+            .OrderBy(e => e.ReviewDeadlineAt)
+            .Take(limit)
+            .Select(e => e.Id)
+            .ToListAsync(ct);
+
     public async Task<IReadOnlyList<Essay>> ListByUserAsync(
         Guid userId, EssayStatus? status, Guid? before, int limit, CancellationToken ct)
     {
@@ -74,6 +96,44 @@ internal sealed class AssetRepository(AppDbContext db) : IAssetRepository
 
     public Task<Asset?> FindAsync(Guid assetId, Guid userId, CancellationToken ct) =>
         db.Assets.FirstOrDefaultAsync(a => a.Id == assetId && a.UserId == userId, ct);
+
+    public Task<Asset?> FindByIdAsync(Guid assetId, CancellationToken ct) =>
+        db.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == assetId, ct);
+}
+
+internal sealed class TranscriptionRepository(AppDbContext db) : ITranscriptionRepository
+{
+    public void Add(Transcription transcription) => db.Transcriptions.Add(transcription);
+
+    public Task<Transcription?> FindByEssayAsync(Guid essayId, CancellationToken ct) =>
+        db.Transcriptions.Include(t => t.Words).FirstOrDefaultAsync(t => t.EssayId == essayId, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> IllegibleCountsAsync(
+        IReadOnlyCollection<Guid> essayIds, CancellationToken ct)
+    {
+        if (essayIds.Count == 0)
+        {
+            return new Dictionary<Guid, int>();
+        }
+
+        return await db.Transcriptions
+            .AsNoTracking()
+            .Where(t => essayIds.Contains(t.EssayId))
+            .ToDictionaryAsync(t => t.EssayId, t => t.IllegibleCount, ct);
+    }
+}
+
+internal sealed class AiUsageRepository(AppDbContext db) : IAiUsageRepository
+{
+    public void Add(AiUsage usage) => db.AiUsages.Add(usage);
+
+    public async Task<IReadOnlyList<long>> ListCostsAsync(Guid essayId, CancellationToken ct) =>
+        await db.AiUsages
+            .AsNoTracking()
+            .Where(u => u.EssayId == essayId && u.CostMicroUsd != null)
+            .OrderBy(u => u.Id)
+            .Select(u => u.CostMicroUsd!.Value)
+            .ToListAsync(ct);
 }
 
 internal sealed class JobQueue(AppDbContext db, TimeProvider time) : IJobQueue

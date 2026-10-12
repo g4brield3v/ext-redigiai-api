@@ -21,6 +21,10 @@ public static class DependencyInjection
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
         services.AddScoped<IUploadService, UploadService>();
         services.AddScoped<IEssayService, EssayService>();
+        services.AddScoped<EssayOutcomes>();
+        services.AddOptions<AiBudgetOptions>();
+        services.AddSingleton<AiBudget>();
+        services.AddScoped<Abstractions.IJobHandler, TranscribeEssayHandler>();
 
         return services;
     }

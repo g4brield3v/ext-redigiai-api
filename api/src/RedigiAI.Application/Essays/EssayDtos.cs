@@ -17,6 +17,12 @@ public sealed record SubmitEssaysCommand(
 
 public sealed record BatchEssayResponseDto(IReadOnlyList<Guid> EssayIds);
 
+/// <summary>O que o aluno digitou para uma palavra ilegível.</summary>
+public sealed record IllegibleAnswer(Guid WordId, string? Value);
+
+/// <param name="Url">Endereço temporário da foto, válido por 5 minutos.</param>
+public sealed record PhotoUrlDto(string Url);
+
 /// <param name="Title">"Vestibular – Tipo – Tema", gerado pelo backend.</param>
 /// <param name="HasVersions">A redação é uma reescrita ou já foi reescrita.</param>
 /// <param name="FailureCode">Código do erro quando o status é <c>failed</c> ou <c>cancelled</c>.</param>

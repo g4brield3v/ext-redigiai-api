@@ -68,4 +68,26 @@ public sealed class EssaysController(IUploadService uploads, IEssayService essay
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct) =>
         Ok(await essays.GetAsync(User.GetClerkIdentity().UserId, id, ct));
+
+    /// <summary>
+    /// Palavras ilegíveis digitadas pelo aluno. Só é aceito em <c>awaiting_review</c>, antes do prazo e com todas
+    /// as palavras preenchidas; a redação segue para a fila de correção.
+    /// </summary>
+    [HttpPut("essays/{id:guid}/illegible", Name = "fillIllegibleWords")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> FillIllegible(Guid id, [FromBody] IReadOnlyList<IllegibleAnswer> answers, CancellationToken ct)
+    {
+        await essays.FillIllegibleAsync(User.GetClerkIdentity().UserId, id, answers, ct);
+        return NoContent();
+    }
+
+    /// <summary>Endereço temporário da foto enviada, válido por 5 minutos.</summary>
+    [HttpGet("essays/{id:guid}/photo", Name = "getEssayPhoto")]
+    [ProducesResponseType<PhotoUrlDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPhoto(Guid id, CancellationToken ct) =>
+        Ok(await essays.GetPhotoUrlAsync(User.GetClerkIdentity().UserId, id, ct));
 }

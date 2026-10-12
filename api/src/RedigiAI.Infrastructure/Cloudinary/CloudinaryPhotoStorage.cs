@@ -26,10 +26,15 @@ internal sealed class CloudinaryPhotoStorage(IOptions<CloudinaryOptions> options
 {
     private const string DeliveryType = "authenticated";
 
+    /// <summary>
+    /// Versão para leitura pela IA: cabe em 1568 px de lado, que é o que o modelo aproveita, e pesa bem menos.
+    /// </summary>
+    private const string ReadingTransformation = "c_limit,h_1568,w_1568,q_85";
+
     // Um cliente para a vida do processo; as conexões são renovadas para acompanhar mudanças de DNS.
     private static readonly HttpClient Http = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
     {
-        Timeout = TimeSpan.FromSeconds(15),
+        Timeout = TimeSpan.FromSeconds(30),
     };
 
     public SignedUpload SignUpload(string publicId, DateTimeOffset now)
@@ -52,16 +57,14 @@ internal sealed class CloudinaryPhotoStorage(IOptions<CloudinaryOptions> options
             ["signature"] = Sign(signed, settings.ApiSecret),
         };
 
-        return new SignedUpload($"https://api.cloudinary.com/v1_1/{Uri.EscapeDataString(settings.CloudName)}/image/upload", fields);
+        return new SignedUpload($"{ApiBase(settings)}/image/upload", fields);
     }
 
     public async Task<StoredPhoto?> FindAsync(string publicId, CancellationToken ct)
     {
         var settings = Settings();
-        var path = string.Join('/', publicId.Split('/').Select(Uri.EscapeDataString));
         using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"https://api.cloudinary.com/v1_1/{Uri.EscapeDataString(settings.CloudName)}/resources/image/{DeliveryType}/{path}");
+            HttpMethod.Get, $"{ApiBase(settings)}/resources/image/{DeliveryType}/{EscapePath(publicId)}");
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{settings.ApiKey}:{settings.ApiSecret}")));
 
@@ -78,12 +81,54 @@ internal sealed class CloudinaryPhotoStorage(IOptions<CloudinaryOptions> options
         return new StoredPhoto(root.GetProperty("bytes").GetInt64(), root.GetProperty("format").GetString() ?? "");
     }
 
+    public string CreateDownloadUrl(string publicId, DateTimeOffset now, TimeSpan validFor)
+    {
+        var settings = Settings();
+        var signed = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["expires_at"] = (now + validFor).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
+            ["format"] = "jpg",
+            ["public_id"] = publicId,
+            ["timestamp"] = now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
+            ["type"] = DeliveryType,
+        };
+
+        var query = string.Join('&', signed
+            .Append(new("api_key", settings.ApiKey))
+            .Append(new("signature", Sign(signed, settings.ApiSecret)))
+            .Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value)}"));
+
+        return $"{ApiBase(settings)}/image/download?{query}";
+    }
+
+    public async Task<byte[]> DownloadForReadingAsync(string publicId, CancellationToken ct)
+    {
+        var settings = Settings();
+
+        // URL de entrega assinada: sem a assinatura, o Cloudinary não entrega imagem "authenticated".
+        var toSign = $"{ReadingTransformation}/{publicId}.jpg";
+        var digest = SHA1.HashData(Encoding.UTF8.GetBytes(toSign + settings.ApiSecret));
+        var signature = Convert.ToBase64String(digest).Replace('+', '-').Replace('/', '_')[..8];
+        var url = $"https://res.cloudinary.com/{Uri.EscapeDataString(settings.CloudName)}/image/{DeliveryType}"
+            + $"/s--{signature}--/{ReadingTransformation}/{EscapePath(publicId)}.jpg";
+
+        using var response = await Http.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
     /// <summary>SHA-1 de "chave=valor&amp;…" em ordem alfabética, seguido do segredo (assinatura padrão do Cloudinary).</summary>
     internal static string Sign(SortedDictionary<string, string> parameters, string apiSecret)
     {
         var toSign = string.Join('&', parameters.Select(p => $"{p.Key}={p.Value}")) + apiSecret;
         return Convert.ToHexStringLower(SHA1.HashData(Encoding.UTF8.GetBytes(toSign)));
     }
+
+    private static string ApiBase(CloudinaryOptions settings) =>
+        $"https://api.cloudinary.com/v1_1/{Uri.EscapeDataString(settings.CloudName)}";
+
+    private static string EscapePath(string publicId) =>
+        string.Join('/', publicId.Split('/').Select(Uri.EscapeDataString));
 
     private CloudinaryOptions Settings()
     {

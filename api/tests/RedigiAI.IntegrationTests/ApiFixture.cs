@@ -14,6 +14,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Collections.Concurrent;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
+using RedigiAI.Domain.Common;
+using RedigiAI.Domain.Essays;
 using RedigiAI.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -38,6 +40,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
     /// <summary>Faz o papel do Cloudinary: o que o teste "enviou" e a assinatura devolvida ao navegador.</summary>
     public FakePhotoStorage Photos { get; } = new();
+
+    /// <summary>Faz o papel do Claude na transcrição: devolve o que o teste roteirizar.</summary>
+    public FakeTranscriber Transcriber { get; } = new();
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
@@ -77,6 +82,7 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IPhotoStorage>(Photos);
+                services.AddSingleton<IEssayTranscriber>(Transcriber);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
@@ -176,4 +182,36 @@ public sealed class FakePhotoStorage : IPhotoStorage
 
     public Task<StoredPhoto?> FindAsync(string publicId, CancellationToken ct) =>
         Task.FromResult(Stored.TryGetValue(publicId, out var photo) ? photo : null);
+
+    public string CreateDownloadUrl(string publicId, DateTimeOffset now, TimeSpan validFor) =>
+        $"https://api.cloudinary.com/v1_1/test/image/download?public_id={publicId}&expires_at={(now + validFor).ToUnixTimeSeconds()}";
+
+    public Task<byte[]> DownloadForReadingAsync(string publicId, CancellationToken ct) =>
+        Task.FromResult<byte[]>([0xFF, 0xD8, 0xFF, 0xD9]);
+}
+
+public sealed class FakeTranscriber : IEssayTranscriber
+{
+    public const string Model = "test-model";
+
+    /// <summary>Respostas das próximas chamadas, na ordem; sem roteiro, a leitura sai limpa.</summary>
+    public ConcurrentQueue<Func<TranscriptionCall>> Script { get; } = new();
+
+    public static TranscriptionCall Reading(bool readable = true, bool identificationFound = false, params string[] lines) =>
+        new(
+            new TranscriptionReading(
+                [.. lines.Select((text, index) => new ReadLine(index + 1, text, Indent: index == 0, Illegible: []))],
+                identificationFound,
+                readable),
+            Model,
+            new AiTokens(Input: 5000, Output: 1500, CacheRead: 0, CacheWrite: 0));
+
+    public static TranscriptionCall Invalid() => new(null, Model, new AiTokens(5000, 100, 0, 0));
+
+    public static TranscriptionCall Unavailable() => throw Errors.AiUnavailable();
+
+    public Task<TranscriptionCall> TranscribeAsync(byte[] jpeg, int sheetLines, CancellationToken ct) =>
+        Task.FromResult(Script.TryDequeue(out var next)
+            ? next()
+            : Reading(lines: ["A tecnologia mudou a forma de debater.", "Os algoritmos escolhem o que cada um vê."]));
 }

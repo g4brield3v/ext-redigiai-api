@@ -91,6 +91,50 @@ public sealed class Essay
     }
 }
 
+/// <summary>
+/// Uma passagem da máquina de estados (especificação, seção 4). Só existem as passagens criadas aqui;
+/// o repositório grava cada uma com <c>UPDATE … WHERE status = From</c>.
+/// </summary>
+public sealed record EssayTransition
+{
+    public static readonly TimeSpan ReviewWindow = TimeSpan.FromHours(24);
+
+    private EssayTransition(EssayStatus from, EssayStatus to)
+    {
+        From = from;
+        To = to;
+    }
+
+    public EssayStatus From { get; }
+
+    public EssayStatus To { get; }
+
+    public DateTimeOffset? ReviewDeadlineAt { get; private init; }
+
+    public string? FailureCode { get; private init; }
+
+    /// <summary>Transcrição sem palavras ilegíveis: vai para a fila de correção.</summary>
+    public static EssayTransition TranscribedClean() => new(EssayStatus.Uploaded, EssayStatus.Queued);
+
+    /// <summary>De 1 a 10 palavras ilegíveis: o aluno tem 24 h para digitá-las.</summary>
+    public static EssayTransition NeedsReview(DateTimeOffset now) =>
+        new(EssayStatus.Uploaded, EssayStatus.AwaitingReview) { ReviewDeadlineAt = now + ReviewWindow };
+
+    /// <summary>Mais de 10 palavras ilegíveis ou foto que não dá para ler.</summary>
+    public static EssayTransition PhotoUnreadable() =>
+        new(EssayStatus.Uploaded, EssayStatus.Failed) { FailureCode = "PHOTO_UNREADABLE" };
+
+    public static EssayTransition TranscriptionFailed() =>
+        new(EssayStatus.Uploaded, EssayStatus.Failed) { FailureCode = "TRANSCRIPTION_FAILED" };
+
+    /// <summary>O aluno preencheu todas as palavras.</summary>
+    public static EssayTransition ReviewCompleted() => new(EssayStatus.AwaitingReview, EssayStatus.Queued);
+
+    /// <summary>24 h sem preencher: cancelada pelo sistema.</summary>
+    public static EssayTransition ReviewExpired() =>
+        new(EssayStatus.AwaitingReview, EssayStatus.Cancelled) { FailureCode = "REVIEW_EXPIRED" };
+}
+
 public static class EssayTitle
 {
     /// <summary>Formato único do produto: "Vestibular – Tipo – Tema", sem ano.</summary>

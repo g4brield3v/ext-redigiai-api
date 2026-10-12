@@ -21,6 +21,20 @@ public interface IEssayService
     Task<EssayListDto> ListAsync(string clerkUserId, string? status, string? cursor, CancellationToken ct);
 
     Task<EssayDetailDto> GetAsync(string clerkUserId, Guid essayId, CancellationToken ct);
+
+    /// <summary>
+    /// Recebe as palavras ilegíveis digitadas pelo aluno. Só vale em <c>awaiting_review</c>, antes do prazo e com
+    /// todas preenchidas; a redação vai para a fila de correção.
+    /// </summary>
+    Task FillIllegibleAsync(
+        string clerkUserId, Guid essayId, IReadOnlyList<IllegibleAnswer>? answers, CancellationToken ct);
+
+    /// <summary>Endereço temporário (5 min) para o aluno ver a foto que enviou.</summary>
+    Task<PhotoUrlDto> GetPhotoUrlAsync(string clerkUserId, Guid essayId, CancellationToken ct);
+
+    /// <summary>Cancela as redações cuja revisão passou do prazo e devolve o crédito de cada uma.</summary>
+    /// <returns>Quantas foram canceladas agora.</returns>
+    Task<int> CancelExpiredReviewsAsync(CancellationToken ct);
 }
 
 internal sealed class EssayService(
@@ -28,6 +42,7 @@ internal sealed class EssayService(
     IEssayRepository essays,
     IEssayBatchRepository batches,
     IAssetRepository assets,
+    ITranscriptionRepository transcriptions,
     IThemeRepository themes,
     IExamRepository exams,
     IEssayTypeRepository essayTypes,
@@ -37,10 +52,15 @@ internal sealed class EssayService(
     IAuditLog audit,
     IAccessLog accessLog,
     IUnitOfWork unitOfWork,
+    EssayOutcomes outcomes,
     TimeProvider time) : IEssayService
 {
     private const int PageSize = 20;
     private const int TranscribeAttempts = 4;
+    private const int GradeAttempts = 4;
+    private const int ExpiredReviewsPerSweep = 100;
+    private const int ContextLength = 30;
+    private static readonly TimeSpan PhotoUrlLifetime = TimeSpan.FromMinutes(5);
 
     private static readonly Dictionary<string, EssayStatus> StatusNames = Enum.GetValues<EssayStatus>()
         .ToDictionary(status => JsonNamingPolicy.SnakeCaseLower.ConvertName(status.ToString()));
@@ -113,10 +133,12 @@ internal sealed class EssayService(
         // Uma a mais do que a página, só para saber se existe a próxima.
         var found = await essays.ListByUserAsync(user.Id, filter, before, PageSize + 1, ct);
         var page = found.Take(PageSize).ToList();
-        var rewritten = await essays.RewrittenAsync([.. page.Select(e => e.Id)], ct);
+        var ids = page.Select(e => e.Id).ToList();
+        var rewritten = await essays.RewrittenAsync(ids, ct);
+        var illegible = await transcriptions.IllegibleCountsAsync(ids, ct);
 
         return new EssayListDto(
-            [.. page.Select(e => ToSummary(e, rewritten.Contains(e.Id)))],
+            [.. page.Select(e => ToSummary(e, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id)))],
             found.Count > PageSize ? page[^1].Id.ToString("N") : null);
     }
 
@@ -126,9 +148,11 @@ internal sealed class EssayService(
         var essay = await essays.FindAsync(essayId, user.Id, ct) ?? throw Errors.EssayNotFound();
         var exam = await exams.FindByIdAsync(essay.ExamId, ct) ?? throw Errors.Internal();
         var rewritten = await essays.RewrittenAsync([essay.Id], ct);
-        var summary = ToSummary(essay, rewritten.Contains(essay.Id));
+        var transcription = await transcriptions.FindByEssayAsync(essay.Id, ct);
+        var summary = ToSummary(essay, rewritten.Contains(essay.Id), transcription?.IllegibleCount ?? 0);
+        var lines = transcription?.Lines ?? [];
+        var textByLine = lines.ToDictionary(line => line.Number, line => line.Text);
 
-        // A transcrição e as palavras ilegíveis entram com o job transcribe.
         return new EssayDetailDto(
             summary.Id,
             summary.Title,
@@ -144,8 +168,79 @@ internal sealed class EssayService(
             summary.MaxScore,
             summary.FailureCode,
             exam.SheetLines,
-            Lines: [],
-            IllegibleWords: []);
+            [.. lines.Select(line => new TranscriptionLineDto(line.Number, line.Text, line.Indent))],
+            [.. (transcription?.Words ?? [])
+                .OrderBy(word => word.LineNumber)
+                .ThenBy(word => word.CharStart)
+                .Select(word => ToDto(word, textByLine[word.LineNumber]))]);
+    }
+
+    public async Task FillIllegibleAsync(
+        string clerkUserId, Guid essayId, IReadOnlyList<IllegibleAnswer>? answers, CancellationToken ct)
+    {
+        var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
+        var essay = await essays.FindAsync(essayId, user.Id, ct) ?? throw Errors.EssayNotFound();
+        if (essay.Status != EssayStatus.AwaitingReview)
+        {
+            throw Errors.InvalidState();
+        }
+
+        var now = time.GetUtcNow();
+        if (essay.ReviewDeadlineAt <= now)
+        {
+            // O prazo acabou antes de a varredura passar: cancela e devolve o crédito já.
+            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.ReviewExpired(), ct);
+            throw Errors.ReviewExpired();
+        }
+
+        var transcription = await transcriptions.FindByEssayAsync(essay.Id, ct) ?? throw Errors.Internal();
+        var typed = (answers ?? []).GroupBy(answer => answer.WordId).ToDictionary(group => group.Key, group => group.Last().Value);
+        if (typed.Count != transcription.Words.Count || transcription.Words.Any(word => !typed.ContainsKey(word.Id)))
+        {
+            throw Errors.ReviewIncomplete();
+        }
+
+        await unitOfWork.InTransactionAsync(
+            async () =>
+            {
+                foreach (var word in transcription.Words)
+                {
+                    word.Fill(typed[word.Id], now);
+                }
+
+                if (!await essays.TryMoveAsync(essay.Id, EssayTransition.ReviewCompleted(), ct))
+                {
+                    throw Errors.InvalidState();
+                }
+
+                jobs.Enqueue(JobTypes.Grade, new EssayJobPayload(essay.Id), GradeAttempts);
+                audit.Record($"user:{user.Id}", "essay.status_changed", "essay", essay.Id, new { from = "AwaitingReview", to = "Queued" });
+                return true;
+            },
+            ct);
+    }
+
+    public async Task<PhotoUrlDto> GetPhotoUrlAsync(string clerkUserId, Guid essayId, CancellationToken ct)
+    {
+        var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
+        var essay = await essays.FindAsync(essayId, user.Id, ct) ?? throw Errors.EssayNotFound();
+        var photo = await assets.FindAsync(essay.PhotoAssetId, user.Id, ct) ?? throw Errors.EssayNotFound();
+
+        return new PhotoUrlDto(storage.CreateDownloadUrl(photo.PublicId, time.GetUtcNow(), PhotoUrlLifetime));
+    }
+
+    public async Task<int> CancelExpiredReviewsAsync(CancellationToken ct)
+    {
+        var cancelled = 0;
+        foreach (var essayId in await essays.ListExpiredReviewsAsync(time.GetUtcNow(), ExpiredReviewsPerSweep, ct))
+        {
+            if (await outcomes.EndWithRefundAsync(essayId, EssayTransition.ReviewExpired(), ct))
+            {
+                cancelled++;
+            }
+        }
+
+        return cancelled;
     }
 
     private async Task<PreparedEssay> PrepareAsync(
@@ -230,7 +325,16 @@ internal sealed class EssayService(
         throw Errors.QuotaExceeded();
     }
 
-    private static EssaySummaryDto ToSummary(Essay essay, bool rewritten) =>
+    private static IllegibleWordDto ToDto(IllegibleWord word, string lineText) =>
+        new(
+            word.Id,
+            word.LineNumber,
+            word.CharStart,
+            word.CharEnd,
+            lineText[Math.Max(0, word.CharStart - ContextLength)..word.CharStart],
+            lineText[word.CharEnd..Math.Min(lineText.Length, word.CharEnd + ContextLength)]);
+
+    private static EssaySummaryDto ToSummary(Essay essay, bool rewritten, int illegibleCount) =>
         new(
             essay.Id,
             essay.Title,
@@ -241,7 +345,7 @@ internal sealed class EssayService(
             HasVersions: essay.ParentEssayId is not null || rewritten,
             essay.CreatedAt,
             essay.ReviewDeadlineAt,
-            IllegibleCount: 0,
+            illegibleCount,
             Score: null,
             MaxScore: null,
             essay.FailureCode);

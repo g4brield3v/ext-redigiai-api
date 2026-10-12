@@ -11,6 +11,7 @@ public enum JobStatus
 public static class JobTypes
 {
     public const string Transcribe = "transcribe";
+    public const string Grade = "grade";
 }
 
 /// <summary>Trabalho da fila. É gravado na mesma transação da mudança que o disparou.</summary>

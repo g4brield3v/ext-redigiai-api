@@ -6,6 +6,7 @@ using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Essays;
+using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Clerk;
 using RedigiAI.Infrastructure.Cloudinary;
 using RedigiAI.Infrastructure.Jobs;
@@ -37,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IEssayRepository, EssayRepository>();
         services.AddScoped<IEssayBatchRepository, EssayBatchRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
+        services.AddScoped<ITranscriptionRepository, TranscriptionRepository>();
+        services.AddScoped<IAiUsageRepository, AiUsageRepository>();
         services.AddScoped<IJobQueue, JobQueue>();
         services.AddSingleton<IJobRunner, JobRunner>();
         services.AddSingleton<JobSignal>();
@@ -44,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IClerkWebhookVerifier, ClerkWebhookVerifier>();
 
         services.AddSingleton<IPhotoStorage, CloudinaryPhotoStorage>();
+        services.AddSingleton<IEssayTranscriber, ClaudeEssayTranscriber>();
 
         return services;
     }

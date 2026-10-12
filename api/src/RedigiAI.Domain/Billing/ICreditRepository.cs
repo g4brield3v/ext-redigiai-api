@@ -14,6 +14,12 @@ public interface ICreditRepository
 
     void AddEntry(CreditLedgerEntry entry);
 
+    /// <summary>O bucket de onde saiu a correção reservada para a redação; <c>null</c> se não houve reserva.</summary>
+    Task<CreditBucket?> FindReservedBucketAsync(Guid essayId, CancellationToken ct);
+
+    /// <summary>Devolve 1 correção ao bucket com <c>UPDATE … WHERE remaining &lt; granted</c>, na transação aberta.</summary>
+    Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct);
+
     /// <summary>Buckets com saldo e não vencidos.</summary>
     Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(Guid userId, DateTimeOffset now, CancellationToken ct);
 }
