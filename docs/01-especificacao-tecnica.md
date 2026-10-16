@@ -49,8 +49,8 @@ Cada regra abaixo é requisito de backend e frontend; o backend é a fonte da ve
 
 **Seleção e título**
 
-1. O aluno escolhe, nesta ordem, o vestibular e uma proposta publicada desse vestibular. O tipo de redação é definido pelo administrador no cadastro da proposta (`genreLabel` e `essayType`); o aluno não escolhe tipo nem opção. A proposta e a coletânea ficam numa página só de leitura, separada da página de envio, onde se envia a foto. Cada redação responde a exatamente uma proposta, na versão publicada no momento do envio.
-2. O título de toda redação e correção segue o formato "Vestibular – Tipo – Tema", sem ano: nome do vestibular, nome da categoria de correção e título da proposta ("Fuvest – Dissertação – O papel da ciência no mundo contemporâneo").
+1. O aluno escolhe, nesta ordem, o vestibular e uma proposta publicada desse vestibular. O tipo de redação é a categoria de correção que o administrador escolhe numa lista no cadastro da proposta (`essayType`; não há texto livre); o aluno não escolhe tipo nem opção. A proposta e a coletânea ficam numa página só de leitura, separada da página de envio, onde se envia a foto. Cada redação responde a exatamente uma proposta, na versão publicada no momento do envio.
+2. O título de toda redação e correção segue o formato "Vestibular – Tipo – Tema", sem ano: nome do vestibular, nome da categoria de correção e título da proposta ("Fuvest – Dissertação em prosa – O papel da ciência no mundo contemporâneo").
 
 **Envio**
 
@@ -132,10 +132,10 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | `exams` | id, slug (`fuvest`), name, status (`active`, `coming_soon`), sheet_lines (30) | Vestibular. |
 | `rubric_versions` | id, exam_id, version, published_at, max_level, max_score, source, label ("Fuvest 2027"), zero_rules (jsonb: `code`, `description`, `studentNote`) | Imutável depois de publicada. `studentNote` é a explicação da hipótese para o aluno, exibida na correção com nota zero. |
 | `rubric_criteria` | id, rubric_version_id, position (1–4), name, short_name ("Tema e autoria"), weight, level_descriptors (jsonb: um por nível, de 1 a `max_level`) | Peso e descritores oficiais por nível. O nome curto é o que a tela da correção usa em títulos e filtros. |
-| `prompts` | id, exam_id, slug, version, status (`draft`, `published`, `archived`), title, summary, source_label, essay_type_id, genre_label, sheet_lines_min, sheet_lines_max, title_required, created_at, updated_at, published_at, created_by, published_by | Proposta de redação (`docs/07-propostas-de-redacao.md`, A2). `title` é o tema, sem ano. `slug` + `version` é único; só uma versão `published` por slug. Depois de publicada não é editada: mudar cria a versão seguinte, e a anterior fica arquivada. |
+| `prompts` | id, exam_id, slug, version, status (`draft`, `published`, `archived`), title, summary, source_label, essay_type_id, created_at, updated_at, published_at, created_by, published_by | Proposta de redação (`docs/07-propostas-de-redacao.md`, A2). `title` é o tema, sem ano. `slug` + `version` é único; só uma versão `published` por slug. Depois de publicada não é editada: mudar cria a versão seguinte, e a anterior fica arquivada. |
 | `prompt_blocks` | id, prompt_id, position, kind, data (jsonb) | Conteúdo da página da proposta, em ordem (`docs/07-propostas-de-redacao.md`, A3). |
 | `prompt_grading_notes` | id, prompt_id, expected_focus, tangent_signals, off_topic_signals, key_data (jsonb), extra | Abordagens esperadas do tema. Uma por proposta; obrigatórias para publicar. |
-| `essay_types` | id, exam_id, slug (`dissertacao`, `narrativa`), name, description | Tipos do vestibular. |
+| `essay_types` | id, exam_id, slug (`dissertacao-em-prosa`, `narrativa`), name, description | Categorias de correção do vestibular. O nome ("Dissertação em prosa") é o tipo que o aluno vê e o que entra no título da redação. Um perfil de correção ativo por vestibular e categoria; categoria nova entra pelo banco, junto com o perfil dela. |
 
 **Usuário, redação e correção**
 
@@ -178,8 +178,8 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 | Método e rota | Faz |
 |---|---|
 | `GET /v1/exams` | Vestibulares e status (`active`, `coming_soon`). |
-| `GET /v1/exams/{slug}/prompts?q=` | Propostas publicadas, com `title`, `summary`, `genreLabel` e nº de textos. |
-| `GET /v1/prompts/{slug}?version=` | Versão publicada da proposta: blocos em ordem, `genreLabel`, linhas, URLs públicas das imagens e `essayTitle` (o título que a redação vai ter). Não devolve as abordagens esperadas nem a descrição das imagens feita para a IA. Com `version`, devolve essa versão se ela já foi publicada (`status` `archived`): é o que a redação feita numa versão antiga continua mostrando. |
+| `GET /v1/exams/{slug}/prompts?q=` | Propostas publicadas, com `title`, `summary`, `essayType` (`slug`, `name`) e nº de textos. |
+| `GET /v1/prompts/{slug}?version=` | Versão publicada da proposta: blocos em ordem, `essayType` (`slug`, `name`), linhas da folha, URLs públicas das imagens e `essayTitle` (o título que a redação vai ter). Não devolve as abordagens esperadas nem a descrição das imagens feita para a IA. Com `version`, devolve essa versão se ela já foi publicada (`status` `archived`): é o que a redação feita numa versão antiga continua mostrando. |
 | `GET /v1/prompts/{id}/sheet.pdf` | Folha pautada em PDF, com o título da proposta e o tipo no topo. Ainda não implementada: entra numa branch própria, depois da etapa 3b. |
 | `GET /v1/rubrics/{versionId}` | Critérios, pesos e descritores (seção "Como a nota é calculada"). |
 
@@ -409,7 +409,7 @@ Regras para manter qualidade dentro do teto:
 2. **Cache na ordem certa.** Instruções e grade (iguais para todos) → proposta e abordagens esperadas (iguais por versão de proposta) → redação (única). Redações da mesma proposta em sequência reaproveitam o cache.
 3. **Saída curta e estruturada.** Justificativa de até 60 palavras por critério, até 12 marcas na redação, 3 próximos passos, `max_tokens` fixo por chamada.
 4. **Imagem enxuta.** Recortar a área da folha e reduzir para o menor tamanho que mantenha a leitura, medido no conjunto de referência. A imagem vai só para a transcrição; a correção recebe apenas texto.
-5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,15 é a referência; a redação nunca é bloqueada enquanto o gasto ficar até 50% acima dele (limite rígido de US$ 0,225). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
+5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,15 é a referência; a redação nunca é bloqueada enquanto o gasto ficar até o limite rígido de US$ 0,33 (`Ai__HardCapUsd`). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
 6. **Batch API como opção futura.** Dá 50% de desconto, mas pode levar até 24 h (em geral menos de 1 h). Fica fora do fluxo normal; serve para rodar o conjunto de referência e reprocessamentos.
 
 ## 9. Pagamentos e créditos
