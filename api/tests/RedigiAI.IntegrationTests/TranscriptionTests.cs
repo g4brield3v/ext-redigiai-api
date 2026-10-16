@@ -147,6 +147,40 @@ public class TranscriptionTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Truncated_reading_is_asked_again_with_twice_the_max_tokens()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        var before = api.Transcriber.Requests.Count;
+        api.Transcriber.Script.Enqueue(FakeTranscriber.Truncated);
+
+        await RunTranscriptionsAsync();
+
+        Assert.Equal(EssayStatus.Queued, await student.StatusAsync(essayId));
+        Assert.Equal([8_000, 16_000], api.Transcriber.Requests.Skip(before).Select(request => request.MaxTokens));
+        Assert.Equal(2, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == essayId)));
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.EntityId == essayId && a.Action == "transcription.response_truncated")));
+    }
+
+    [Fact]
+    public async Task Reading_truncated_twice_fails_with_the_credit_back()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        api.Transcriber.Script.Enqueue(FakeTranscriber.Truncated);
+        api.Transcriber.Script.Enqueue(FakeTranscriber.Truncated);
+
+        await RunTranscriptionsAsync();
+
+        var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
+        Assert.Equal((EssayStatus.Failed, "TRANSCRIPTION_FAILED"), (essay.Status, essay.FailureCode));
+        var job = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.Transcribe).ToListAsync()))
+            .Single(j => j.Payload.Contains(essayId.ToString()));
+        Assert.Equal((JobStatus.Dead, 1, "AI_OUTPUT_TRUNCATED"), (job.Status, job.Attempts, job.LastError));
+        Assert.Equal(1, await student.BalanceAsync());
+    }
+
+    [Fact]
     public async Task Unavailable_ai_keeps_the_essay_and_the_credit_for_the_next_attempt()
     {
         var student = await Student.CreateAsync(api);
@@ -230,7 +264,7 @@ public class TranscriptionTests(ApiFixture api)
         {
             builder.UseSetting($"Ai:Pricing:{FakeTranscriber.Model}:Input", "3");
             builder.UseSetting($"Ai:Pricing:{FakeTranscriber.Model}:Output", "15");
-            builder.UseSetting("Ai:HardCapUsd", "0.02");
+            builder.UseSetting("Ai:HardCapUsd", "0.04");
         });
         var student = await Student.CreateAsync(api);
         var essayId = await student.SubmitAsync();
@@ -239,7 +273,12 @@ public class TranscriptionTests(ApiFixture api)
 
         await RunTranscriptionsAsync(factory);
 
-        // 5.000 tokens de entrada a US$ 3 e 100 de saída a US$ 15 por milhão = US$ 0,0165; duas chamadas passariam de US$ 0,02.
+        // Cada chamada conta pelo pior caso, com o preço do modelo do perfil (Sonnet: entrada a US$ 2,50 na escrita
+        // do cache e saída a US$ 10): a entrada estimada (instruções, foto e folga, perto de 7,5 mil tokens) e a
+        // saída inteira. A primeira só cabe com o max_tokens reduzido.
+        var reduced = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == essayId && a.Action == "ai.max_tokens_reduced"));
+        Assert.Contains("\"requested\":8000", reduced.Data!.Replace(" ", ""));
+        // Ela custou 5.000 tokens de entrada e 100 de saída = US$ 0,0165; a segunda, no pior caso, não cabe no que falta.
         var usage = await api.QueryAsync(db => db.AiUsages.SingleAsync(u => u.EssayId == essayId));
         Assert.Equal(16_500, usage.CostMicroUsd);
         var job = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.Transcribe).ToListAsync()))

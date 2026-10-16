@@ -19,13 +19,15 @@ public sealed record GradingSchema(
 /// <param name="Proposal">Enunciado, coletânea e notas do tema (camada 6).</param>
 /// <param name="Essay">A redação, delimitada como dado (camada 7).</param>
 /// <param name="Model">Modelo definido pelo perfil de correção.</param>
-public sealed record GradingRequest(string System, string Proposal, string Essay, GradingSchema Schema, string Model);
+/// <param name="MaxTokens">Teto de segurança da resposta (<c>max_tokens</c>); não é meta de tamanho.</param>
+public sealed record GradingRequest(string System, string Proposal, string Essay, GradingSchema Schema, string Model, int MaxTokens);
 
 /// <param name="ToolInput">
 /// O JSON que a IA passou à ferramenta, como veio; nulo quando ela não usou a ferramenta ou a resposta foi
 /// cortada. O consumo é cobrado mesmo assim.
 /// </param>
-public sealed record GradingCall(string? ToolInput, string Model, AiTokens Tokens);
+/// <param name="Truncated">A resposta parou no <c>max_tokens</c> (<c>stop_reason = "max_tokens"</c>): nunca é completada.</param>
+public sealed record GradingCall(string? ToolInput, string Model, AiTokens Tokens, bool Truncated = false);
 
 /// <summary>Corrige a redação com a IA. Devolve só o que a IA respondeu; validar e calcular a nota é do backend.</summary>
 public interface IEssayGrader

@@ -230,7 +230,7 @@ A fila é a tabela `jobs` no PostgreSQL: gravar a mudança de status e o job na 
 **Funcionamento**
 
 1. O worker acorda por `LISTEN/NOTIFY` ou a cada 5 s e pega 1 job com `run_at <= now()` usando `FOR UPDATE SKIP LOCKED`.
-2. Marca `status = running` e `locked_until = now() + 10 min`. Se o worker morrer, o job volta a ficar disponível quando `locked_until` vencer.
+2. Marca `status = running` e `locked_until = now() + 10 min`. Enquanto o handler roda, o worker renova a trava a cada 2 minutos (`Jobs__Heartbeat`), só se o job ainda for dele (mesma tentativa, `status = running`). Se o worker morrer, o job volta a ficar disponível quando `locked_until` vencer.
 3. Sucesso: `done`. Erro com `retryable = true`: `run_at = now() + backoff exponencial` (30 s, 2 min, 8 min, 30 min) até `max_attempts`. Erro definitivo ou tentativas esgotadas: `dead` e o handler de falha do tipo roda.
 4. Todo handler é idempotente: antes de agir, confere o status atual da redação com `UPDATE … WHERE status = <esperado>` e sai sem fazer nada se outra execução já avançou.
 5. Concorrência: N workers por instância (configurável), com limite separado para `grade` e `transcribe` para respeitar o limite de requisições da API do Claude.
@@ -337,7 +337,8 @@ A proposta não faz parte do perfil: tem versão própria, porque muda a cada pr
 - Saída sempre estruturada: a chamada define uma ferramenta com JSON Schema e exige seu uso; texto livre é rejeitado.
 - O conteúdo do aluno vai delimitado como dado (`<redacao>…</redacao>`), com instrução explícita de ignorar qualquer ordem escrita nele. Defesa contra prompt injection.
 - Partes fixas (instruções, grade, enunciado e coletânea) vêm primeiro e usam prompt caching; o texto do aluno vem por último.
-- Timeout de 3 min por chamada. Erros 429, 5xx, overloaded e timeout são retentáveis; 400 e resposta inválida após 2 tentativas são definitivos.
+- Chamadas em streaming, com timeout de 10 min por chamada (`docs/08-ajustes-correcao.md`, item 1). Erros 429, 5xx, overloaded, conexão perdida e timeout são retentáveis; 400 e resposta inválida após 2 tentativas são definitivos.
+- `max_tokens` em configuração, como teto de segurança e não como meta: `Ai__Grading__MaxTokens` (32.000) e `Ai__Transcription__MaxTokens` (8.000). Resposta cortada (`stop_reason = "max_tokens"`) nunca é completada: a nova chamada usa o dobro, até o máximo do modelo; cortada de novo, `AI_OUTPUT_TRUNCATED`, a redação falha e o crédito volta. Toda nova chamada respeita o limite rígido de gasto.
 - A resposta bruta é guardada (`raw_response`) para auditoria e para o feedback do aluno.
 
 **Transcrição**
@@ -407,7 +408,7 @@ Regras para manter qualidade dentro do teto:
 
 1. **Modelo por tarefa.** Transcrição e correção são configuradas separadamente. A transcrição testa primeiro o modelo mais barato; a correção usa o modelo que passar no conjunto de referência. A escolha final sai dos números do conjunto de referência, não de suposição.
 2. **Cache na ordem certa.** Instruções e grade (iguais para todos) → proposta e abordagens esperadas (iguais por versão de proposta) → redação (única). Redações da mesma proposta em sequência reaproveitam o cache.
-3. **Saída curta e estruturada.** Justificativa de até 60 palavras por critério, até 12 marcas na redação, 3 próximos passos, `max_tokens` fixo por chamada.
+3. **Saída curta e estruturada.** Justificativa de até 60 palavras por critério, até 12 marcas na redação, 3 próximos passos. O `max_tokens` é só teto de segurança (ver a seção 8): resposta cortada custa a chamada inteira e nunca é aproveitada.
 4. **Imagem enxuta.** Recortar a área da folha e reduzir para o menor tamanho que mantenha a leitura, medido no conjunto de referência. A imagem vai só para a transcrição; a correção recebe apenas texto.
 5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,15 é a referência; a redação nunca é bloqueada enquanto o gasto ficar até o limite rígido de US$ 0,33 (`Ai__HardCapUsd`). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
 6. **Batch API como opção futura.** Dá 50% de desconto, mas pode levar até 24 h (em geral menos de 1 h). Fica fora do fluxo normal; serve para rodar o conjunto de referência e reprocessamentos.

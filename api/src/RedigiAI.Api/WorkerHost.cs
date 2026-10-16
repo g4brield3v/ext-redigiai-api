@@ -44,6 +44,8 @@ internal static class WorkerHost
         });
         builder.Services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
         builder.Services.Configure<CollectionCopyOptions>(builder.Configuration.GetSection(CollectionCopyOptions.Section));
+        builder.Services.Configure<RedigiAI.Infrastructure.Jobs.JobQueueOptions>(
+            builder.Configuration.GetSection(RedigiAI.Infrastructure.Jobs.JobQueueOptions.Section));
         return builder;
     }
 }

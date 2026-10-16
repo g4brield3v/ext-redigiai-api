@@ -13,22 +13,23 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
 {
     private const string ToolName = "registrar_correcao";
 
-    /// <summary>Folga sobre os 2.500 tokens de saída estimados; resposta cortada é recusada.</summary>
-    private const int MaxTokens = 4000;
-
     public async Task<GradingCall> GradeAsync(GradingRequest request, CancellationToken ct)
     {
         using var document = await api.SendAsync(BuildRequest(request), "grading", ct);
         var root = document.RootElement;
         return new GradingCall(
-            ClaudeMessagesApi.ToolInputOf(root, ToolName)?.GetRawText(), request.Model, ClaudeMessagesApi.TokensOf(root));
+            ClaudeMessagesApi.ToolInputOf(root, ToolName)?.GetRawText(),
+            request.Model,
+            ClaudeMessagesApi.TokensOf(root),
+            ClaudeMessagesApi.IsTruncated(root));
     }
 
     private static JsonObject BuildRequest(GradingRequest request) =>
         new()
         {
             ["model"] = request.Model,
-            ["max_tokens"] = MaxTokens,
+            // Teto de segurança, não meta: a resposta cortada nunca é completada (docs/08-ajustes-correcao.md, item 1).
+            ["max_tokens"] = request.MaxTokens,
             ["system"] = new JsonArray(Cached(request.System)),
             ["tools"] = new JsonArray(new JsonObject
             {

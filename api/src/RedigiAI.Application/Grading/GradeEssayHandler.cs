@@ -38,6 +38,7 @@ internal sealed class GradeEssayHandler(
     IUnitOfWork unitOfWork,
     EssayOutcomes outcomes,
     AiSpending spending,
+    AiBudget budget,
     IOptions<CollectionCopyOptions> copyOptions,
     TimeProvider time) : IJobHandler
 {
@@ -45,6 +46,9 @@ internal sealed class GradeEssayHandler(
 
     /// <summary>Resposta que não passa na validação: pede mais uma vez; repetida, a falha é definitiva.</summary>
     private const int InvalidResponseAttempts = 2;
+
+    /// <summary>Resposta cortada no <c>max_tokens</c>: pede de novo com o dobro; cortada de novo, a falha é definitiva.</summary>
+    private const int TruncatedResponseAttempts = 2;
     private const int EmailAttempts = 6;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -87,7 +91,8 @@ internal sealed class GradeEssayHandler(
             copy.Passages,
             CopyRequiresZero: copy.CopiedWords > 0 && copy.Share >= copyOptions.Value.ZeroShare);
 
-        var request = GradingPromptBuilder.Build(layers, lines, transcription.IdentificationFound, copy.Passages, profile.GradingModel);
+        var request = GradingPromptBuilder.Build(
+            layers, lines, transcription.IdentificationFound, copy.Passages, profile.GradingModel, budget.GradingMaxTokens);
         var correction = await GradeAsync(essay.Id, context, request, ct);
 
         await unitOfWork.InTransactionAsync(
@@ -166,34 +171,66 @@ internal sealed class GradeEssayHandler(
             await proposals.FindAsync(essay.PromptId, ct) ?? throw Errors.AiFailed("PROMPT_VERSION_MISSING"));
     }
 
+    /// <summary>
+    /// Chama a IA até ter uma correção válida. Resposta cortada no <c>max_tokens</c> nunca é completada: a nova
+    /// chamada vai com o dobro do tamanho e, cortada de novo, <c>AI_OUTPUT_TRUNCATED</c>. Resposta fora das regras
+    /// ganha mais uma chamada e, repetida, <c>AI_INVALID_RESPONSE</c>. Toda chamada respeita o limite rígido de gasto.
+    /// </summary>
     private async Task<Correction> GradeAsync(Guid essayId, GradingContext context, GradingRequest request, CancellationToken ct)
     {
-        for (var attempt = 1; attempt <= InvalidResponseAttempts; attempt++)
+        var (invalidResponses, truncatedResponses) = (0, 0);
+        var inputTokens = AiSpending.EstimateInputTokens(request.System, request.Proposal, request.Essay);
+        while (true)
         {
-            await spending.EnsureRoomForAnotherCallAsync(essayId, ct);
+            // O tamanho pedido diminui se a chamada, no pior caso, não couber no que falta do limite rígido.
+            var sent = request with
+            {
+                MaxTokens = await spending.MaxTokensWithinCapAsync(essayId, request.Model, inputTokens, request.MaxTokens, ct),
+            };
 
-            var call = await grader.GradeAsync(request, ct);
+            var call = await spending.CallAsync(essayId, AiUsage.Grading, sent.Model, () => grader.GradeAsync(sent, ct), ct);
             await spending.RecordAsync(essayId, AiUsage.Grading, call.Model, call.Tokens, ct);
 
-            if (GradingResponseParser.Parse(call.ToolInput) is not { } output)
+            if (call.Truncated)
             {
-                audit.Record("system", "grading.response_rejected", "essay", essayId, new { attempt, rule = 1 });
+                truncatedResponses++;
+                audit.Record(
+                    "system", "grading.response_truncated", "essay", essayId, new { attempt = truncatedResponses, maxTokens = sent.MaxTokens });
                 await unitOfWork.SaveChangesAsync(ct);
+                if (truncatedResponses >= TruncatedResponseAttempts)
+                {
+                    throw Errors.AiFailed("AI_OUTPUT_TRUNCATED");
+                }
+
+                request = request with { MaxTokens = budget.Doubled(sent.MaxTokens) };
                 continue;
             }
 
-            try
+            int rule;
+            if (GradingResponseParser.Parse(call.ToolInput) is not { } output)
             {
-                return Correction.Grade(context, output, call.Model, call.ToolInput!, time.GetUtcNow());
+                rule = 1;
             }
-            catch (InvalidGradingException invalid)
+            else
             {
-                // Só o número da regra: o motivo pode citar o texto da correção.
-                audit.Record("system", "grading.response_rejected", "essay", essayId, new { attempt, rule = invalid.Rule });
-                await unitOfWork.SaveChangesAsync(ct);
+                try
+                {
+                    return Correction.Grade(context, output, call.Model, call.ToolInput!, time.GetUtcNow());
+                }
+                catch (InvalidGradingException invalid)
+                {
+                    rule = invalid.Rule;
+                }
+            }
+
+            // Só o número da regra: o motivo pode citar o texto da correção.
+            invalidResponses++;
+            audit.Record("system", "grading.response_rejected", "essay", essayId, new { attempt = invalidResponses, rule });
+            await unitOfWork.SaveChangesAsync(ct);
+            if (invalidResponses >= InvalidResponseAttempts)
+            {
+                throw Errors.AiFailed("AI_INVALID_RESPONSE");
             }
         }
-
-        throw Errors.AiFailed("AI_INVALID_RESPONSE");
     }
 }

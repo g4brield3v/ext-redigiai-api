@@ -29,12 +29,14 @@ internal static partial class GradingPromptBuilder
 
     /// <param name="identificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
     /// <param name="copiedPassages">Trechos copiados da coletânea que a verificação automática encontrou.</param>
+    /// <param name="maxTokens">Teto de segurança da resposta.</param>
     public static GradingRequest Build(
         GradingLayers layers,
         IReadOnlyList<TranscribedLine> lines,
         bool identificationFound,
         IReadOnlyList<CopiedPassage> copiedPassages,
-        string model)
+        string model,
+        int maxTokens)
     {
         var rubric = layers.Rubric;
         var system = Fill(layers.Prompt.SystemText, new Dictionary<string, string>
@@ -88,7 +90,8 @@ internal static partial class GradingPromptBuilder
                 [.. rubric.ZeroRules.Select(rule => rule.Code)],
                 layers.Exam.SheetLines,
                 [.. layers.WritingRules.Rules.OrderBy(rule => rule.Position).Select(rule => rule.Code)]),
-            model);
+            model,
+            maxTokens);
     }
 
     /// <summary>

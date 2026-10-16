@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Common;
@@ -11,9 +12,11 @@ namespace RedigiAI.Infrastructure.Jobs;
 
 /// <summary>
 /// Fila sobre a tabela <c>jobs</c> (especificação, seção 7): pega um job com <c>FOR UPDATE SKIP LOCKED</c>,
-/// trava por 10 minutos e decide entre concluir, tentar de novo com espera crescente ou encerrar.
+/// trava por 10 minutos, renovando a trava enquanto o job roda, e decide entre concluir, tentar de novo com
+/// espera crescente ou encerrar.
 /// </summary>
-internal sealed class JobRunner(IServiceScopeFactory scopes, TimeProvider time, ILogger<JobRunner> logger) : IJobRunner
+internal sealed class JobRunner(
+    IServiceScopeFactory scopes, TimeProvider time, IOptions<JobQueueOptions> options, ILogger<JobRunner> logger) : IJobRunner
 {
     public async Task<bool> RunNextAsync(IReadOnlyCollection<string> types, CancellationToken ct)
     {
@@ -35,7 +38,17 @@ internal sealed class JobRunner(IServiceScopeFactory scopes, TimeProvider time, 
 
         try
         {
-            await handler.HandleAsync(job.Payload, ct);
+            using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var keeping = KeepLockAsync(job, heartbeat.Token);
+            try
+            {
+                await handler.HandleAsync(job.Payload, ct);
+            }
+            finally
+            {
+                await heartbeat.CancelAsync();
+                await keeping;
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -115,6 +128,41 @@ internal sealed class JobRunner(IServiceScopeFactory scopes, TimeProvider time, 
         return await reader.ReadAsync(ct)
             ? new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3), reader.GetInt32(4))
             : null;
+    }
+
+    /// <summary>
+    /// Enquanto o handler roda, renova a trava. Só renova o job que este worker ainda segura (mesma tentativa e
+    /// <c>status = running</c>, regra 10): se outro worker o pegou, para sem efeito.
+    /// </summary>
+    private async Task KeepLockAsync(ClaimedJob job, CancellationToken ct)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(options.Value.Heartbeat, time, ct);
+
+                await using var scope = scopes.CreateAsyncScope();
+                var lockedUntil = time.GetUtcNow() + Job.LockDuration;
+                var renewed = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Jobs
+                    .Where(j => j.Id == job.Id && j.Status == JobStatus.Running && j.Attempts == job.Attempts)
+                    .ExecuteUpdateAsync(update => update.SetProperty(j => j.LockedUntil, lockedUntil), ct);
+                if (renewed == 0)
+                {
+                    logger.LogWarning("Job {JobId} ({Type}) is no longer held by this worker", job.Id, job.Type);
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // O handler terminou (ou o worker está desligando).
+        }
+        catch (Exception ex)
+        {
+            // Sem renovar, a trava vence no tempo normal; o handler segue.
+            logger.LogWarning(ex, "Could not renew the lock of job {JobId} ({Type})", job.Id, job.Type);
+        }
     }
 
     /// <summary>Só mexe no job que este worker ainda segura (<c>status = running</c>).</summary>
