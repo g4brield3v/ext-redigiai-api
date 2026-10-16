@@ -18,6 +18,54 @@ public enum PromptBlockKind
 
     /// <summary>Linha separadora. A IA não recebe.</summary>
     Divider,
+
+    /// <summary>Um card com exatamente 3 itens empilhados, cada um texto ou imagem.</summary>
+    Card,
+}
+
+/// <summary>Formato de um item do card, como vai gravado em <see cref="PromptCardItem.Format"/>.</summary>
+public static class CardItemFormat
+{
+    public const string Text = "text";
+    public const string Image = "image";
+
+    public static bool IsKnown(string? format) => format is Text or Image;
+}
+
+/// <summary>Um dos 3 itens de um card: texto (<see cref="Body"/>) ou imagem (<see cref="AssetId"/>).</summary>
+public sealed record PromptCardItem
+{
+    /// <summary><c>text</c> ou <c>image</c>.</summary>
+    public string? Format { get; init; }
+    public string? Body { get; init; }
+    public Guid? AssetId { get; init; }
+
+    /// <summary>Texto alternativo da imagem, para leitores de tela.</summary>
+    public string? Alt { get; init; }
+
+    /// <summary>O que a imagem mostra, com as falas transcritas: a correção só recebe texto.</summary>
+    public string? AiDescription { get; init; }
+
+    /// <summary>Legenda ou fonte, abaixo do item. Opcional.</summary>
+    public string? Caption { get; init; }
+
+    /// <summary>Só os campos do formato.</summary>
+    internal static PromptCardItem For(PromptCardItem? item) => item?.Format switch
+    {
+        CardItemFormat.Image => new PromptCardItem
+        {
+            Format = item.Format,
+            AssetId = item.AssetId,
+            Alt = Clean(item.Alt),
+            AiDescription = Clean(item.AiDescription),
+            Caption = Clean(item.Caption),
+        },
+        _ => new PromptCardItem { Format = item?.Format, Body = Clean(item?.Body), Caption = Clean(item?.Caption) },
+    };
+
+    internal IEnumerable<string> Texts() => new[] { Body, Alt, AiDescription, Caption }.OfType<string>();
+
+    private static string? Clean(string? text) => PromptRules.Clean(text);
 }
 
 /// <summary>Formato de um texto da coletânea, como vai gravado em <see cref="PromptBlockData.Format"/>.</summary>
@@ -70,6 +118,9 @@ public sealed record PromptBlockData
     /// <summary>Texto do título de seção livre.</summary>
     public string? Text { get; init; }
 
+    /// <summary>Os itens do card, na ordem em que aparecem.</summary>
+    public IReadOnlyList<PromptCardItem>? CardItems { get; init; }
+
     /// <summary>Só os campos do tipo (e, na coletânea, do formato): o que não pertence ao bloco não é guardado.</summary>
     public static PromptBlockData For(PromptBlockKind kind, PromptBlockData data) => kind switch
     {
@@ -100,6 +151,11 @@ public sealed record PromptBlockData
             Items = [.. (data.Items ?? []).Select(Clean).OfType<string>()],
         },
         PromptBlockKind.Heading => new PromptBlockData { Text = Clean(data.Text) },
+        PromptBlockKind.Card => new PromptBlockData
+        {
+            Title = Clean(data.Title),
+            CardItems = [.. (data.CardItems ?? []).Select(PromptCardItem.For)],
+        },
         _ => None,
     };
 
@@ -110,8 +166,13 @@ public sealed record PromptBlockData
         return single.OfType<string>()
             .Concat(Items ?? [])
             .Concat((Columns ?? []).SelectMany(column => column ?? []))
+            .Concat((CardItems ?? []).SelectMany(item => item.Texts()))
             .Where(text => text is not null);
     }
+
+    /// <summary>As imagens do bloco: a do texto da coletânea e as dos itens do card.</summary>
+    public IEnumerable<Guid> AssetIds() =>
+        new[] { AssetId }.Concat((CardItems ?? []).Select(item => item.AssetId)).OfType<Guid>();
 
     private static string? Clean(string? text) => PromptRules.Clean(text);
 }

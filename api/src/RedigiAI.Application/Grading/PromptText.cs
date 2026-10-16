@@ -9,10 +9,10 @@ namespace RedigiAI.Application.Grading;
 internal static class PromptText
 {
     /// <summary>
-    /// Os blocos na ordem da página: <c>[Texto 2] corpo — Fonte</c>, <c>[Comando] corpo</c>,
-    /// <c>[Instruções] Tipo de redação: …; item; item</c>.
+    /// Os blocos na ordem da página: <c>[Texto 2] corpo — Fonte</c>, <c>[Card: título] 1) … · 2) … · 3) …</c>,
+    /// <c>[Comando] corpo</c>, <c>[Instruções] Tipo de redação: …; item; item</c>.
     /// </summary>
-    /// <param name="genre">O tipo de redação, que abre as instruções.</param>
+    /// <param name="genre">O tipo de redação (o nome da categoria de correção), que abre as instruções.</param>
     public static string Blocks(Prompt prompt, string genre) =>
         string.Join("\n", prompt.Blocks
             .Select(block => block.Kind == PromptBlockKind.CollectionItem ? CollectionItem(block.Data) : Statement(block, genre))
@@ -57,9 +57,6 @@ internal static class PromptText
         return string.Join("\n", lines);
     }
 
-    /// <summary>O tipo exatamente como a prova pede; é contra ele que a modalidade é avaliada.</summary>
-    public static string Genre(Prompt prompt, EssayType essayType) => prompt.GenreLabel ?? essayType.Name;
-
     private static string CollectionItem(PromptBlockData data)
     {
         var (mark, content) = data.Format switch
@@ -71,8 +68,20 @@ internal static class PromptText
         return $"[{data.Label}{mark}] {content} — {data.Source}";
     }
 
+    /// <summary><c>[Card: título] 1) texto — legenda · 2) descrição da imagem · 3) …</c>; sem título, <c>[Card]</c>.</summary>
+    private static string Card(PromptBlockData data)
+    {
+        var items = (data.CardItems ?? []).Select((item, index) =>
+        {
+            var content = item.Format == CardItemFormat.Image ? item.AiDescription : item.Body;
+            return $"{index + 1}) {content}{(item.Caption is null ? "" : $" — {item.Caption}")}";
+        });
+        return $"[Card{(data.Title is null ? "" : $": {data.Title}")}] {string.Join(" · ", items)}";
+    }
+
     private static string? Statement(PromptBlock block, string genre) => block.Kind switch
     {
+        PromptBlockKind.Card => Card(block.Data),
         PromptBlockKind.Command => $"[Comando] {block.Data.Body}",
         PromptBlockKind.Paragraph => block.Data.Body,
         PromptBlockKind.Instructions => "[Instruções] " + string.Join("; ", (block.Data.Items ?? []).Prepend($"Tipo de redação: {genre}")),

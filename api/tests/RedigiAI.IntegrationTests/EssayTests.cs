@@ -45,7 +45,7 @@ public class EssayTests(ApiFixture api)
 
         var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
         Assert.Equal(EssayStatus.Uploaded, essay.Status);
-        Assert.Equal("Fuvest – Dissertação – Algoritmos e o debate público", essay.Title);
+        Assert.Equal("Fuvest – Dissertação em prosa – Algoritmos e o debate público", essay.Title);
         Assert.Equal((1, (Guid?)null), (essay.Version, essay.ParentEssayId));
 
         var entry = await api.QueryAsync(db => db.CreditLedger.SingleAsync(e => e.EssayId == essayId));
@@ -218,7 +218,7 @@ public class EssayTests(ApiFixture api)
         Assert.Equal(0, (await student.Client.GetFromJsonAsync<JsonElement>("/v1/essays?status=completed")).GetProperty("items").GetArrayLength());
 
         var detail = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{essayId}");
-        Assert.Equal("Fuvest – Dissertação – Algoritmos e o debate público", detail.GetProperty("title").GetString());
+        Assert.Equal("Fuvest – Dissertação em prosa – Algoritmos e o debate público", detail.GetProperty("title").GetString());
         Assert.Equal(30, detail.GetProperty("sheetLines").GetInt32());
 
         Assert.Equal(0, (await other.Client.GetFromJsonAsync<JsonElement>("/v1/essays")).GetProperty("items").GetArrayLength());

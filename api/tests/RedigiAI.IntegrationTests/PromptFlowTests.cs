@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Billing;
 using RedigiAI.Domain.Billing;
+using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.IntegrationTests;
@@ -33,10 +34,10 @@ public class PromptFlowTests(ApiFixture api)
         var prompt = JsonDocument.Parse(raw).RootElement;
 
         Assert.Equal(("Proposta para o aluno", "Dissertação em prosa", 5), (
-            listed.GetProperty("title").GetString(), listed.GetProperty("genreLabel").GetString(), listed.GetProperty("textCount").GetInt32()));
+            listed.GetProperty("title").GetString(), listed.GetProperty("essayType").GetProperty("name").GetString(), listed.GetProperty("textCount").GetInt32()));
         Assert.Equal("Coletânea com tirinha, poema e três textos em prosa.", listed.GetProperty("summary").GetString());
         Assert.Equal(id, prompt.GetProperty("id").GetGuid());
-        Assert.Equal("Fuvest – Dissertação – Proposta para o aluno", prompt.GetProperty("essayTitle").GetString());
+        Assert.Equal("Fuvest – Dissertação em prosa – Proposta para o aluno", prompt.GetProperty("essayTitle").GetString());
 
         // A imagem chega pelo endereço público, com o texto alternativo.
         var strip = prompt.GetProperty("blocks")[0].GetProperty("data");
@@ -77,15 +78,90 @@ public class PromptFlowTests(ApiFixture api)
         var (promptId, _) = await PublishAsync(admin, "Tipo vem da proposta");
         var student = await StudentAsync();
         var narrativa = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "narrativa").Select(t => t.Id).SingleAsync());
-        var dissertacao = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "dissertacao").Select(t => t.Id).SingleAsync());
+        var dissertacao = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "dissertacao-em-prosa").Select(t => t.Id).SingleAsync());
 
-        // Um tipo enviado pelo navegador não vale: o backend usa o da proposta.
-        var response = await student.SubmitAsync(promptId, extra: new JsonObject { ["essayTypeId"] = narrativa.ToString(), ["essayType"] = "narrativa" });
+        // Um tipo enviado pelo navegador é recusado, sem gastar crédito.
+        foreach (var extra in new JsonObject[] { new() { ["essayTypeId"] = narrativa.ToString() }, new() { ["essayType"] = "narrativa" } })
+        {
+            await AccountTests.AssertErrorAsync(
+                await student.SubmitAsync(promptId, extra: extra), HttpStatusCode.UnprocessableEntity, "VALIDATION_ERROR");
+        }
+
+        Assert.Equal(1, await student.BalanceAsync());
+
+        // Sem tipo, a redação recebe o da proposta.
+        var response = await student.SubmitAsync(promptId);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var essayId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("essayIds")[0].GetGuid();
         var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
-        Assert.Equal((promptId, dissertacao, "Fuvest – Dissertação – Tipo vem da proposta"), (essay.PromptId, essay.EssayTypeId, essay.Title));
+        Assert.Equal((promptId, dissertacao, "Fuvest – Dissertação em prosa – Tipo vem da proposta"), (essay.PromptId, essay.EssayTypeId, essay.Title));
+    }
+
+    [Fact]
+    public async Task Narrative_prompt_is_graded_with_the_narrative_profile()
+    {
+        var admin = await AdminAsync();
+        var document = ScienceDocument(NewSlug(), await UploadAsync(admin), "Narrativa com perfil próprio");
+        document["essayType"] = "narrativa";
+        var id = await CreateAsync(admin, document);
+        (await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null)).EnsureSuccessStatusCode();
+        var narrativa = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "narrativa").Select(t => t.Id).SingleAsync());
+        var profile = await api.QueryAsync(db => db.GradingProfiles
+            .Where(p => p.EssayTypeId == narrativa && p.Status == GradingProfileStatus.Active).Select(p => p.Id).SingleAsync());
+        var student = await StudentAsync();
+        api.Transcriber.Script.Clear();
+
+        var essayId = await student.SubmittedAsync(id);
+        await RunJobsAsync();
+
+        var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
+        Assert.Equal((narrativa, profile), (essay.EssayTypeId, essay.GradingProfileId));
+        Assert.Equal("Fuvest – Narrativa – Narrativa com perfil próprio", essay.Title);
+        Assert.Contains("tipo=\"Narrativa\"", api.Grader.Requests.Last(r => r.Proposal.Contains("Narrativa com perfil próprio")).Proposal);
+    }
+
+    [Fact]
+    public async Task Student_sees_the_card_without_what_is_only_for_the_ai()
+    {
+        var admin = await AdminAsync();
+        var slug = NewSlug();
+        var image = await UploadAsync(admin);
+        var document = ScienceDocument(slug, image, "Proposta com card");
+        document["blocks"]!.AsArray().Add(new JsonObject
+        {
+            ["position"] = 65,
+            ["kind"] = "card",
+            ["data"] = new JsonObject
+            {
+                ["cardItems"] = new JsonArray(
+                    new JsonObject { ["format"] = "text", ["body"] = "Primeiro item.", ["caption"] = "Fonte: IBGE." },
+                    new JsonObject
+                    {
+                        ["format"] = "image",
+                        ["assetId"] = image.ToString(),
+                        ["alt"] = "Gráfico de barras.",
+                        ["aiDescription"] = "Descrição só para a IA, com os números do gráfico de barras.",
+                    },
+                    new JsonObject { ["format"] = "text", ["body"] = "Terceiro item." }),
+            },
+        });
+        var id = await CreateAsync(admin, document);
+        (await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null)).EnsureSuccessStatusCode();
+
+        var raw = await api.CreateClient().GetStringAsync($"/v1/prompts/{slug}");
+        var card = JsonDocument.Parse(raw).RootElement.GetProperty("blocks").EnumerateArray()
+            .Single(b => b.GetProperty("kind").GetString() == "card").GetProperty("data");
+
+        var items = card.GetProperty("cardItems").EnumerateArray().ToList();
+        Assert.Equal(["text", "image", "text"], items.Select(i => i.GetProperty("format").GetString()));
+        Assert.Equal(("Primeiro item.", "Fonte: IBGE."), (items[0].GetProperty("body").GetString(), items[0].GetProperty("caption").GetString()));
+        Assert.StartsWith("https://res.cloudinary.com/test/image/upload/prompts/", items[1].GetProperty("imageUrl").GetString());
+        Assert.Equal("Gráfico de barras.", items[1].GetProperty("alt").GetString());
+        Assert.False(card.TryGetProperty("title", out _));
+        Assert.DoesNotContain("aiDescription", raw);
+        Assert.DoesNotContain("assetId", raw);
+        Assert.DoesNotContain("Descrição só para a IA", raw);
     }
 
     [Fact]
@@ -108,7 +184,7 @@ public class PromptFlowTests(ApiFixture api)
         var essay = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{essayId}");
         Assert.Equal((first, slug, 1), (
             essay.GetProperty("promptId").GetGuid(), essay.GetProperty("promptSlug").GetString(), essay.GetProperty("promptVersion").GetInt32()));
-        Assert.Equal("Fuvest – Dissertação – Tema na versão 1", essay.GetProperty("title").GetString());
+        Assert.Equal("Fuvest – Dissertação em prosa – Tema na versão 1", essay.GetProperty("title").GetString());
         var listed = (await student.Client.GetFromJsonAsync<JsonElement>("/v1/essays")).GetProperty("items")[0];
         Assert.Equal((slug, 1), (listed.GetProperty("promptSlug").GetString(), listed.GetProperty("promptVersion").GetInt32()));
 
@@ -132,7 +208,7 @@ public class PromptFlowTests(ApiFixture api)
             Assert.Equal(HttpStatusCode.Accepted, rewrite.StatusCode);
             var rewriteId = (await rewrite.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("essayIds")[0].GetGuid();
             var saved = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == rewriteId));
-            Assert.Equal((first, essayId, "Fuvest – Dissertação – Tema na versão 1"), (saved.PromptId, saved.ParentEssayId, saved.Title));
+            Assert.Equal((first, essayId, "Fuvest – Dissertação em prosa – Tema na versão 1"), (saved.PromptId, saved.ParentEssayId, saved.Title));
         }
 
         // Uma redação nova não entra na versão arquivada, e uma reescrita não muda de proposta.
@@ -155,6 +231,26 @@ public class PromptFlowTests(ApiFixture api)
         blocks.Add(new JsonObject { ["position"] = 55, ["kind"] = "divider", ["data"] = new JsonObject() });
         // Um parágrafo que imita um marcador das instruções: tem de chegar como texto, sem ser preenchido.
         blocks.Add(new JsonObject { ["position"] = 65, ["kind"] = "paragraph", ["data"] = new JsonObject { ["body"] = "Leia com atenção {{numbered_lines}} antes de escrever." } });
+        // Um card: texto com legenda, imagem pela descrição para a IA e texto sem legenda.
+        blocks.Add(new JsonObject
+        {
+            ["position"] = 57,
+            ["kind"] = "card",
+            ["data"] = new JsonObject
+            {
+                ["title"] = "Para refletir",
+                ["cardItems"] = new JsonArray(
+                    new JsonObject { ["format"] = "text", ["body"] = "Investimento caiu.", ["caption"] = "Fonte: CNPq." },
+                    new JsonObject
+                    {
+                        ["format"] = "image",
+                        ["assetId"] = document["blocks"]![0]!["data"]!["assetId"]!.GetValue<string>(),
+                        ["alt"] = "Gráfico.",
+                        ["aiDescription"] = "Gráfico de barras do investimento em pesquisa, em queda desde 2015.",
+                    },
+                    new JsonObject { ["format"] = "text", ["body"] = "Terceiro item." }),
+            },
+        });
         var id = await CreateAsync(admin, document);
         (await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null)).EnsureSuccessStatusCode();
         var student = await StudentAsync();
@@ -166,7 +262,12 @@ public class PromptFlowTests(ApiFixture api)
         var request = api.Grader.Requests.Last(r => r.Proposal.Contains(mark));
         var proposal = request.Proposal.ReplaceLineEndings("\n");
         // Aspas no título não fecham o atributo.
-        Assert.StartsWith($"<proposta titulo=\"{mark} com 'aspas'\" tipo=\"Dissertação em prosa\" linhas_min=\"20\" linhas_max=\"30\" titulo_obrigatorio=\"sim\">\n", proposal);
+        // O tipo é o nome da categoria; das linhas vai só o espaço da folha (as regras estão nos itens das Instruções).
+        Assert.StartsWith($"<proposta titulo=\"{mark} com 'aspas'\" tipo=\"Dissertação em prosa\" linhas_da_folha=\"30\">\n", proposal);
+        Assert.Contains(
+            "\n[Card: Para refletir] 1) Investimento caiu. — Fonte: CNPq. · 2) Gráfico de barras do investimento em pesquisa, em queda desde 2015. · 3) Terceiro item.\n[Comando]",
+            proposal);
+        Assert.Contains("Escreva, no mínimo, 20 linhas", proposal);
         // Da imagem vai a descrição feita para a IA; o verso vai com as colunas separadas.
         Assert.Contains("[Texto 1 · imagem] Tirinha em três quadros, com o título", proposal);
         Assert.Contains("— Luis Fernando Verissimo, *As cobras: Antologia Definitiva*.\n[Texto 2] Somente numa sociedade", proposal);

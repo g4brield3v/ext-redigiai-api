@@ -280,6 +280,75 @@
         ]
       }
     },
+    "/v1/admin/exams/{slug}/essay-types": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "As categorias de correção do vestibular, para a lista do cartão Instruções, com a indicação de quais têm\r\nperfil de correção ativo. Vestibular desconhecido responde 404.",
+        "operationId": "listEssayTypes",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EssayTypeOptionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/v1/admin/prompts": {
       "post": {
         "tags": [
@@ -2017,7 +2086,8 @@
             ],
             "format": "uuid"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "BatchEssayRequest": {
         "required": [
@@ -2853,6 +2923,40 @@
           }
         }
       },
+      "EssayTypeDto": {
+        "required": [
+          "slug",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "EssayTypeOptionDto": {
+        "required": [
+          "slug",
+          "name",
+          "hasActiveProfile"
+        ],
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hasActiveProfile": {
+            "type": "boolean"
+          }
+        }
+      },
       "ExamDto": {
         "required": [
           "slug",
@@ -3038,8 +3142,6 @@
           "summary",
           "sourceLabel",
           "essayType",
-          "genreLabel",
-          "sheet",
           "blocks",
           "gradingNotes",
           "updatedAt",
@@ -3085,15 +3187,6 @@
               "null",
               "string"
             ]
-          },
-          "genreLabel": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "sheet": {
-            "$ref": "#/components/schemas/PromptSheetDto"
           },
           "blocks": {
             "type": "array",
@@ -3201,6 +3294,15 @@
               "null",
               "string"
             ]
+          },
+          "cardItems": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PromptCardItemDto"
+            }
           },
           "imageUrl": {
             "type": [
@@ -3316,6 +3418,15 @@
               "null",
               "string"
             ]
+          },
+          "cardItems": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PromptCardItemPublicDto"
+            }
           }
         }
       },
@@ -3336,6 +3447,89 @@
           },
           "data": {
             "$ref": "#/components/schemas/PromptBlockPublicDataDto"
+          }
+        }
+      },
+      "PromptCardItemDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "aiDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caption": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptCardItemPublicDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caption": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3374,16 +3568,11 @@
           "status",
           "title",
           "summary",
-          "genreLabel",
-          "essayTypeId",
-          "essayTypeName",
+          "essayType",
           "essayTitle",
           "examSlug",
           "examName",
           "sheetLines",
-          "minLines",
-          "maxLines",
-          "titleRequired",
           "textCount",
           "blocks"
         ],
@@ -3412,15 +3601,8 @@
               "string"
             ]
           },
-          "genreLabel": {
-            "type": "string"
-          },
-          "essayTypeId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "essayTypeName": {
-            "type": "string"
+          "essayType": {
+            "$ref": "#/components/schemas/EssayTypeDto"
           },
           "essayTitle": {
             "type": "string"
@@ -3434,23 +3616,6 @@
           "sheetLines": {
             "type": "integer",
             "format": "int32"
-          },
-          "minLines": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "maxLines": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "titleRequired": {
-            "type": "boolean"
           },
           "textCount": {
             "type": "integer",
@@ -3501,22 +3666,6 @@
             "type": [
               "null",
               "string"
-            ]
-          },
-          "genreLabel": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "sheet": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/PromptSheetDto"
-              }
             ]
           },
           "blocks": {
@@ -3615,7 +3764,6 @@
           "version",
           "status",
           "title",
-          "genreLabel",
           "essayTypeName",
           "textCount",
           "updatedAt"
@@ -3644,12 +3792,6 @@
           },
           "title": {
             "type": "string"
-          },
-          "genreLabel": {
-            "type": [
-              "null",
-              "string"
-            ]
           },
           "essayTypeName": {
             "type": [
@@ -3749,31 +3891,6 @@
           }
         }
       },
-      "PromptSheetDto": {
-        "type": "object",
-        "properties": {
-          "minLines": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "maxLines": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "titleRequired": {
-            "type": [
-              "null",
-              "boolean"
-            ]
-          }
-        }
-      },
       "PromptStatus": {
         "enum": [
           "draft",
@@ -3787,12 +3904,8 @@
           "slug",
           "title",
           "summary",
-          "genreLabel",
-          "essayTypeName",
+          "essayType",
           "textCount",
-          "minLines",
-          "maxLines",
-          "titleRequired",
           "examSlug",
           "examName"
         ],
@@ -3814,32 +3927,12 @@
               "string"
             ]
           },
-          "genreLabel": {
-            "type": "string"
-          },
-          "essayTypeName": {
-            "type": "string"
+          "essayType": {
+            "$ref": "#/components/schemas/EssayTypeDto"
           },
           "textCount": {
             "type": "integer",
             "format": "int32"
-          },
-          "minLines": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "maxLines": {
-            "type": [
-              "null",
-              "integer"
-            ],
-            "format": "int32"
-          },
-          "titleRequired": {
-            "type": "boolean"
           },
           "examSlug": {
             "type": "string"

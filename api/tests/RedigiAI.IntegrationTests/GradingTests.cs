@@ -56,7 +56,8 @@ public class GradingTests(ApiFixture api)
             .Single(j => j.Payload.Contains(student.EssayId.ToString()));
         Assert.Equal(JobStatus.Ready, email.Status);
         Assert.Contains("correction_ready", email.Payload);
-        Assert.DoesNotContain("27", email.Payload);
+        // Os ids são aleatórios e podem conter "27"; a nota não pode aparecer fora deles.
+        Assert.DoesNotContain("27", System.Text.RegularExpressions.Regex.Replace(email.Payload, "[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", ""));
 
         var usage = await api.QueryAsync(db => db.AiUsages.SingleAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading));
         // 1.200 de entrada a US$ 4, 2.500 de saída a US$ 20 e 7.000 lidos do cache a US$ 0,20 por milhão.
@@ -85,13 +86,14 @@ public class GradingTests(ApiFixture api)
         // Camada 6, igual para a versão da proposta: os blocos na ordem da página e as abordagens esperadas.
         var proposal = request.Proposal.ReplaceLineEndings("\n");
         Assert.StartsWith(
-            "<proposta titulo=\"Algoritmos e o debate público\" tipo=\"Dissertação em prosa\" linhas_min=\"20\" linhas_max=\"30\" titulo_obrigatorio=\"sim\">\n"
+            "<proposta titulo=\"Algoritmos e o debate público\" tipo=\"Dissertação em prosa\" linhas_da_folha=\"30\">\n"
             + "[Texto 1] [Trecho do texto 1, como aparece na proposta da prova.] — [Fonte do texto 1]\n",
             proposal);
         Assert.Contains("[Texto 3 · verso] [verso]\n[verso] / [verso]\n[verso] — [Fonte do texto 3]", proposal);
         Assert.Contains("\n[Comando] [Enunciado da proposta:", proposal);
         Assert.Contains(
-            "[Instruções] Tipo de redação: Dissertação em prosa; [Instrução da proposta para o texto dissertativo-argumentativo.]\n</proposta>",
+            "[Instruções] Tipo de redação: Dissertação em prosa; [Instrução da proposta para o texto dissertativo-argumentativo.]; "
+            + "Escreva, no mínimo, 20 linhas e não ultrapasse as 30 linhas da folha de redação.; Dê um título a sua redação.\n</proposta>",
             proposal);
         Assert.EndsWith(
             "<abordagens_esperadas>\nRecorte esperado: [Recorte que a banca espera do tema.]\n"
@@ -318,6 +320,59 @@ public class GradingTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Previous_grading_instructions_keep_working_with_the_category_as_the_type()
+    {
+        // Fora de Development, um perfil ativo pode ainda apontar para as instruções de antes da categoria única.
+        const string legacyUser =
+            "<proposta titulo=\"{{prompt_title}}\" tipo=\"{{genre_label}}\" linhas_min=\"{{min_lines}}\" linhas_max=\"{{max_lines}}\" titulo_obrigatorio=\"{{title_required}}\">\n"
+            + "{{prompt_blocks}}\n</proposta>\n<abordagens_esperadas>\n{{expected_approaches}}\n</abordagens_esperadas>\n\n"
+            + "<redacao linhas=\"{{line_count}}\" identificacao_na_folha=\"{{identification_found}}\">\n{{numbered_lines}}\n</redacao>\n"
+            + "<copia_da_coletanea>{{collection_copy}}</copia_da_coletanea>";
+        var student = await QueuedEssayAsync();
+        var category = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "dissertacao-em-prosa").Select(t => t.Id).SingleAsync());
+        var active = await api.QueryAsync(db => db.GradingProfiles
+            .SingleAsync(p => p.EssayTypeId == category && p.Status == GradingProfileStatus.Active));
+        var current = await api.QueryAsync(db => db.PromptTemplates.SingleAsync(p => p.Id == active.GradingPromptId));
+        var transcription = await api.QueryAsync(db => db.PromptTemplates.SingleAsync(p => p.Id == active.TranscriptionPromptId));
+        var version = await api.QueryAsync(db => db.PromptTemplates.Where(p => p.Kind == PromptKind.Grading).MaxAsync(p => p.Version));
+        var legacy = PromptTemplate.Create(PromptKind.Grading, version + 1, current.SystemText, legacyUser, DateTimeOffset.UtcNow);
+        var profile = GradingProfile.Draft(
+            active.ExamId, active.EssayTypeId, active.Version + 1, transcription, legacy,
+            active.RubricVersionId, active.GuidelinesVersionId, active.WritingRulesVersionId,
+            active.TranscriptionModel, active.GradingModel, DateTimeOffset.UtcNow);
+        profile.Activate(DateTimeOffset.UtcNow);
+        await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == active.Id)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Retired)));
+        await api.QueryAsync(async db =>
+        {
+            db.PromptTemplates.Add(legacy);
+            db.GradingProfiles.Add(profile);
+            return await db.SaveChangesAsync();
+        });
+
+        try
+        {
+            await RunAsync(JobTypes.Grade);
+
+            Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+            Assert.StartsWith(
+                "<proposta titulo=\"Algoritmos e o debate público\" tipo=\"Dissertação em prosa\" linhas_min=\"\" linhas_max=\"30\" titulo_obrigatorio=\"ver instruções\">\n",
+                api.Grader.LastRequest!.Proposal.ReplaceLineEndings("\n"));
+        }
+        finally
+        {
+            await api.QueryAsync(db => db.Corrections.Where(c => c.GradingProfileId == profile.Id)
+                .ExecuteUpdateAsync(c => c.SetProperty(x => x.GradingProfileId, active.Id)));
+            await api.QueryAsync(db => db.Essays.Where(e => e.GradingProfileId == profile.Id)
+                .ExecuteUpdateAsync(e => e.SetProperty(x => x.GradingProfileId, (Guid?)active.Id)));
+            await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == profile.Id).ExecuteDeleteAsync());
+            await api.QueryAsync(db => db.PromptTemplates.Where(p => p.Id == legacy.Id).ExecuteDeleteAsync());
+            await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == active.Id)
+                .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Active)));
+        }
+    }
+
+    [Fact]
     public async Task Blank_lines_do_not_count_as_written_lines()
     {
         await QueuedEssayAsync("Primeira linha da redação.", "", "Terceira linha da redação.", "   ");
@@ -400,7 +455,7 @@ public class GradingTests(ApiFixture api)
 
         var shown = await student.Client.GetFromJsonAsync<JsonElement>(path);
         Assert.Equal((27, 40), (shown.GetProperty("score").GetInt32(), shown.GetProperty("maxScore").GetInt32()));
-        Assert.Equal("Fuvest – Dissertação – Algoritmos e o debate público", shown.GetProperty("title").GetString());
+        Assert.Equal("Fuvest – Dissertação em prosa – Algoritmos e o debate público", shown.GetProperty("title").GetString());
         Assert.Equal((1, "Fuvest", 30), (shown.GetProperty("version").GetInt32(), shown.GetProperty("examName").GetString(), shown.GetProperty("sheetLines").GetInt32()));
         Assert.Equal((JsonValueKind.Null, JsonValueKind.Null, JsonValueKind.Null), (
             shown.GetProperty("scoreDelta").ValueKind, shown.GetProperty("previousVersionScore").ValueKind, shown.GetProperty("feedback").ValueKind));

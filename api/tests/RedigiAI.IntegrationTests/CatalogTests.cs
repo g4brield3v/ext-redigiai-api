@@ -32,10 +32,12 @@ public class CatalogTests(ApiFixture api)
         Assert.Equal("Algoritmos e o debate público", prompt.GetProperty("title").GetString());
         Assert.Equal("Fuvest", prompt.GetProperty("examName").GetString());
         Assert.Equal(4, prompt.GetProperty("textCount").GetInt32());
-        Assert.Equal(("Dissertação em prosa", "Dissertação"), (prompt.GetProperty("genreLabel").GetString(), prompt.GetProperty("essayTypeName").GetString()));
-        Assert.Equal((20, 30, true), (prompt.GetProperty("minLines").GetInt32(), prompt.GetProperty("maxLines").GetInt32(), prompt.GetProperty("titleRequired").GetBoolean()));
-        // O aluno não escolhe tipo: a lista não oferece tipos.
+        var essayType = prompt.GetProperty("essayType");
+        Assert.Equal(("dissertacao-em-prosa", "Dissertação em prosa"), (essayType.GetProperty("slug").GetString(), essayType.GetProperty("name").GetString()));
+        // O aluno não escolhe tipo: a lista não oferece tipos. Linhas e título ficam nos itens das Instruções.
         Assert.False(prompt.TryGetProperty("essayTypes", out _));
+        Assert.False(prompt.TryGetProperty("genreLabel", out _));
+        Assert.False(prompt.TryGetProperty("minLines", out _));
     }
 
     [Theory]
@@ -70,11 +72,10 @@ public class CatalogTests(ApiFixture api)
         Assert.Equal(("fuvest", 30, 1, "published"), (
             prompt.GetProperty("examSlug").GetString(), prompt.GetProperty("sheetLines").GetInt32(),
             prompt.GetProperty("version").GetInt32(), prompt.GetProperty("status").GetString()));
-        Assert.Equal(("Dissertação em prosa", "Dissertação", "Fuvest – Dissertação – Algoritmos e o debate público"), (
-            prompt.GetProperty("genreLabel").GetString(), prompt.GetProperty("essayTypeName").GetString(), prompt.GetProperty("essayTitle").GetString()));
-        Assert.Equal((20, 30, true, 4), (
-            prompt.GetProperty("minLines").GetInt32(), prompt.GetProperty("maxLines").GetInt32(),
-            prompt.GetProperty("titleRequired").GetBoolean(), prompt.GetProperty("textCount").GetInt32()));
+        Assert.Equal(("Dissertação em prosa", "Fuvest – Dissertação em prosa – Algoritmos e o debate público"), (
+            prompt.GetProperty("essayType").GetProperty("name").GetString(), prompt.GetProperty("essayTitle").GetString()));
+        Assert.Equal(4, prompt.GetProperty("textCount").GetInt32());
+        Assert.False(prompt.TryGetProperty("titleRequired", out _));
         var blocks = prompt.GetProperty("blocks").EnumerateArray().ToList();
         Assert.Equal([10, 20, 30, 40, 50, 60], blocks.Select(b => b.GetProperty("position").GetInt32()));
         Assert.Equal(

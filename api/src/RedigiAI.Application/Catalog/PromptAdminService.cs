@@ -43,6 +43,9 @@ public interface IPromptAdminService
 
     /// <summary>Guarda uma imagem de proposta (JPG, PNG ou WebP, até 5 MB) na pasta pública.</summary>
     Task<PromptImageDto> UploadImageAsync(Guid adminId, PromptImageUpload upload, CancellationToken ct);
+
+    /// <summary>As categorias de correção do vestibular, para a lista do cartão Instruções.</summary>
+    Task<IReadOnlyList<EssayTypeOptionDto>> ListEssayTypesAsync(string examSlug, CancellationToken ct);
 }
 
 internal sealed class PromptAdminService(
@@ -161,7 +164,6 @@ internal sealed class PromptAdminService(
                 item.Version,
                 item.Status,
                 item.Title,
-                item.GenreLabel,
                 item.EssayTypeId is { } typeId && typeNames.TryGetValue(typeId, out var name) ? name : null,
                 item.TextCount,
                 item.UpdatedAt))
@@ -193,8 +195,6 @@ internal sealed class PromptAdminService(
             prompt.Summary,
             prompt.SourceLabel,
             types.FirstOrDefault(type => type.Id == prompt.EssayTypeId)?.Slug,
-            prompt.GenreLabel,
-            new PromptSheetDto(prompt.SheetLinesMin, prompt.SheetLinesMax, prompt.TitleRequired),
             [.. prompt.Blocks.Select(block => ToDto(block, imageIds))],
             new PromptNotesDto(
                 NullIfEmpty(prompt.GradingNotes.ExpectedFocus),
@@ -357,6 +357,18 @@ internal sealed class PromptAdminService(
         return new PromptImageDto(id, images.PublicUrl(publicId), stored.Width, stored.Height);
     }
 
+    public async Task<IReadOnlyList<EssayTypeOptionDto>> ListEssayTypesAsync(string examSlug, CancellationToken ct)
+    {
+        var exam = await exams.FindBySlugAsync(examSlug, ct) ?? throw Errors.NotFound();
+        var options = new List<EssayTypeOptionDto>();
+        foreach (var type in (await essayTypes.ListByExamAsync(exam.Id, ct)).OrderBy(type => type.Name, StringComparer.Ordinal))
+        {
+            options.Add(new EssayTypeOptionDto(type.Slug, type.Name, await profiles.FindActiveAsync(exam.Id, type.Id, ct) is not null));
+        }
+
+        return options;
+    }
+
     /// <summary>Endereço a partir do título: minúsculas, sem acento, com hífen entre as palavras.</summary>
     internal static string Slugify(string? title)
     {
@@ -482,10 +494,6 @@ internal sealed class PromptAdminService(
             document.Summary,
             document.SourceLabel,
             essayTypeId,
-            document.GenreLabel,
-            document.Sheet?.MinLines,
-            document.Sheet?.MaxLines,
-            document.Sheet?.TitleRequired ?? false,
             blocks,
             new PromptNotesContent(notes?.ExpectedFocus, notes?.TangentSignals, notes?.OffTopicSignals, notes?.KeyData, notes?.Extra));
     }
@@ -505,6 +513,15 @@ internal sealed class PromptAdminService(
             Title = data.Title,
             Items = data.Items,
             Text = data.Text,
+            CardItems = data.CardItems?.Select(item => new PromptCardItem
+            {
+                Format = item?.Format,
+                Body = item?.Body,
+                AssetId = item?.AssetId,
+                Alt = item?.Alt,
+                AiDescription = item?.AiDescription,
+                Caption = item?.Caption,
+            }).ToList(),
         };
 
     private PromptBlockDto ToDto(PromptBlock block, IReadOnlyDictionary<Guid, string> imageIds)
@@ -527,12 +544,25 @@ internal sealed class PromptAdminService(
                 Title = data.Title,
                 Items = data.Items,
                 Text = data.Text,
-                ImageUrl = data.AssetId is { } assetId && imageIds.TryGetValue(assetId, out var publicId) ? images.PublicUrl(publicId) : null,
+                CardItems = data.CardItems?.Select(item => new PromptCardItemDto
+                {
+                    Format = item.Format,
+                    Body = item.Body,
+                    AssetId = item.AssetId,
+                    Alt = item.Alt,
+                    AiDescription = item.AiDescription,
+                    Caption = item.Caption,
+                    ImageUrl = ImageUrl(item.AssetId, imageIds),
+                }).ToList(),
+                ImageUrl = ImageUrl(data.AssetId, imageIds),
             });
     }
 
+    private string? ImageUrl(Guid? assetId, IReadOnlyDictionary<Guid, string> imageIds) =>
+        assetId is { } id && imageIds.TryGetValue(id, out var publicId) ? images.PublicUrl(publicId) : null;
+
     private Task<IReadOnlyDictionary<Guid, string>> ImageIdsAsync(Prompt prompt, CancellationToken ct) =>
-        assets.PromptImagePublicIdsAsync([.. prompt.Blocks.Select(block => block.Data.AssetId).OfType<Guid>().Distinct()], ct);
+        assets.PromptImagePublicIdsAsync([.. prompt.Blocks.SelectMany(block => block.Data.AssetIds()).Distinct()], ct);
 
     private async Task<PublicationContext> ContextAsync(Prompt prompt, CancellationToken ct)
     {
@@ -546,7 +576,7 @@ internal sealed class PromptAdminService(
         var hasProfile = prompt.EssayTypeId is { } typeId
             && types.Any(type => type.Id == typeId)
             && await profiles.FindActiveAsync(exam.Id, typeId, ct) is not null;
-        return new PublicationContext(hasProfile, exam.SheetLines, imageIds.Keys.ToHashSet());
+        return new PublicationContext(hasProfile, imageIds.Keys.ToHashSet());
     }
 
     private static IReadOnlyList<PromptIssueDto> IssuesOf(Prompt prompt, PublicationContext context) =>
@@ -593,6 +623,7 @@ internal static class PromptBlockKinds
     private static readonly Dictionary<string, PromptBlockKind> Kinds = new(StringComparer.Ordinal)
     {
         ["collection_item"] = PromptBlockKind.CollectionItem,
+        ["card"] = PromptBlockKind.Card,
         ["command"] = PromptBlockKind.Command,
         ["instructions"] = PromptBlockKind.Instructions,
         ["heading"] = PromptBlockKind.Heading,

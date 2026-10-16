@@ -133,12 +133,8 @@ internal sealed class PromptRepository(AppDbContext db) : IPromptRepository
             p.Title,
             p.Summary,
             p.EssayTypeId,
-            p.GenreLabel,
             p.Blocks.Count(b => b.Kind == PromptBlockKind.CollectionItem),
-            p.UpdatedAt,
-            p.SheetLinesMin,
-            p.SheetLinesMax,
-            p.TitleRequired));
+            p.UpdatedAt));
 
     public async Task<int> MaxVersionAsync(string slug, CancellationToken ct) =>
         await db.Prompts.Where(p => p.Slug == slug).MaxAsync(p => (int?)p.Version, ct) ?? 0;

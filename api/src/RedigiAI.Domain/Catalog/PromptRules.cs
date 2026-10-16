@@ -19,9 +19,8 @@ public static partial class PromptRules
     public const int MaxSlugLength = 80;
     public const int MaxSummaryLength = 300;
     public const int MaxSourceLabelLength = 200;
-    public const int MinGenreLength = 3;
-    public const int MaxGenreLength = 80;
     public const int MaxColumns = 4;
+    public const int CardItemCount = 3;
     public const int MaxVersesPerColumn = 200;
     public const int MaxAltLength = 300;
     public const int MinAiDescriptionLength = 40;
@@ -51,11 +50,6 @@ public static partial class PromptRules
         CheckText(issues, "title", content.Title, MaxTitleLength);
         CheckText(issues, "summary", content.Summary, MaxSummaryLength);
         CheckText(issues, "sourceLabel", content.SourceLabel, MaxSourceLabelLength);
-        CheckText(issues, "genreLabel", content.GenreLabel, MaxGenreLength);
-        if (content.MinLines is < 0 || content.MaxLines is < 0)
-        {
-            issues.Add(new ValidationIssue("sheet", "O número de linhas não pode ser negativo."));
-        }
 
         if (content.Blocks.Count > MaxBlocks)
         {
@@ -76,6 +70,11 @@ public static partial class PromptRules
             }
 
             var data = PromptBlockData.For(block.Kind, block.Data);
+            if (block.Kind == PromptBlockKind.Card && data.CardItems?.Count != CardItemCount)
+            {
+                issues.Add(new ValidationIssue($"blocks[{index}].data.cardItems", $"Um card tem exatamente {CardItemCount} itens."));
+            }
+
             if (data.Columns is { Count: > MaxColumns })
             {
                 issues.Add(new ValidationIssue($"blocks[{index}].data.columns", $"Um texto em verso pode ter até {MaxColumns} colunas."));
@@ -178,13 +177,6 @@ public static partial class PromptRules
             issues.Add(new ValidationIssue("essayType", "Instruções: essa categoria não tem perfil de correção ativo neste vestibular."));
         }
 
-        if (prompt.GenreLabel is not { Length: >= MinGenreLength and <= MaxGenreLength })
-        {
-            issues.Add(new ValidationIssue(
-                "genreLabel", $"Instruções: escreva o tipo de redação como na prova, com {MinGenreLength} a {MaxGenreLength} caracteres."));
-        }
-
-        CheckSheet(issues, prompt, context);
         CheckBlocks(issues, prompt, context);
 
         if (prompt.GradingNotes.ExpectedFocus.Length == 0)
@@ -198,23 +190,6 @@ public static partial class PromptRules
         }
 
         return issues;
-    }
-
-    private static void CheckSheet(List<ValidationIssue> issues, Prompt prompt, PublicationContext context)
-    {
-        if (prompt.SheetLinesMin is not { } min || prompt.SheetLinesMax is not { } max)
-        {
-            issues.Add(new ValidationIssue("sheet", "Instruções: informe o mínimo e o máximo de linhas."));
-        }
-        else if (min < 1 || min > max)
-        {
-            issues.Add(new ValidationIssue("sheet.minLines", "Instruções: o mínimo de linhas vai de 1 até o máximo."));
-        }
-        else if (max > context.ExamSheetLines)
-        {
-            issues.Add(new ValidationIssue(
-                "sheet.maxLines", $"Instruções: o máximo de linhas não passa das {context.ExamSheetLines} linhas da folha do vestibular."));
-        }
     }
 
     private static void CheckBlocks(List<ValidationIssue> issues, Prompt prompt, PublicationContext context)
@@ -246,6 +221,9 @@ public static partial class PromptRules
             {
                 case PromptBlockKind.CollectionItem:
                     CheckCollectionItem(issues, data, path, labels, context);
+                    break;
+                case PromptBlockKind.Card:
+                    CheckCard(issues, data, path, context);
                     break;
                 case PromptBlockKind.Command when data.Body is null:
                     issues.Add(new ValidationIssue($"{path}.body", "Comando: escreva o enunciado."));
@@ -291,28 +269,57 @@ public static partial class PromptRules
                 issues.Add(new ValidationIssue($"{path}.columns", $"{name}: de 1 a {MaxColumns} colunas, cada uma com ao menos um verso."));
                 break;
             case CollectionFormat.Image:
-                if (data.AssetId is not { } assetId || !context.PromptImageAssetIds.Contains(assetId))
-                {
-                    issues.Add(new ValidationIssue($"{path}.assetId", $"{name}: envie a imagem."));
-                }
-
-                if (data.Alt is not { Length: <= MaxAltLength })
-                {
-                    issues.Add(new ValidationIssue($"{path}.alt", $"{name}: texto alternativo obrigatório, com até {MaxAltLength} caracteres."));
-                }
-
-                if (data.AiDescription is not { Length: >= MinAiDescriptionLength and <= MaxAiDescriptionLength })
-                {
-                    issues.Add(new ValidationIssue(
-                        $"{path}.aiDescription",
-                        $"{name}: descrição para a IA obrigatória (mínimo de {MinAiDescriptionLength} caracteres, máximo de {Thousands(MaxAiDescriptionLength)})."));
-                }
-
+                CheckImage(issues, data.AssetId, data.Alt, data.AiDescription, path, name, context);
                 break;
             case not null when !CollectionFormat.IsKnown(data.Format):
             case null:
                 issues.Add(new ValidationIssue($"{path}.format", $"{name}: escolha o formato (texto, verso ou imagem)."));
                 break;
+        }
+    }
+
+    private static void CheckCard(List<ValidationIssue> issues, PromptBlockData data, string path, PublicationContext context)
+    {
+        // Que são exatamente 3 itens, o salvamento já garante.
+        var items = data.CardItems ?? [];
+        for (var index = 0; index < items.Count; index++)
+        {
+            var (item, itemPath, name) = (items[index], $"{path}.cardItems[{index}]", $"Card, item {index + 1}");
+            switch (item.Format)
+            {
+                case CardItemFormat.Text when item.Body is null:
+                    issues.Add(new ValidationIssue($"{itemPath}.body", $"{name}: escreva o texto."));
+                    break;
+                case CardItemFormat.Image:
+                    CheckImage(issues, item.AssetId, item.Alt, item.AiDescription, itemPath, name, context);
+                    break;
+                case not null when !CardItemFormat.IsKnown(item.Format):
+                case null:
+                    issues.Add(new ValidationIssue($"{itemPath}.format", $"{name}: escolha o formato (texto ou imagem)."));
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Imagem de proposta: o arquivo enviado, o texto alternativo e a descrição para a IA.</summary>
+    private static void CheckImage(
+        List<ValidationIssue> issues, Guid? assetId, string? alt, string? aiDescription, string path, string name, PublicationContext context)
+    {
+        if (assetId is not { } id || !context.PromptImageAssetIds.Contains(id))
+        {
+            issues.Add(new ValidationIssue($"{path}.assetId", $"{name}: envie a imagem."));
+        }
+
+        if (alt is not { Length: <= MaxAltLength })
+        {
+            issues.Add(new ValidationIssue($"{path}.alt", $"{name}: texto alternativo obrigatório, com até {MaxAltLength} caracteres."));
+        }
+
+        if (aiDescription is not { Length: >= MinAiDescriptionLength and <= MaxAiDescriptionLength })
+        {
+            issues.Add(new ValidationIssue(
+                $"{path}.aiDescription",
+                $"{name}: descrição para a IA obrigatória (mínimo de {MinAiDescriptionLength} caracteres, máximo de {Thousands(MaxAiDescriptionLength)})."));
         }
     }
 

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Essays;
 
@@ -6,8 +7,12 @@ namespace RedigiAI.Application.Essays;
 /// <param name="Fields">Campos que o navegador envia ao provedor junto com o arquivo.</param>
 public sealed record UploadSignatureDto(Guid AssetId, string UploadUrl, IReadOnlyDictionary<string, string> Fields);
 
-/// <summary>Uma redação do envio. Sem tipo: o backend usa o da proposta.</summary>
+/// <summary>
+/// Uma redação do envio. Sem tipo: o backend usa o da proposta. Qualquer campo a mais (um tipo, por exemplo) recusa
+/// o pedido inteiro.
+/// </summary>
 /// <param name="PromptId">A versão publicada da proposta; numa reescrita vale a versão da redação original.</param>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record BatchEssayItem(Guid PromptId, Guid AssetId, Guid? ParentEssayId);
 
 public sealed record SubmitEssaysCommand(

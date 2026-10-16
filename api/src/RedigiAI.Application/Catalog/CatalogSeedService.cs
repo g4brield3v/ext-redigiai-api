@@ -87,7 +87,8 @@ internal sealed class CatalogSeedService(
         exams.Add(Exam.Create("unicamp", "Unicamp", ExamStatus.ComingSoon, sheetLines: 30, position: 2));
         exams.Add(Exam.Create("enem", "Enem", ExamStatus.ComingSoon, sheetLines: 30, position: 3));
 
-        var dissertacao = EssayType.Create(fuvest.Id, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
+        // As categorias de correção: o nome é o tipo de redação que o aluno vê e o que entra no título da redação.
+        var dissertacao = EssayType.Create(fuvest.Id, "dissertacao-em-prosa", "Dissertação em prosa", "Texto dissertativo-argumentativo");
         var narrativa = EssayType.Create(fuvest.Id, "narrativa", "Narrativa", "Texto narrativo com reflexão");
         essayTypes.Add(dissertacao);
         essayTypes.Add(narrativa);
@@ -103,7 +104,7 @@ internal sealed class CatalogSeedService(
     {
         if (await exams.FindBySlugAsync("fuvest", ct) is not { } fuvest
             || await prompts.AnyAsync(fuvest.Id, ct)
-            || (await essayTypes.ListByExamAsync(fuvest.Id, ct)).FirstOrDefault(type => type.Slug == "dissertacao") is not { } dissertacao)
+            || (await essayTypes.ListByExamAsync(fuvest.Id, ct)).FirstOrDefault(type => type.Slug == "dissertacao-em-prosa") is not { } dissertacao)
         {
             return false;
         }
@@ -125,10 +126,6 @@ internal sealed class CatalogSeedService(
                 "[Resumo da proposta, para o cartão da lista.]",
                 "Exemplo",
                 dissertacao.Id,
-                "Dissertação em prosa",
-                MinLines: 20,
-                MaxLines: fuvest.SheetLines,
-                TitleRequired: true,
                 [
                     Text(10, "Texto 1", "[Trecho do texto 1, como aparece na proposta da prova.]"),
                     Text(20, "Texto 2", "[Trecho do texto 2.]"),
@@ -147,13 +144,18 @@ internal sealed class CatalogSeedService(
                     new(null, 60, PromptBlockKind.Instructions, new PromptBlockData
                     {
                         Title = "Instruções",
-                        Items = ["[Instrução da proposta para o texto dissertativo-argumentativo.]"],
+                        Items =
+                        [
+                            "[Instrução da proposta para o texto dissertativo-argumentativo.]",
+                            $"Escreva, no mínimo, 20 linhas e não ultrapasse as {fuvest.SheetLines} linhas da folha de redação.",
+                            "Dê um título a sua redação.",
+                        ],
                     }),
                 ],
                 new PromptNotesContent("[Recorte que a banca espera do tema.]", "[O que caracteriza tangenciar o tema.]", null, null, null)),
             createdBy: null,
             now);
-        prompt.Publish(new PublicationContext(true, fuvest.SheetLines, new HashSet<Guid>()), publishedBy: null, now);
+        prompt.Publish(new PublicationContext(true, new HashSet<Guid>()), publishedBy: null, now);
         prompts.Add(prompt);
 
         return true;

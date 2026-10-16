@@ -10,7 +10,7 @@ public class PromptTests
     private static readonly Guid ExamId = Guid.CreateVersion7();
     private static readonly Guid EssayTypeId = Guid.CreateVersion7();
     private static readonly Guid ImageId = Guid.CreateVersion7();
-    private static readonly PublicationContext Context = new(true, 30, new HashSet<Guid> { ImageId });
+    private static readonly PublicationContext Context = new(true, new HashSet<Guid> { ImageId });
 
     private const string AiDescription = "Tirinha em três quadros: duas cobras numa ladeira e uma roda que desce.";
 
@@ -55,6 +55,18 @@ public class PromptTests
         PromptBlockKind.Instructions,
         new PromptBlockData { Title = "Instruções", Items = ["Escreva, no mínimo, 20 linhas.", "Dê um título a sua redação."] });
 
+    private static PromptCardItem TextItem(string? body = "A ciência brasileira publica cada vez mais.") =>
+        new() { Format = CardItemFormat.Text, Body = body, Caption = "Fonte: CNPq, 2024." };
+
+    private static PromptCardItem ImageItem() =>
+        new() { Format = CardItemFormat.Image, AssetId = ImageId, Alt = "Gráfico de barras.", AiDescription = AiDescription };
+
+    private static PromptBlockContent Card(int position = 65, params PromptCardItem[] items) => new(
+        null,
+        position,
+        PromptBlockKind.Card,
+        new PromptBlockData { Title = "Para refletir", CardItems = items.Length == 0 ? [TextItem(), ImageItem(), TextItem("Terceiro.")] : items });
+
     private static PromptNotesContent Notes { get; } = new(
         "Ponto de vista sobre a função da ciência hoje.",
         "Fala de tecnologia em geral sem discutir o papel da ciência.",
@@ -70,10 +82,6 @@ public class PromptTests
         "Coletânea com tirinha, poema e três textos em prosa.",
         "Fuvest (prova anterior)",
         EssayTypeId,
-        "Dissertação em prosa",
-        20,
-        30,
-        TitleRequired: true,
         blocks.Length == 0 ? [Image(), Prose(), Verse(), Command(), Instructions()] : blocks,
         Notes);
 
@@ -109,21 +117,21 @@ public class PromptTests
     [Fact]
     public void Empty_draft_is_saved_and_lists_what_is_missing()
     {
-        var empty = new PromptContent(ExamId, "rascunho", null, null, null, null, null, null, null, false, [], PromptNotesContent.Empty);
+        var empty = new PromptContent(ExamId, "rascunho", null, null, null, null, [], PromptNotesContent.Empty);
 
         var issues = IssuesOf(empty).Select(issue => issue.Path).ToList();
 
         Assert.Equal(
-            ["title", "essayType", "genreLabel", "sheet", "blocks", "blocks", "blocks", "gradingNotes.expectedFocus", "gradingNotes.tangentSignals"],
+            ["title", "essayType", "blocks", "blocks", "blocks", "gradingNotes.expectedFocus", "gradingNotes.tangentSignals"],
             issues);
     }
 
     [Fact]
     public void Draft_with_issues_is_not_published()
     {
-        var prompt = Prompt.Draft(Complete() with { GenreLabel = null }, null, Now);
+        var prompt = Prompt.Draft(Complete() with { EssayTypeId = null }, null, Now);
 
-        AssertRefused(() => prompt.Publish(Context, null, Now), "genreLabel");
+        AssertRefused(() => prompt.Publish(Context, null, Now), "essayType");
         Assert.Equal(PromptStatus.Draft, prompt.Status);
     }
 
@@ -153,28 +161,13 @@ public class PromptTests
     public void Slug_has_only_lowercase_letters_digits_and_hyphens(string slug, bool accepted) =>
         Assert.Equal(accepted, IssuesOf(Complete() with { Slug = slug }).All(issue => issue.Path != "slug"));
 
-    // Regra 2: categoria de correção com perfil ativo; gênero de 3 a 80 caracteres.
+    // Regra 2: categoria de correção com perfil ativo. O tipo de redação é o nome dela; não há texto livre.
     [Fact]
     public void Essay_type_needs_an_active_grading_profile()
     {
         AssertIssue(Complete() with { EssayTypeId = null }, "essayType");
         AssertIssue(Complete(), "essayType", Context with { EssayTypeHasActiveProfile = false });
         Assert.Empty(IssuesOf(Complete()));
-    }
-
-    [Theory]
-    [InlineData("Dissertação em prosa", true)]
-    [InlineData("Ata", true)]
-    [InlineData("Ab", false)]
-    [InlineData(null, false)]
-    public void Genre_label_has_3_to_80_characters(string? genre, bool accepted) =>
-        Assert.Equal(accepted, IssuesOf(Complete() with { GenreLabel = genre }).All(issue => issue.Path != "genreLabel"));
-
-    [Fact]
-    public void Genre_label_with_more_than_80_characters_is_not_even_saved()
-    {
-        Assert.Empty(IssuesOf(Complete() with { GenreLabel = new string('a', 80) }));
-        AssertRefused(() => Prompt.Draft(Complete() with { GenreLabel = new string('a', 81) }, null, Now), "genreLabel");
     }
 
     // Regra 3: ao menos um texto da coletânea, exatamente um bloco de instruções e ao menos um comando.
@@ -256,18 +249,88 @@ public class PromptTests
         AssertIssue(Complete(block, Command(), Instructions()), "blocks[0].data.format");
     }
 
-    // Regra 6: mínimo ≤ máximo ≤ linhas da folha do vestibular.
+    // Regra 6: card com exatamente 3 itens; texto exige o corpo, imagem as mesmas regras da coletânea.
+    [Fact]
+    public void Complete_card_has_no_issues()
+    {
+        Assert.Empty(IssuesOf(Complete(Prose(), Card(), Command(), Instructions())));
+        Assert.Empty(IssuesOf(Complete(Prose(), Card(65, ImageItem(), ImageItem(), ImageItem()), Command(), Instructions())));
+    }
+
     [Theory]
-    [InlineData(20, 30, true)]
-    [InlineData(30, 30, true)]
-    [InlineData(1, 1, true)]
-    [InlineData(25, 20, false)]
-    [InlineData(20, 31, false)]
-    [InlineData(0, 30, false)]
-    [InlineData(null, 30, false)]
-    [InlineData(20, null, false)]
-    public void Sheet_lines_fit_the_exam_sheet(int? min, int? max, bool accepted) =>
-        Assert.Equal(accepted, IssuesOf(Complete() with { MinLines = min, MaxLines = max }).Count == 0);
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void Card_without_exactly_3_items_is_not_even_saved(int count)
+    {
+        var card = Card(65, [.. Enumerable.Repeat(TextItem(), count)]);
+        if (count == 0)
+        {
+            card = card with { Data = card.Data with { CardItems = null } };
+        }
+
+        var error = AssertRefused(() => Prompt.Draft(Complete(Prose(), card, Command(), Instructions()), null, Now), "blocks[2].data.cardItems");
+        Assert.Equal(422, error.HttpStatus);
+    }
+
+    [Fact]
+    public void Card_text_item_needs_the_body()
+    {
+        var card = Card(65, TextItem(), TextItem(" "), TextItem());
+
+        AssertIssue(Complete(Prose(), card, Command(), Instructions()), "blocks[2].data.cardItems[1].body");
+    }
+
+    [Fact]
+    public void Card_image_item_follows_the_collection_image_rules()
+    {
+        PromptBlockContent With(Func<PromptCardItem, PromptCardItem> change) => Card(65, TextItem(), change(ImageItem()), TextItem());
+
+        AssertIssue(Complete(Prose(), With(i => i with { AiDescription = null }), Command(), Instructions()), "blocks[2].data.cardItems[1].aiDescription");
+        AssertIssue(Complete(Prose(), With(i => i with { AiDescription = new string('a', 39) }), Command(), Instructions()), "blocks[2].data.cardItems[1].aiDescription");
+        AssertIssue(Complete(Prose(), With(i => i with { Alt = null }), Command(), Instructions()), "blocks[2].data.cardItems[1].alt");
+        AssertIssue(Complete(Prose(), With(i => i with { AssetId = Guid.CreateVersion7() }), Command(), Instructions()), "blocks[2].data.cardItems[1].assetId");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("video")]
+    public void Card_item_needs_a_known_format(string? format)
+    {
+        var card = Card(65, TextItem() with { Format = format }, TextItem(), TextItem());
+
+        AssertIssue(Complete(Prose(), card, Command(), Instructions()), "blocks[2].data.cardItems[0].format");
+    }
+
+    [Fact]
+    public void Card_text_is_checked_for_markup_and_counts_in_the_limits()
+    {
+        var card = Card(65, TextItem("a < b"), TextItem(), TextItem());
+
+        AssertRefused(() => Prompt.Draft(Complete(Prose(), card, Command(), Instructions()), null, Now), "blocks[2].data");
+        var tooLong = Card(65, TextItem(new string('a', 6001)), TextItem(), TextItem());
+        AssertRefused(() => Prompt.Draft(Complete(Prose(), tooLong, Command(), Instructions()), null, Now), "blocks[2].data");
+    }
+
+    [Fact]
+    public void Card_items_keep_only_the_fields_of_their_format()
+    {
+        var mixed = new PromptCardItem
+        {
+            Format = CardItemFormat.Text, Body = " Corpo ", AssetId = ImageId, Alt = "alt", AiDescription = AiDescription, Caption = " ",
+        };
+        var data = PromptBlockData.For(
+            PromptBlockKind.Card,
+            new PromptBlockData { Title = " ", Body = "fora", CardItems = [mixed, mixed with { Format = CardItemFormat.Image }, mixed] });
+
+        Assert.Null(data.Title);
+        Assert.Null(data.Body);
+        Assert.Equal(new PromptCardItem { Format = CardItemFormat.Text, Body = "Corpo" }, data.CardItems![0]);
+        Assert.Equal(
+            new PromptCardItem { Format = CardItemFormat.Image, AssetId = ImageId, Alt = "alt", AiDescription = AiDescription },
+            data.CardItems[1]);
+        Assert.Equal([ImageId], data.AssetIds());
+    }
 
     // Regra 7: abordagens esperadas com o recorte e os sinais de tangenciamento.
     [Fact]

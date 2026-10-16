@@ -56,6 +56,15 @@ public sealed class AdminPromptsController(IPromptAdminService prompts) : Contro
     }
 
     /// <summary>
+    /// As categorias de correção do vestibular, para a lista do cartão Instruções, com a indicação de quais têm
+    /// perfil de correção ativo. Vestibular desconhecido responde 404.
+    /// </summary>
+    [HttpGet("exams/{slug}/essay-types", Name = "listEssayTypes")]
+    [ProducesResponseType<IReadOnlyList<EssayTypeOptionDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListEssayTypes(string slug, CancellationToken ct) =>
+        Ok(await prompts.ListEssayTypesAsync(slug, ct));
+
+    /// <summary>
     /// Cria um rascunho, vazio ou a partir do JSON completo da proposta (importação). Exige <c>Idempotency-Key</c>;
     /// repetir a chave devolve o mesmo rascunho.
     /// </summary>

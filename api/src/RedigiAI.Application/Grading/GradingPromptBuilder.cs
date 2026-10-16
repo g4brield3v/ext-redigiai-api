@@ -49,14 +49,19 @@ internal static partial class GradingPromptBuilder
         });
 
         var proposal = layers.Proposal;
-        var genre = PromptText.Genre(proposal, layers.EssayType);
+        // O tipo de redação é o nome da categoria de correção da proposta.
+        var genre = layers.EssayType.Name;
         var user = Fill(layers.Prompt.UserText ?? "", new Dictionary<string, string>
         {
             ["prompt_title"] = PromptText.Attribute(proposal.Title),
+            ["essay_type"] = PromptText.Attribute(genre),
+            ["sheet_lines"] = Number(layers.Exam.SheetLines),
+            // Campos das instruções anteriores, que um perfil ainda ativo pode usar: a proposta não tem mais limites
+            // de linha nem título obrigatório no cadastro (essas regras estão nos itens das Instruções).
             ["genre_label"] = PromptText.Attribute(genre),
-            ["min_lines"] = proposal.SheetLinesMin is { } min ? Number(min) : "",
-            ["max_lines"] = proposal.SheetLinesMax is { } max ? Number(max) : "",
-            ["title_required"] = proposal.TitleRequired ? "sim" : "não",
+            ["min_lines"] = "",
+            ["max_lines"] = Number(layers.Exam.SheetLines),
+            ["title_required"] = "ver instruções",
             ["prompt_blocks"] = PromptText.Blocks(proposal, genre),
             ["expected_approaches"] = PromptText.GradingNotes(proposal.GradingNotes),
             ["collection_copy"] = PromptText.CopiedPassages(copiedPassages),

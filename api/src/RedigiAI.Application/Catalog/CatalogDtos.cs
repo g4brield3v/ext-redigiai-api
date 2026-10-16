@@ -6,23 +6,44 @@ namespace RedigiAI.Application.Catalog;
 /// <param name="CurrentRubricVersionId">Grade publicada mais recente; nula em vestibulares "em breve".</param>
 public sealed record ExamDto(string Slug, string Name, ExamStatus Status, int SheetLines, Guid? CurrentRubricVersionId);
 
+/// <summary>Categoria de correção: o nome é o tipo de redação que o aluno vê e o que entra no título da redação.</summary>
+/// <param name="Slug"><c>dissertacao-em-prosa</c> ou <c>narrativa</c>.</param>
+/// <param name="Name">"Dissertação em prosa".</param>
+public sealed record EssayTypeDto(string Slug, string Name);
+
 /// <summary>Uma proposta publicada na lista do vestibular.</summary>
-/// <param name="GenreLabel">O tipo de redação exatamente como a prova pede ("Dissertação em prosa").</param>
-/// <param name="EssayTypeName">A categoria de correção ("Dissertação"), que entra no título da redação.</param>
+/// <param name="EssayType">O tipo de redação da proposta.</param>
 /// <param name="TextCount">Textos da coletânea.</param>
 public sealed record PromptSummaryDto(
     Guid Id,
     string Slug,
     string Title,
     string? Summary,
-    string GenreLabel,
-    string EssayTypeName,
+    EssayTypeDto EssayType,
     int TextCount,
-    int? MinLines,
-    int? MaxLines,
-    bool TitleRequired,
     string ExamSlug,
     string ExamName);
+
+/// <summary>Um item de card para o aluno: texto, ou imagem com o endereço público. Sem a descrição feita para a IA.</summary>
+public sealed record PromptCardItemPublicDto
+{
+    /// <summary><c>text</c> ou <c>image</c>.</summary>
+    public string? Format { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Body { get; init; }
+
+    /// <summary>Endereço público da imagem.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ImageUrl { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Alt { get; init; }
+
+    /// <summary>Legenda ou fonte, abaixo do item.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Caption { get; init; }
+}
 
 /// <summary>Conteúdo de um bloco para o aluno; cada tipo usa só os seus campos. Os textos trazem o markdown mínimo.</summary>
 public sealed record PromptBlockPublicDataDto
@@ -53,16 +74,20 @@ public sealed record PromptBlockPublicDataDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; init; }
 
-    /// <summary>Itens das instruções. O primeiro, "Tipo de redação: …", é montado na tela com <c>genreLabel</c>.</summary>
+    /// <summary>Itens das instruções. O primeiro, "Tipo de redação: …", é montado na tela com <c>essayType.name</c>.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? Items { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Text { get; init; }
+
+    /// <summary>Os 3 itens do card, empilhados na ordem.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<PromptCardItemPublicDto>? CardItems { get; init; }
 }
 
 /// <param name="Kind">
-/// <c>collection_item</c>, <c>command</c>, <c>instructions</c>, <c>heading</c>, <c>paragraph</c> ou <c>divider</c>.
+/// <c>collection_item</c>, <c>card</c>, <c>command</c>, <c>instructions</c>, <c>heading</c>, <c>paragraph</c> ou <c>divider</c>.
 /// </param>
 public sealed record PromptBlockPublicDto(int Position, string Kind, PromptBlockPublicDataDto Data);
 
@@ -77,16 +102,11 @@ public sealed record PromptDetailDto(
     PromptStatus Status,
     string Title,
     string? Summary,
-    string GenreLabel,
-    Guid EssayTypeId,
-    string EssayTypeName,
+    EssayTypeDto EssayType,
     string EssayTitle,
     string ExamSlug,
     string ExamName,
     int SheetLines,
-    int? MinLines,
-    int? MaxLines,
-    bool TitleRequired,
     int TextCount,
     IReadOnlyList<PromptBlockPublicDto> Blocks);
 

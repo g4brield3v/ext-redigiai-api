@@ -21,10 +21,6 @@ public class CollectionCopyTests
             null,
             null,
             Guid.CreateVersion7(),
-            "Dissertação em prosa",
-            20,
-            30,
-            TitleRequired: true,
             [
                 new(null, 10, PromptBlockKind.CollectionItem, new PromptBlockData
                 {
@@ -142,5 +138,37 @@ public class CollectionCopyTests
 
         Assert.Equal(1d, copy.Share);
         Assert.Single(copy.Passages);
+    }
+
+    [Fact]
+    public void Card_text_is_not_part_of_the_collection_copy_check()
+    {
+        const string cardText = "O investimento federal em pesquisa caiu pela metade entre os anos de 2015 e 2024 no país.";
+        var withCard = Prompt.Draft(
+            new PromptContent(
+                Guid.CreateVersion7(),
+                "card",
+                "Tema com card",
+                null,
+                null,
+                Guid.CreateVersion7(),
+                [
+                    new(null, 10, PromptBlockKind.Card, new PromptBlockData
+                    {
+                        CardItems =
+                        [
+                            new PromptCardItem { Format = CardItemFormat.Text, Body = cardText },
+                            new PromptCardItem { Format = CardItemFormat.Text, Body = "Segundo." },
+                            new PromptCardItem { Format = CardItemFormat.Text, Body = "Terceiro." },
+                        ],
+                    }),
+                ],
+                PromptNotesContent.Empty),
+            createdBy: null,
+            Now);
+
+        var copy = CollectionCopyDetector.Find(withCard, [new TranscribedLine(1, cardText, false)], minWords: 8);
+
+        Assert.Empty(copy.Passages);
     }
 }

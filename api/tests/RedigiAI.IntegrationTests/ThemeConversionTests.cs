@@ -90,13 +90,16 @@ public class ThemeConversionTests(ApiFixture api)
         var v2 = prompts.Single(p => p.Id == revision);
         var v1Narrativa = prompts.Single(p => p.Version == 1 && p.EssayTypeId == narrativa);
         var v2Narrativa = prompts.Single(p => p.Version == 2 && p.EssayTypeId == narrativa);
-        Assert.Equal((1, PromptStatus.Archived, dissertacao, "Dissertação"), (v1.Version, v1.Status, v1.EssayTypeId, v1.GenreLabel));
+        Assert.Equal((1, PromptStatus.Archived, dissertacao), (v1.Version, v1.Status, v1.EssayTypeId));
         Assert.Equal((v1.Slug, 2, PromptStatus.Published), (v2.Slug, v2.Version, v2.Status));
         Assert.Equal(($"{v1.Slug}-narrativa", PromptStatus.Archived), (v1Narrativa.Slug, v1Narrativa.Status));
         Assert.Equal(($"{v1.Slug}-narrativa", PromptStatus.Published), (v2Narrativa.Slug, v2Narrativa.Status));
         Assert.All(new[] { v1Narrativa, v2Narrativa }, p => Assert.Equal(7, p.Id.Version));
         Assert.Equal(published.AddDays(5), v2.PublishedAt);
-        Assert.Equal((1, 30, false), (v2.SheetLinesMin, v2.SheetLinesMax, v2.TitleRequired));
+
+        // A migração seguinte (EssayTypeCategory) renomeia a categoria de dissertação na mesma linha: o id não muda.
+        var category = await db.EssayTypes.AsNoTracking().SingleAsync(t => t.Id == dissertacao);
+        Assert.Equal(("dissertacao-em-prosa", "Dissertação em prosa"), (category.Slug, category.Name));
 
         // Dois temas cujo título dá o mesmo endereço: um deles ganha um sufixo. O rascunho sem tipo continua rascunho.
         Assert.Equal(

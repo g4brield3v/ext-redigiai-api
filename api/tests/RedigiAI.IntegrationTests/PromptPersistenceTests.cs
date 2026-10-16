@@ -47,7 +47,7 @@ public class PromptPersistenceTests(ApiFixture api)
         await SaveAsync(prompts => prompts.Add(prompt));
         var saved = await ReadAsync(prompt.Id);
 
-        Assert.Equal((PromptStatus.Draft, 1, "Dissertação em prosa", 20, 30, true), (saved.Status, saved.Version, saved.GenreLabel, saved.SheetLinesMin, saved.SheetLinesMax, saved.TitleRequired));
+        Assert.Equal((PromptStatus.Draft, 1), (saved.Status, saved.Version));
         Assert.Equal(essayTypeId, saved.EssayTypeId);
         Assert.Equal([10, 15, 20, 25, 30], saved.Blocks.Select(block => block.Position));
         Assert.Equal(
@@ -173,7 +173,7 @@ public class PromptPersistenceTests(ApiFixture api)
     private static string NewSlug() => $"proposta-{Guid.NewGuid():N}";
 
     private static PublicationContext Context(Prompt prompt) => new(
-        true, 30, prompt.Blocks.Select(block => block.Data.AssetId).OfType<Guid>().ToHashSet());
+        true, prompt.Blocks.SelectMany(block => block.Data.AssetIds()).ToHashSet());
 
     private static PromptContent Content(Guid examId, Guid essayTypeId, string slug, IReadOnlyList<PromptBlockContent> blocks) => new(
         examId,
@@ -182,10 +182,6 @@ public class PromptPersistenceTests(ApiFixture api)
         "Coletânea com tirinha e poema.",
         "Fuvest (prova anterior)",
         essayTypeId,
-        "Dissertação em prosa",
-        20,
-        30,
-        TitleRequired: true,
         blocks,
         new PromptNotesContent("Recorte.", "Tangente.", null, ["Texto 1: dado."], null));
 
@@ -216,7 +212,7 @@ public class PromptPersistenceTests(ApiFixture api)
     private Task<(Guid ExamId, Guid EssayTypeId)> FuvestAsync() => api.QueryAsync(async db =>
     {
         var exam = await db.Exams.SingleAsync(e => e.Slug == "fuvest");
-        var essayType = await db.EssayTypes.SingleAsync(t => t.ExamId == exam.Id && t.Slug == "dissertacao");
+        var essayType = await db.EssayTypes.SingleAsync(t => t.ExamId == exam.Id && t.Slug == "dissertacao-em-prosa");
         return (exam.Id, essayType.Id);
     });
 

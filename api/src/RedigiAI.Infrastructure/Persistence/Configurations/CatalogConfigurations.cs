@@ -70,7 +70,6 @@ internal sealed class PromptConfiguration : IEntityTypeConfiguration<Prompt>
         builder.Property(p => p.Title).HasMaxLength(PromptRules.MaxTitleLength);
         builder.Property(p => p.Summary).HasMaxLength(PromptRules.MaxSummaryLength);
         builder.Property(p => p.SourceLabel).HasMaxLength(PromptRules.MaxSourceLabelLength);
-        builder.Property(p => p.GenreLabel).HasMaxLength(PromptRules.MaxGenreLength);
         builder.Property(p => p.CreationKey).HasMaxLength(Prompt.MaxCreationKeyLength);
         builder.HasIndex(p => new { p.CreatedBy, p.CreationKey }).IsUnique();
         builder.HasOne<Exam>().WithMany().HasForeignKey(p => p.ExamId).OnDelete(DeleteBehavior.Restrict);

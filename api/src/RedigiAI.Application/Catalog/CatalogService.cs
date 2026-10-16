@@ -61,12 +61,8 @@ internal sealed class CatalogService(
                 p.Slug,
                 p.Title,
                 p.Summary,
-                p.GenreLabel ?? types[p.EssayTypeId!.Value].Name,
-                types[p.EssayTypeId!.Value].Name,
+                ToDto(types[p.EssayTypeId!.Value]),
                 p.TextCount,
-                p.SheetLinesMin,
-                p.SheetLinesMax,
-                p.TitleRequired,
                 exam.Slug,
                 exam.Name))];
     }
@@ -84,7 +80,7 @@ internal sealed class CatalogService(
         }
 
         var imageIds = await assets.PromptImagePublicIdsAsync(
-            [.. prompt.Blocks.Select(block => block.Data.AssetId).OfType<Guid>().Distinct()], ct);
+            [.. prompt.Blocks.SelectMany(block => block.Data.AssetIds()).Distinct()], ct);
 
         return new PromptDetailDto(
             prompt.Id,
@@ -93,16 +89,11 @@ internal sealed class CatalogService(
             prompt.Status,
             prompt.Title,
             prompt.Summary,
-            prompt.GenreLabel ?? essayType.Name,
-            essayType.Id,
-            essayType.Name,
+            ToDto(essayType),
             EssayTitle.Compose(exam.Name, essayType.Name, prompt.Title),
             exam.Slug,
             exam.Name,
             exam.SheetLines,
-            prompt.SheetLinesMin,
-            prompt.SheetLinesMax,
-            prompt.TitleRequired,
             prompt.Blocks.Count(block => block.Kind == PromptBlockKind.CollectionItem),
             [.. prompt.Blocks.Select(block => ToDto(block, imageIds))]);
     }
@@ -148,13 +139,26 @@ internal sealed class CatalogService(
                 Source = data.Source,
                 Body = data.Body,
                 Columns = data.Columns,
-                ImageUrl = data.AssetId is { } assetId && imageIds.TryGetValue(assetId, out var publicId) ? images.PublicUrl(publicId) : null,
+                ImageUrl = ImageUrl(data.AssetId, imageIds),
                 Alt = data.Alt,
                 Title = data.Title,
                 Items = data.Items,
                 Text = data.Text,
+                CardItems = data.CardItems?.Select(item => new PromptCardItemPublicDto
+                {
+                    Format = item.Format,
+                    Body = item.Body,
+                    ImageUrl = ImageUrl(item.AssetId, imageIds),
+                    Alt = item.Alt,
+                    Caption = item.Caption,
+                }).ToList(),
             });
     }
+
+    private string? ImageUrl(Guid? assetId, IReadOnlyDictionary<Guid, string> imageIds) =>
+        assetId is { } id && imageIds.TryGetValue(id, out var publicId) ? images.PublicUrl(publicId) : null;
+
+    private static EssayTypeDto ToDto(EssayType essayType) => new(essayType.Slug, essayType.Name);
 
     /// <summary>Tira caracteres de controle (o PostgreSQL recusa NUL) e corta sem partir um par substituto.</summary>
     private static string? CleanSearch(string? search)

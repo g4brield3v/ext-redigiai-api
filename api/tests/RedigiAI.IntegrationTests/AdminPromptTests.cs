@@ -25,6 +25,7 @@ public class AdminPromptTests(ApiFixture api)
     public static TheoryData<string, string> AdminRoutes => new()
     {
         { "POST", "/v1/admin/assets" },
+        { "GET", "/v1/admin/exams/fuvest/essay-types" },
         { "POST", "/v1/admin/prompts" },
         { "GET", "/v1/admin/prompts" },
         { "GET", $"/v1/admin/prompts/{AnyId}" },
@@ -78,7 +79,7 @@ public class AdminPromptTests(ApiFixture api)
             .Where(endpoint => endpoint.RoutePattern.RawText!.TrimStart('/').StartsWith("v1/admin", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        Assert.Equal(11, routes.Count);
+        Assert.Equal(12, routes.Count);
         Assert.All(routes, route => Assert.Contains(route.Metadata, item => item.GetType().Name == "AdminOnlyAttribute"));
         Assert.All(routes, route => Assert.NotEmpty(route.Metadata.OfType<Microsoft.AspNetCore.Authorization.IAuthorizeData>()));
     }
@@ -99,6 +100,88 @@ public class AdminPromptTests(ApiFixture api)
         Assert.Equal([HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.TooManyRequests], statuses);
         // O limite da administração não gasta o das outras rotas.
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/v1/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Essay_types_come_from_the_database_with_their_profile_status()
+    {
+        var admin = await AdminAsync();
+        var narrativa = await api.QueryAsync(db => db.EssayTypes.Where(t => t.Slug == "narrativa").Select(t => t.Id).SingleAsync());
+        var profile = await api.QueryAsync(db => db.GradingProfiles
+            .Where(p => p.EssayTypeId == narrativa && p.Status == GradingProfileStatus.Active).Select(p => p.Id).SingleAsync());
+
+        var types = (await admin.GetFromJsonAsync<JsonElement>("/v1/admin/exams/fuvest/essay-types")).EnumerateArray().ToList();
+
+        // A primeira é a dissertação em prosa; não existe mais a categoria "dissertacao".
+        Assert.Equal(
+            [("dissertacao-em-prosa", "Dissertação em prosa", true), ("narrativa", "Narrativa", true)],
+            types.Select(t => (t.GetProperty("slug").GetString(), t.GetProperty("name").GetString(), t.GetProperty("hasActiveProfile").GetBoolean())));
+        try
+        {
+            await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == profile)
+                .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Retired)));
+
+            var withoutProfile = (await admin.GetFromJsonAsync<JsonElement>("/v1/admin/exams/fuvest/essay-types")).EnumerateArray()
+                .Single(t => t.GetProperty("slug").GetString() == "narrativa");
+            Assert.False(withoutProfile.GetProperty("hasActiveProfile").GetBoolean());
+        }
+        finally
+        {
+            await api.QueryAsync(db => db.GradingProfiles.Where(p => p.Id == profile)
+                .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Active)));
+        }
+
+        await AccountTests.AssertErrorAsync(await admin.GetAsync("/v1/admin/exams/inexistente/essay-types"), HttpStatusCode.NotFound, "NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task Card_with_three_items_is_saved_exported_and_validated()
+    {
+        var admin = await AdminAsync();
+        var image = (await UploadAsync(admin, Png, "grafico.png")).GetProperty("assetId").GetGuid();
+        var document = ScienceDocument(NewSlug(), image);
+        JsonObject Card(params JsonObject[] items) => new()
+        {
+            ["position"] = 65,
+            ["kind"] = "card",
+            ["data"] = new JsonObject { ["title"] = "Para refletir", ["cardItems"] = new JsonArray([.. items]) },
+        };
+        JsonObject Text(string body) => new() { ["format"] = "text", ["body"] = body, ["caption"] = "Fonte: IBGE, 2024." };
+        var picture = new JsonObject
+        {
+            ["format"] = "image",
+            ["assetId"] = image.ToString(),
+            ["alt"] = "Gráfico de barras.",
+            ["aiDescription"] = "Gráfico de barras com o investimento em pesquisa de 2010 a 2024, em queda.",
+        };
+
+        document["blocks"]!.AsArray().Add(Card(Text("Primeiro."), picture.DeepClone().AsObject(), Text("Terceiro.")));
+        var id = await CreateAsync(admin, document);
+
+        var exported = await admin.GetFromJsonAsync<JsonElement>($"/v1/admin/prompts/{id}");
+        var card = exported.GetProperty("blocks").EnumerateArray().Single(b => b.GetProperty("kind").GetString() == "card");
+        var items = card.GetProperty("data").GetProperty("cardItems").EnumerateArray().ToList();
+        Assert.Equal(["text", "image", "text"], items.Select(i => i.GetProperty("format").GetString()));
+        Assert.Equal("Fonte: IBGE, 2024.", items[0].GetProperty("caption").GetString());
+        Assert.False(string.IsNullOrEmpty(items[1].GetProperty("imageUrl").GetString()));
+        Assert.Empty(exported.GetProperty("issues").EnumerateArray());
+
+        // Com 2 ou 4 itens, nem o rascunho é guardado.
+        foreach (var count in new[] { 2, 4 })
+        {
+            var wrong = ScienceDocument(NewSlug(), image);
+            wrong["blocks"]!.AsArray().Add(Card([.. Enumerable.Range(1, count).Select(i => Text($"Item {i}."))]));
+            var refused = await admin.SendAsync(Create(wrong, Guid.NewGuid().ToString()));
+            Assert.Equal(["blocks[6].data.cardItems"], Paths(await AssertValidationFailedAsync(refused)));
+        }
+
+        // Imagem sem descrição para a IA vira pendência.
+        var noDescription = ScienceDocument(NewSlug(), image);
+        var bare = picture.DeepClone().AsObject();
+        bare.Remove("aiDescription");
+        noDescription["blocks"]!.AsArray().Add(Card(Text("Primeiro."), bare, Text("Terceiro.")));
+        var pending = await (await admin.SendAsync(Create(noDescription, Guid.NewGuid().ToString()))).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(["blocks[6].data.cardItems[1].aiDescription"], Paths(pending.GetProperty("issues")));
     }
 
     [Fact]
@@ -234,8 +317,10 @@ public class AdminPromptTests(ApiFixture api)
         Assert.Equal("published", (await published.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString());
 
         var exported = await admin.GetFromJsonAsync<JsonElement>($"/v1/admin/prompts/{id}");
-        Assert.Equal(("fuvest", "dissertacao", "Dissertação em prosa"), (
-            exported.GetProperty("exam").GetString(), exported.GetProperty("essayType").GetString(), exported.GetProperty("genreLabel").GetString()));
+        Assert.Equal(("fuvest", "dissertacao-em-prosa"), (exported.GetProperty("exam").GetString(), exported.GetProperty("essayType").GetString()));
+        // O tipo é só a categoria: não há gênero em texto livre nem limites de linha no cadastro.
+        Assert.False(exported.TryGetProperty("genreLabel", out _));
+        Assert.False(exported.TryGetProperty("sheet", out _));
         var strip = exported.GetProperty("blocks")[0];
         Assert.Equal(("collection_item", "image"), (strip.GetProperty("kind").GetString(), strip.GetProperty("data").GetProperty("format").GetString()));
         Assert.Equal(image.GetProperty("url").GetString(), strip.GetProperty("data").GetProperty("imageUrl").GetString());
@@ -319,9 +404,7 @@ public class AdminPromptTests(ApiFixture api)
         var saved = await admin.PutAsJsonAsync($"/v1/admin/prompts/{id}", new
         {
             title = "Algoritmos e o debate público",
-            essayType = "dissertacao",
-            genreLabel = "Dissertação em prosa",
-            sheet = new { minLines = 20, maxLines = 30, titleRequired = true },
+            essayType = "dissertacao-em-prosa",
             blocks = new object[]
             {
                 new { position = 20, kind = "command", data = new { body = "Redija uma dissertação." } },
@@ -538,9 +621,8 @@ public class AdminPromptTests(ApiFixture api)
             new[] { published, draft, archived }.Order(),
             all.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).Order());
         var item = all.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == published);
-        Assert.Equal(("Fuvest", "Dissertação em prosa", "Dissertação", 5, 1), (
+        Assert.Equal(("Fuvest", "Dissertação em prosa", 5, 1), (
             item.GetProperty("examName").GetString(),
-            item.GetProperty("genreLabel").GetString(),
             item.GetProperty("essayTypeName").GetString(),
             item.GetProperty("textCount").GetInt32(),
             item.GetProperty("version").GetInt32()));

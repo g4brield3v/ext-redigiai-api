@@ -26,7 +26,7 @@ public sealed class AiBudgetOptions
     public decimal ReferenceCapUsd { get; set; } = 0.15m;
 
     /// <summary>Limite rígido: uma nova tentativa que não cabe nele não é feita.</summary>
-    public decimal HardCapUsd { get; set; } = 0.225m;
+    public decimal HardCapUsd { get; set; } = 0.33m;
 
     /// <summary>Preço por modelo (<c>Ai__Pricing__&lt;modelo&gt;__Input</c> etc.). Sem preço, o custo fica sem registro.</summary>
     public Dictionary<string, ModelPriceOptions> Pricing { get; set; } = new(StringComparer.OrdinalIgnoreCase);

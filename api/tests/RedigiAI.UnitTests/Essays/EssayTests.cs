@@ -19,12 +19,12 @@ public class EssayTests
 
     public EssayTests()
     {
-        _dissertacao = EssayType.Create(_exam.Id, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
+        _dissertacao = EssayType.Create(_exam.Id, "dissertacao-em-prosa", "Dissertação em prosa", "Texto dissertativo-argumentativo");
         _narrativa = EssayType.Create(_exam.Id, "narrativa", "Narrativa", "Texto narrativo com reflexão");
         _prompt = Published("algoritmos");
     }
 
-    private static readonly PublicationContext Context = new(true, 30, new HashSet<Guid>());
+    private static readonly PublicationContext Context = new(true, new HashSet<Guid>());
 
     private Prompt Draft(string slug) => Prompt.Draft(
         new PromptContent(
@@ -34,10 +34,6 @@ public class EssayTests
             null,
             null,
             _dissertacao.Id,
-            "Dissertação em prosa",
-            20,
-            30,
-            TitleRequired: true,
             [
                 new(null, 10, PromptBlockKind.CollectionItem, new PromptBlockData { Label = "Texto 1", Format = CollectionFormat.Prose, Source = "Fonte", Body = "Trecho." }),
                 new(null, 20, PromptBlockKind.Command, new PromptBlockData { Body = "Redija uma dissertação." }),
@@ -65,8 +61,8 @@ public class EssayTests
         var essay = Submit(UserId, _prompt, photo);
 
         Assert.Equal(EssayStatus.Uploaded, essay.Status);
-        // Vestibular, categoria de correção e título da proposta; o gênero como a prova escreve não entra no título.
-        Assert.Equal("Fuvest – Dissertação – Algoritmos e o debate público", essay.Title);
+        // Vestibular, nome da categoria de correção (o tipo de redação) e título da proposta.
+        Assert.Equal("Fuvest – Dissertação em prosa – Algoritmos e o debate público", essay.Title);
         Assert.Equal((_prompt.Id, _dissertacao.Id, _rubricVersionId), (essay.PromptId, essay.EssayTypeId, essay.RubricVersionId));
         Assert.Equal((1, (Guid?)null, photo.Id), (essay.Version, essay.ParentEssayId, essay.PhotoAssetId));
     }

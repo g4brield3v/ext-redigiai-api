@@ -37,14 +37,11 @@ public sealed class Prompt
     public string? Summary { get; private set; }
     public string? SourceLabel { get; private set; }
 
-    /// <summary>Categoria de correção: escolhe a grade e o perfil de correção.</summary>
+    /// <summary>
+    /// Categoria de correção ("Dissertação em prosa"), escolhida numa lista: o nome dela é o tipo que o aluno vê, o
+    /// que vai para a IA e o que entra no título da redação; ela também escolhe o perfil de correção.
+    /// </summary>
     public Guid? EssayTypeId { get; private set; }
-
-    /// <summary>O tipo exatamente como a prova pede ("Dissertação em prosa"): vai para o aluno e para a IA.</summary>
-    public string? GenreLabel { get; private set; }
-    public int? SheetLinesMin { get; private set; }
-    public int? SheetLinesMax { get; private set; }
-    public bool TitleRequired { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? PublishedAt { get; private set; }
@@ -168,10 +165,6 @@ public sealed class Prompt
             Summary = Summary,
             SourceLabel = SourceLabel,
             EssayTypeId = EssayTypeId,
-            GenreLabel = GenreLabel,
-            SheetLinesMin = SheetLinesMin,
-            SheetLinesMax = SheetLinesMax,
-            TitleRequired = TitleRequired,
             CreatedAt = now,
             UpdatedAt = now,
             CreatedBy = createdBy,
@@ -203,10 +196,6 @@ public sealed class Prompt
         Summary = PromptRules.Clean(content.Summary);
         SourceLabel = PromptRules.Clean(content.SourceLabel);
         EssayTypeId = content.EssayTypeId;
-        GenreLabel = PromptRules.Clean(content.GenreLabel);
-        SheetLinesMin = content.MinLines;
-        SheetLinesMax = content.MaxLines;
-        TitleRequired = content.TitleRequired;
 
         // Bloco que já existe continua sendo o mesmo (mesmo id); os que não vieram saem.
         var kept = new HashSet<Guid>();
@@ -247,21 +236,16 @@ public sealed record PromptListItem(
     string Title,
     string? Summary,
     Guid? EssayTypeId,
-    string? GenreLabel,
     int TextCount,
-    DateTimeOffset UpdatedAt,
-    int? SheetLinesMin = null,
-    int? SheetLinesMax = null,
-    bool TitleRequired = false);
+    DateTimeOffset UpdatedAt);
 
 /// <summary>Nova posição de um bloco, para a reordenação.</summary>
 public sealed record BlockPosition(Guid Id, int Position);
 
 /// <summary>O que a publicação precisa saber e a proposta não tem como conferir sozinha.</summary>
 /// <param name="EssayTypeHasActiveProfile">A categoria de correção existe no vestibular e tem perfil de correção ativo.</param>
-/// <param name="ExamSheetLines">Linhas da folha do vestibular (30 na Fuvest).</param>
 /// <param name="PromptImageAssetIds">Imagens de proposta que existem, entre as usadas nos blocos.</param>
-public sealed record PublicationContext(bool EssayTypeHasActiveProfile, int ExamSheetLines, IReadOnlySet<Guid> PromptImageAssetIds);
+public sealed record PublicationContext(bool EssayTypeHasActiveProfile, IReadOnlySet<Guid> PromptImageAssetIds);
 
 /// <summary>Conteúdo de um rascunho, como veio do cadastro ou da importação.</summary>
 public sealed record PromptContent(
@@ -271,10 +255,6 @@ public sealed record PromptContent(
     string? Summary,
     string? SourceLabel,
     Guid? EssayTypeId,
-    string? GenreLabel,
-    int? MinLines,
-    int? MaxLines,
-    bool TitleRequired,
     IReadOnlyList<PromptBlockContent> Blocks,
     PromptNotesContent Notes);
 

@@ -423,11 +423,6 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("exam_id");
 
-                    b.Property<string>("GenreLabel")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("genre_label");
-
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
@@ -435,14 +430,6 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PublishedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("published_by");
-
-                    b.Property<int?>("SheetLinesMax")
-                        .HasColumnType("integer")
-                        .HasColumnName("sheet_lines_max");
-
-                    b.Property<int?>("SheetLinesMin")
-                        .HasColumnType("integer")
-                        .HasColumnName("sheet_lines_min");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -471,10 +458,6 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("title");
-
-                    b.Property<bool>("TitleRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("title_required");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
