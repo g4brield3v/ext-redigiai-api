@@ -12,10 +12,16 @@ internal sealed class EssayConfiguration : IEntityTypeConfiguration<Essay>
 {
     public void Configure(EntityTypeBuilder<Essay> builder)
     {
-        builder.ToTable("essays");
+        // Redação que falhou ou foi cancelada sempre diz por quê (docs/08-ajustes-correcao.md, item 3).
+        builder.ToTable("essays", table => table.HasCheckConstraint(
+            "ck_essays_failure_code",
+            "status NOT IN ('failed', 'cancelled') OR (failure_code IS NOT NULL AND failed_at IS NOT NULL)"));
         builder.Property(e => e.Title).HasMaxLength(400);
         builder.Property(e => e.Status).HasMaxLength(20);
         builder.Property(e => e.FailureCode).HasMaxLength(40);
+        builder.Property(e => e.FailureDetails)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<EssayFailureDetails>, JsonComparer<EssayFailureDetails>>();
         builder.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EssayBatch>().WithMany().HasForeignKey(e => e.BatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Exam>().WithMany().HasForeignKey(e => e.ExamId).OnDelete(DeleteBehavior.Restrict);

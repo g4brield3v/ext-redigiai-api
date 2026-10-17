@@ -27,7 +27,16 @@ public interface IEssayRepository
 
     /// <summary>Redações à espera da revisão do aluno com o prazo vencido.</summary>
     Task<IReadOnlyList<Guid>> ListExpiredReviewsAsync(DateTimeOffset now, int limit, CancellationToken ct);
+
+    /// <summary>
+    /// Registros da trilha de auditoria ligados à redação, do mais antigo para o mais novo. Quem chama já
+    /// conferiu que a redação é do aluno.
+    /// </summary>
+    Task<IReadOnlyList<EssayHistoryEntry>> ListHistoryAsync(Guid essayId, CancellationToken ct);
 }
+
+/// <param name="Data">JSON gravado com o registro; nunca vai direto para o aluno.</param>
+public sealed record EssayHistoryEntry(string Action, string? Data, DateTimeOffset At);
 
 public interface IEssayBatchRepository
 {

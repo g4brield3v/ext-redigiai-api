@@ -34,7 +34,8 @@ public sealed record PhotoUrlDto(string Url);
 /// <param name="PromptSlug">Endereço da proposta (<c>/propostas/{slug}</c>).</param>
 /// <param name="PromptVersion">A versão da proposta que o aluno usou; pode não ser mais a publicada.</param>
 /// <param name="HasVersions">A redação é uma reescrita ou já foi reescrita.</param>
-/// <param name="FailureCode">Código do erro quando o status é <c>failed</c> ou <c>cancelled</c>.</param>
+/// <param name="FailureCode">Código do erro quando o status é <c>failed</c> ou <c>cancelled</c>; o mesmo de <c>failure.code</c>.</param>
+/// <param name="Failure">Motivo da falha ou do cancelamento; nulo nos outros status.</param>
 public sealed record EssaySummaryDto(
     Guid Id,
     string Title,
@@ -50,7 +51,33 @@ public sealed record EssaySummaryDto(
     int IllegibleCount,
     int? Score,
     int? MaxScore,
-    string? FailureCode);
+    string? FailureCode,
+    EssayFailureDto? Failure);
+
+/// <summary>Por que a redação não foi corrigida. A tela escolhe o texto pelo <c>code</c>; a API não manda texto.</summary>
+/// <param name="Code"><c>PHOTO_UNREADABLE</c>, <c>REVIEW_EXPIRED</c>, <c>TRANSCRIPTION_FAILED</c>, <c>GRADING_FAILED</c> ou <c>INTERNAL_ERROR</c>.</param>
+/// <param name="OccurredAt">Quando a redação falhou ou foi cancelada.</param>
+/// <param name="CreditRefunded">A correção reservada voltou para o saldo.</param>
+public sealed record EssayFailureDto(string Code, DateTimeOffset OccurredAt, bool CreditRefunded, EssayEventDetailsDto? Details);
+
+/// <summary>Dados para a tela; cada campo só aparece quando se aplica.</summary>
+/// <param name="IllegibleCount">Palavras ilegíveis na leitura da foto.</param>
+/// <param name="FailureCode">Código da falha, no evento <c>failed</c> ou <c>cancelled</c>.</param>
+public sealed record EssayEventDetailsDto(int? IllegibleCount, string? FailureCode);
+
+public enum EssayEventType
+{
+    Submitted,
+    Transcribed,
+    ReviewCompleted,
+    GradingStarted,
+    Completed,
+    Failed,
+    Cancelled,
+    CreditRefunded,
+}
+
+public sealed record EssayEventDto(DateTimeOffset At, EssayEventType Type, EssayEventDetailsDto? Details);
 
 /// <param name="NextCursor">Passe em <c>cursor</c> para a página seguinte; nulo na última.</param>
 public sealed record EssayListDto(IReadOnlyList<EssaySummaryDto> Items, string? NextCursor);
@@ -62,6 +89,7 @@ public sealed record TranscriptionLineDto(int Number, string Text, bool Indent);
 public sealed record IllegibleWordDto(
     Guid Id, int LineNumber, int Start, int End, string ContextBefore, string ContextAfter);
 
+/// <param name="Timeline">O que aconteceu com a redação, do mais antigo para o mais novo.</param>
 public sealed record EssayDetailDto(
     Guid Id,
     string Title,
@@ -78,6 +106,8 @@ public sealed record EssayDetailDto(
     int? Score,
     int? MaxScore,
     string? FailureCode,
+    EssayFailureDto? Failure,
     int SheetLines,
     IReadOnlyList<TranscriptionLineDto> Lines,
-    IReadOnlyList<IllegibleWordDto> IllegibleWords);
+    IReadOnlyList<IllegibleWordDto> IllegibleWords,
+    IReadOnlyList<EssayEventDto> Timeline);

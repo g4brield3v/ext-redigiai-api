@@ -50,6 +50,8 @@ internal static class ApiHost
         });
         services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
         services.Configure<CollectionCopyOptions>(builder.Configuration.GetSection(CollectionCopyOptions.Section));
+        services.Configure<RedigiAI.Infrastructure.Jobs.JobQueueOptions>(
+            builder.Configuration.GetSection(RedigiAI.Infrastructure.Jobs.JobQueueOptions.Section));
         var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
         services.AddClerkAuthentication(builder.Configuration, devAccess);
         if (devAccess)

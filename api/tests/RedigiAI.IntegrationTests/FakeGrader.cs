@@ -75,11 +75,37 @@ public sealed class FakeGrader : IEssayGrader
 
     public static string? Unavailable() => throw Errors.AiUnavailable();
 
-    public Task<GradingCall> GradeAsync(GradingRequest request, CancellationToken ct)
+    /// <summary>
+    /// No roteiro, simula a resposta cortada no <c>max_tokens</c> (<c>stop_reason = "max_tokens"</c>): a saída
+    /// cobrada é o <c>max_tokens</c> inteiro, como na API.
+    /// </summary>
+    public const string TruncatedMarker = "<<max_tokens>>";
+
+    /// <summary>No roteiro, simula a conexão perdida no meio do streaming, com a entrada e a saída cobradas.</summary>
+    public const string FailedMidStreamMarker = "<<mid_stream>>";
+
+    public static string? Truncated() => TruncatedMarker;
+
+    public static string? FailedMidStream() => FailedMidStreamMarker;
+
+    /// <summary>Se definido, a correção espera por ele antes de responder (para testar a trava do job).</summary>
+    public TaskCompletionSource? Hold { get; set; }
+
+    public async Task<GradingCall> GradeAsync(GradingRequest request, CancellationToken ct)
     {
         LastRequest = request;
         Requests.Enqueue(request);
+        if (Hold is { } hold)
+        {
+            await hold.Task.WaitAsync(ct);
+        }
+
         var toolInput = Script.TryDequeue(out var next) ? next() : Good().ToJsonString();
-        return Task.FromResult(new GradingCall(toolInput, request.Model, Tokens));
+        return toolInput switch
+        {
+            TruncatedMarker => new GradingCall(null, request.Model, Tokens with { Output = request.MaxTokens }, Truncated: true),
+            FailedMidStreamMarker => throw new AiCallFailedException(Errors.AiUnavailable(), Tokens with { Output = request.MaxTokens }),
+            _ => new GradingCall(toolInput, request.Model, Tokens),
+        };
     }
 }

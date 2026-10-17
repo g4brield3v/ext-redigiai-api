@@ -26,10 +26,17 @@ internal sealed class TranscribeEssayHandler(
     IUnitOfWork unitOfWork,
     EssayOutcomes outcomes,
     AiSpending spending,
+    AiBudget budget,
     TimeProvider time) : IJobHandler
 {
     /// <summary>Resposta fora do formato: pede mais uma vez; repetida, a falha é definitiva.</summary>
     private const int InvalidResponseAttempts = 2;
+
+    /// <summary>Resposta cortada no <c>max_tokens</c>: pede de novo com o dobro; cortada de novo, a falha é definitiva.</summary>
+    private const int TruncatedResponseAttempts = 2;
+
+    /// <summary>A foto da folha na entrada, estimada por cima (imagens grandes chegam perto de 5 mil tokens).</summary>
+    private const int PhotoTokens = 5_000;
     private const int GradeAttempts = 4;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -57,12 +64,13 @@ internal sealed class TranscribeEssayHandler(
             await storage.DownloadForReadingAsync(photo.PublicId, ct),
             exam.SheetLines,
             prompt.SystemText.Replace("{{sheet_lines}}", exam.SheetLines.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            profile.TranscriptionModel);
+            profile.TranscriptionModel,
+            budget.TranscriptionMaxTokens);
 
         var transcription = await ReadAsync(essay, request, ct);
         if (transcription is null || transcription.IsUnreadable)
         {
-            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.PhotoUnreadable(), ct);
+            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.PhotoUnreadable(transcription?.IllegibleCount, time.GetUtcNow()), ct);
             return;
         }
 
@@ -97,40 +105,68 @@ internal sealed class TranscribeEssayHandler(
     public Task OnDeadAsync(string payload, CancellationToken ct)
     {
         var essayId = JsonSerializer.Deserialize<EssayJobPayload>(payload, Json)!.EssayId;
-        return outcomes.EndWithRefundAsync(essayId, EssayTransition.TranscriptionFailed(), ct);
+        return outcomes.EndWithRefundAsync(essayId, EssayTransition.TranscriptionFailed(time.GetUtcNow()), ct);
     }
 
+    /// <summary>
+    /// Chama a IA até ter uma leitura válida. Resposta cortada no <c>max_tokens</c> ganha uma nova chamada com o
+    /// dobro do tamanho e, cortada de novo, <c>AI_OUTPUT_TRUNCATED</c>; resposta fora do formato ganha mais uma
+    /// chamada e, repetida, <c>AI_INVALID_RESPONSE</c>.
+    /// </summary>
     /// <returns><c>null</c> quando a IA diz que a foto não dá para ler.</returns>
     private async Task<Transcription?> ReadAsync(Essay essay, TranscriptionRequest request, CancellationToken ct)
     {
-        for (var attempt = 1; attempt <= InvalidResponseAttempts; attempt++)
+        var (invalidResponses, truncatedResponses) = (0, 0);
+        var inputTokens = AiSpending.EstimateInputTokens(request.Instructions) + PhotoTokens;
+        while (true)
         {
-            await spending.EnsureRoomForAnotherCallAsync(essay.Id, ct);
+            // O tamanho pedido diminui se a chamada, no pior caso, não couber no que falta do limite rígido.
+            var sent = request with
+            {
+                MaxTokens = await spending.MaxTokensWithinCapAsync(essay.Id, request.Model, inputTokens, request.MaxTokens, ct),
+            };
 
-            var call = await transcriber.TranscribeAsync(request, ct);
+            var call = await spending.CallAsync(
+                essay.Id, AiUsage.Transcription, sent.Model, () => transcriber.TranscribeAsync(sent, ct), ct);
             await spending.RecordAsync(essay.Id, AiUsage.Transcription, call.Model, call.Tokens, ct);
 
-            if (call.Reading is not { } reading)
+            if (call.Truncated)
             {
+                truncatedResponses++;
+                audit.Record(
+                    "system", "transcription.response_truncated", "essay", essay.Id, new { attempt = truncatedResponses, maxTokens = sent.MaxTokens });
+                await unitOfWork.SaveChangesAsync(ct);
+                if (truncatedResponses >= TruncatedResponseAttempts)
+                {
+                    throw Errors.AiFailed("AI_OUTPUT_TRUNCATED");
+                }
+
+                request = request with { MaxTokens = budget.Doubled(sent.MaxTokens) };
                 continue;
             }
 
-            if (!reading.Readable)
+            if (call.Reading is { } reading)
             {
-                return null;
+                if (!reading.Readable)
+                {
+                    return null;
+                }
+
+                try
+                {
+                    return Transcription.Create(
+                        essay.Id, request.SheetLines, reading.Lines, reading.IdentificationFound, call.Model, time.GetUtcNow());
+                }
+                catch (InvalidTranscriptionException)
+                {
+                    // Linha fora da folha ou trecho fora do texto: vale pedir de novo.
+                }
             }
 
-            try
+            if (++invalidResponses >= InvalidResponseAttempts)
             {
-                return Transcription.Create(
-                    essay.Id, request.SheetLines, reading.Lines, reading.IdentificationFound, call.Model, time.GetUtcNow());
-            }
-            catch (InvalidTranscriptionException)
-            {
-                // Linha fora da folha ou trecho fora do texto: vale pedir de novo.
+                throw Errors.AiFailed("AI_INVALID_RESPONSE");
             }
         }
-
-        throw Errors.AiFailed("AI_INVALID_RESPONSE");
     }
 }

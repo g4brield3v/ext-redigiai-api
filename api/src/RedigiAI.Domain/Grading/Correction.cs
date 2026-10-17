@@ -78,7 +78,12 @@ public sealed class InvalidGradingException(int rule, string reason) : Exception
 public sealed class Correction
 {
     public const int MaxNextSteps = 3;
-    public const int MaxMarks = 12;
+
+    /// <summary>
+    /// Teto só contra o caso absurdo (redação feita para gerar marcas sem fim): uma redação real com muitos desvios
+    /// fica bem abaixo disso. Passou, a correção fica com as marcas que tiraram pontos antes dos acertos.
+    /// </summary>
+    public const int MaxMarks = 80;
 
     private readonly List<CorrectionCriterion> _criteria = [];
     private readonly List<CorrectionMark> _marks = [];
@@ -136,11 +141,8 @@ public sealed class Correction
             throw new InvalidGradingException(8, "Most of the essay was copied from the collection but the grading did not apply zero.");
         }
 
-        if (output.Marks.Count > MaxMarks)
-        {
-            throw new InvalidGradingException(1, "More than 12 marks.");
-        }
-
+        // A IA marca todos os trechos que afetam a nota (docs/08-ajustes-correcao.md, item 1); o teto de marcas só
+        // corta o caso absurdo, sem recusar a resposta (ver AddMarks). Os 3 próximos passos são limite pedagógico.
         if (output.NextSteps.Count > MaxNextSteps)
         {
             throw new InvalidGradingException(5, "More than 3 next steps.");
@@ -249,6 +251,8 @@ public sealed class Correction
         Dictionary<int, string> textByLine,
         IReadOnlySet<string> ruleCodes)
     {
+        // Toda marca é validada, mesmo as que o teto vai cortar: uma posição inventada continua recusando a resposta.
+        var valid = new List<(RubricCriterion Criterion, GradedMark Mark)>(marks.Count);
         foreach (var mark in marks)
         {
             var criterion = rubric.Criteria.FirstOrDefault(c => c.Position == mark.Criterion)
@@ -264,7 +268,23 @@ public sealed class Correction
             var rule = string.IsNullOrWhiteSpace(mark.Rule)
                 ? null
                 : ruleCodes.Contains(mark.Rule.Trim()) ? mark.Rule.Trim() : WritingRulesVersion.OtherCode;
-            _marks.Add(new CorrectionMark(Id, criterion, mark with { Rule = rule }));
+            valid.Add((criterion, mark with { Rule = rule }));
+        }
+
+        // Marca repetida (mesmo critério, tipo e trecho) entra uma vez só. Acima do teto, a correção não é recusada:
+        // recusar devolveria a correção ao aluno, que poderia reenviar o mesmo texto sem fim. Ficam primeiro as
+        // marcas que tiraram pontos, na ordem em que vieram, e a lista volta para a ordem da IA.
+        var kept = valid
+            .DistinctBy(item => (item.Mark.Criterion, item.Mark.Kind, item.Mark.Line, item.Mark.Start, item.Mark.End))
+            .Select((item, index) => (item, index))
+            .OrderBy(entry => entry.item.Mark.Kind == MarkKind.Issue ? 0 : 1)
+            .ThenBy(entry => entry.index)
+            .Take(MaxMarks)
+            .OrderBy(entry => entry.index);
+
+        foreach (var (item, _) in kept)
+        {
+            _marks.Add(new CorrectionMark(Id, item.Criterion, item.Mark));
         }
     }
 }

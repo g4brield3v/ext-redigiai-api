@@ -19,21 +19,29 @@ public sealed class AnthropicOptions
 }
 
 /// <summary>
-/// Chamada à API de mensagens do Claude, comum à transcrição e à correção: envio, tempo limite, tradução dos
-/// erros em retentável ou definitivo e leitura do consumo.
+/// Chamada à API de mensagens do Claude, comum à transcrição e à correção: envio em streaming, tempo limite,
+/// tradução dos erros em retentável ou definitivo e leitura do consumo.
 /// </summary>
 internal sealed class ClaudeMessagesApi(IOptions<AnthropicOptions> options, ILogger<ClaudeMessagesApi> logger)
 {
-    // Um cliente para a vida do processo. O tempo limite de cada chamada é o da especificação: 3 minutos.
+    /// <summary>Tempo limite de cada chamada, do envio ao fim do streaming (docs/08-ajustes-correcao.md, item 1).</summary>
+    private static readonly TimeSpan CallTimeout = TimeSpan.FromMinutes(10);
+
+    // Um cliente para a vida do processo. O tempo limite é o de cada chamada (CallTimeout), que cobre também a
+    // leitura do streaming; o do HttpClient só valeria até chegarem os cabeçalhos.
     private static readonly HttpClient Http = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
     {
-        Timeout = TimeSpan.FromMinutes(3),
+        Timeout = Timeout.InfiniteTimeSpan,
     };
 
+    /// <summary>
+    /// Envia o pedido com <c>stream: true</c> (a API exige streaming para respostas longas) e devolve a mensagem
+    /// final montada a partir dos eventos, no formato da resposta sem streaming.
+    /// </summary>
     /// <param name="purpose">Para o log: "transcription" ou "grading".</param>
     /// <exception cref="AppError">
-    /// <c>AI_UNAVAILABLE</c> (retentável) para 429, 5xx, sobrecarga e tempo esgotado; <c>AI_REQUEST_REJECTED</c>
-    /// quando a API recusa o pedido.
+    /// <c>AI_UNAVAILABLE</c> (retentável) para 429, 5xx, sobrecarga, conexão perdida e tempo esgotado;
+    /// <c>AI_REQUEST_REJECTED</c> quando a API recusa o pedido.
     /// </exception>
     public async Task<JsonDocument> SendAsync(JsonObject body, string purpose, CancellationToken ct)
     {
@@ -43,6 +51,7 @@ internal sealed class ClaudeMessagesApi(IOptions<AnthropicOptions> options, ILog
             throw new InvalidOperationException("Anthropic is not configured: set Anthropic__ApiKey.");
         }
 
+        body["stream"] = true;
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl.TrimEnd('/')}/v1/messages")
         {
             Content = JsonContent.Create(body),
@@ -50,27 +59,63 @@ internal sealed class ClaudeMessagesApi(IOptions<AnthropicOptions> options, ILog
         request.Headers.Add("x-api-key", settings.ApiKey);
         request.Headers.Add("anthropic-version", "2023-06-01");
 
-        HttpResponseMessage response;
+        var progress = new ClaudeStreamProgress();
+        using var call = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        call.CancelAfter(CallTimeout);
         try
         {
-            response = await Http.SendAsync(request, ct);
-        }
-        catch (Exception ex) when (ex is HttpRequestException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
-        {
-            logger.LogWarning("Claude {Purpose} call did not complete: {Error}", purpose, ex.GetType().Name);
-            throw Errors.AiUnavailable();
-        }
-
-        using (response)
-        {
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, call.Token);
             if (!response.IsSuccessStatusCode)
             {
-                throw await FailureOfAsync(response, purpose, ct);
+                throw await FailureOfAsync(response, purpose, call.Token);
             }
 
-            return JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            await using var stream = await response.Content.ReadAsStreamAsync(call.Token);
+            return await ClaudeStream.ReadAsync(stream, progress, call.Token);
+        }
+        catch (ClaudeStreamError error)
+        {
+            logger.LogWarning(
+                "Claude {Purpose} stream failed ({ErrorType}): {ErrorMessage}",
+                purpose,
+                error.ErrorType,
+                error.Message is { Length: > 300 } message ? message[..300] : error.Message);
+            throw Charged(
+                error.ErrorType is "overloaded_error" or "api_error" or "rate_limit_error" or "malformed_event"
+                    ? Errors.AiUnavailable()
+                    : Errors.AiFailed("AI_REQUEST_REJECTED"),
+                progress,
+                body);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException
+            || (ex is OperationCanceledException && !ct.IsCancellationRequested))
+        {
+            // Conexão perdida no meio do streaming ou os 10 minutos esgotados: vale tentar de novo.
+            logger.LogWarning("Claude {Purpose} call did not complete: {Error}", purpose, ex.GetType().Name);
+            throw Charged(Errors.AiUnavailable(), progress, body);
         }
     }
+
+    /// <summary>
+    /// A falha leva junto o consumo, se a IA já tinha começado a responder: a entrada como a API informou e a
+    /// saída pelo total informado ou, sem ele, pelo <c>max_tokens</c> do pedido (o pior caso).
+    /// </summary>
+    private static Exception Charged(AppError error, ClaudeStreamProgress progress, JsonObject body)
+    {
+        if (!progress.Started)
+        {
+            return error;
+        }
+
+        int Read(string name) => progress.Usage[name]?.GetValue<int>() ?? 0;
+        var output = progress.OutputKnown ? Read("output_tokens") : body["max_tokens"]?.GetValue<int>() ?? 0;
+        return new AiCallFailedException(
+            error, new AiTokens(Read("input_tokens"), output, Read("cache_read_input_tokens"), Read("cache_creation_input_tokens")));
+    }
+
+    /// <summary>A resposta parou no <c>max_tokens</c>: o que veio está incompleto e nunca é completado.</summary>
+    public static bool IsTruncated(JsonElement root) =>
+        root.TryGetProperty("stop_reason", out var stop) && stop.ValueKind == JsonValueKind.String && stop.GetString() == "max_tokens";
 
     /// <returns>
     /// O que a IA passou à ferramenta; <c>null</c> quando ela não usou a ferramenta ou a resposta foi cortada pelo
@@ -78,7 +123,7 @@ internal sealed class ClaudeMessagesApi(IOptions<AnthropicOptions> options, ILog
     /// </returns>
     public static JsonElement? ToolInputOf(JsonElement root, string toolName)
     {
-        if (root.TryGetProperty("stop_reason", out var stop) && stop.GetString() == "max_tokens")
+        if (IsTruncated(root))
         {
             return null;
         }

@@ -141,6 +141,68 @@ public class GradingTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Correction_with_more_than_twelve_marks_is_accepted()
+    {
+        // A IA marca todos os trechos que afetam a nota (docs/08-ajustes-correcao.md, item 1).
+        var student = await QueuedEssayAsync();
+        var response = FakeGrader.Good();
+        var marks = response["marks"]!.AsArray();
+        for (var i = 0; i < 18; i++)
+        {
+            marks.Add(new JsonObject
+            {
+                ["criterion"] = 3, ["kind"] = "issue", ["line"] = 1, ["start"] = i, ["end"] = i + 1,
+                ["note"] = $"Apontamento {i + 1}.", ["rule"] = null, ["fix"] = null,
+            });
+        }
+
+        api.Grader.Script.Enqueue(() => response.ToJsonString());
+
+        await RunAsync(JobTypes.Grade);
+
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
+        Assert.Equal(20, correction.Marks.Count);
+        Assert.False(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.EntityId == student.EssayId && a.Action == "grading.marks_trimmed")));
+        Assert.Contains("todos os trechos que afetam a nota", api.Grader.LastRequest!.System);
+        Assert.DoesNotContain("até 12", api.Grader.LastRequest.System);
+        Assert.DoesNotContain("60 palavras", api.Grader.LastRequest.System);
+    }
+
+    [Fact]
+    public async Task Repeated_marks_and_marks_above_the_cap_are_cut_without_failing_the_essay()
+    {
+        // Resposta absurda: 100 marcas diferentes e 50 repetidas. A correção sai com 80 e o crédito é consumido,
+        // para o aluno não poder reenviar o mesmo texto sem fim com a correção devolvida.
+        var student = await QueuedEssayAsync();
+        var response = FakeGrader.Good();
+        var marks = response["marks"]!.AsArray();
+        marks.Clear();
+        for (var i = 0; i < 150; i++)
+        {
+            var position = i % 100;
+            marks.Add(new JsonObject
+            {
+                ["criterion"] = 1 + (position % 3), ["kind"] = "issue", ["line"] = 1, ["start"] = position / 3, ["end"] = (position / 3) + 1,
+                ["note"] = "Apontamento.", ["rule"] = null, ["fix"] = null,
+            });
+        }
+
+        api.Grader.Script.Enqueue(() => response.ToJsonString());
+
+        await RunAsync(JobTypes.Grade);
+
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
+        Assert.Equal(Correction.MaxMarks, correction.Marks.Count);
+        Assert.Equal(0, await student.BalanceAsync());
+        var trimmed = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "grading.marks_trimmed"));
+        var data = JsonDocument.Parse(trimmed.Data!).RootElement;
+        Assert.Equal((150, 80), (data.GetProperty("received").GetInt32(), data.GetProperty("kept").GetInt32()));
+        Assert.Contains("até 80 trechos", api.Grader.LastRequest!.System);
+    }
+
+    [Fact]
     public async Task Two_bad_responses_fail_the_essay_and_give_the_credit_back_once()
     {
         var student = await QueuedEssayAsync();
@@ -165,6 +227,203 @@ public class GradingTests(ApiFixture api)
         Assert.Equal(1, await student.BalanceAsync());
         var ledger = await api.QueryAsync(db => db.CreditLedger.Where(e => e.EssayId == student.EssayId).OrderBy(e => e.Id).ToListAsync());
         Assert.Equal([(-1, CreditSource.Trial), (1, CreditSource.Refund)], ledger.Select(e => (e.Delta, e.Source)));
+    }
+
+    /// <summary>Limite de gasto folgado, para testar o tamanho pedido sem a redução pelo limite.</summary>
+    private WebApplicationFactory<Program> WithoutSpendingLimit(string? gradingMaxTokens = null) =>
+        api.CreateFactory(builder =>
+        {
+            builder.UseSetting("Ai:HardCapUsd", "100");
+            if (gradingMaxTokens is not null)
+            {
+                builder.UseSetting("Ai:Grading:MaxTokens", gradingMaxTokens);
+            }
+        });
+
+    [Fact]
+    public async Task Truncated_response_is_asked_again_with_twice_the_max_tokens()
+    {
+        await using var factory = WithoutSpendingLimit();
+        var student = await QueuedEssayAsync();
+        var before = api.Grader.Requests.Count;
+        api.Grader.Script.Enqueue(FakeGrader.Truncated);
+
+        await RunAsync(JobTypes.Grade, factory);
+
+        // A resposta cortada não é completada: a segunda chamada, com o dobro, conclui a correção.
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        Assert.Equal([32_000, 64_000], api.Grader.Requests.Skip(before).Select(request => request.MaxTokens));
+        // As duas chamadas são cobradas e entram no gasto da redação.
+        Assert.Equal(2, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
+        var truncated = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_truncated"));
+        Assert.Contains("\"maxTokens\":32000", truncated.Data!.Replace(" ", ""));
+        // Cortada não é o mesmo que recusada pelas regras.
+        Assert.False(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_rejected")));
+    }
+
+    [Fact]
+    public async Task Response_truncated_twice_fails_the_essay_with_the_credit_back()
+    {
+        await using var factory = WithoutSpendingLimit();
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(FakeGrader.Truncated);
+        api.Grader.Script.Enqueue(FakeGrader.Truncated);
+
+        await RunAsync(JobTypes.Grade, factory);
+
+        var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == student.EssayId));
+        Assert.Equal((EssayStatus.Failed, "GRADING_FAILED"), (essay.Status, essay.FailureCode));
+        var job = await student.JobAsync(JobTypes.Grade);
+        Assert.Equal((JobStatus.Dead, 1, "AI_OUTPUT_TRUNCATED"), (job.Status, job.Attempts, job.LastError));
+        Assert.Equal(1, await student.BalanceAsync());
+        Assert.Equal(2, await api.QueryAsync(db => db.AuditLog.CountAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_truncated")));
+        Assert.NotNull(essay.FailedAt);
+
+        // O aluno vê GRADING_FAILED; o motivo interno e as tentativas da IA ficam só na trilha de auditoria.
+        var body = await student.Client.GetStringAsync($"/v1/essays/{student.EssayId}");
+        Assert.DoesNotContain("AI_", body);
+        Assert.DoesNotContain("truncated", body);
+        var detail = JsonDocument.Parse(body).RootElement;
+        Assert.Equal(("GRADING_FAILED", true), (
+            detail.GetProperty("failure").GetProperty("code").GetString(),
+            detail.GetProperty("failure").GetProperty("creditRefunded").GetBoolean()));
+        Assert.Equal(
+            ["submitted", "transcribed", "grading_started", "failed", "credit_refunded"],
+            detail.GetProperty("timeline").EnumerateArray().Select(e => e.GetProperty("type").GetString()));
+    }
+
+    [Fact]
+    public async Task New_attempt_after_a_truncated_response_respects_the_hard_cap()
+    {
+        // Cada chamada custa US$ 0,0562: a segunda não cabe em US$ 0,10.
+        await using var factory = api.CreateFactory(builder => builder.UseSetting("Ai:HardCapUsd", "0.10"));
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(FakeGrader.Truncated);
+
+        await RunAsync(JobTypes.Grade, factory);
+
+        var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == student.EssayId));
+        Assert.Equal((EssayStatus.Failed, "GRADING_FAILED"), (essay.Status, essay.FailureCode));
+        Assert.Equal("AI_BUDGET_EXCEEDED", (await student.JobAsync(JobTypes.Grade)).LastError);
+        Assert.Equal(1, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
+        Assert.Equal(1, await student.BalanceAsync());
+    }
+
+    [Fact]
+    public async Task Max_tokens_comes_from_the_configuration()
+    {
+        await using var factory = WithoutSpendingLimit(gradingMaxTokens: "20000");
+        await QueuedEssayAsync();
+        var before = api.Grader.Requests.Count;
+
+        await RunAsync(JobTypes.Grade, factory);
+
+        Assert.Equal(20_000, api.Grader.Requests.Skip(before).Single().MaxTokens);
+    }
+
+    [Fact]
+    public async Task Max_tokens_is_reduced_to_what_fits_in_the_hard_cap_at_the_worst_case()
+    {
+        // Limite padrão de US$ 0,33: 32 mil tokens de saída no Opus (US$ 20 por milhão) seriam US$ 0,64.
+        var student = await QueuedEssayAsync();
+        var before = api.Grader.Requests.Count;
+
+        await RunAsync(JobTypes.Grade);
+
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        var sent = api.Grader.Requests.Skip(before).Single().MaxTokens;
+        Assert.InRange(sent, 1_024, 16_499);
+        var reduced = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "ai.max_tokens_reduced"));
+        Assert.Contains($"\"allowed\":{sent}", reduced.Data!.Replace(" ", ""));
+    }
+
+    [Fact]
+    public async Task Truncated_response_that_already_used_the_budget_is_not_asked_again()
+    {
+        // Com o limite padrão, a resposta cortada gasta quase tudo: a nova chamada, no pior caso, não cabe.
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(FakeGrader.Truncated);
+
+        await RunAsync(JobTypes.Grade);
+
+        var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == student.EssayId));
+        Assert.Equal((EssayStatus.Failed, "GRADING_FAILED"), (essay.Status, essay.FailureCode));
+        Assert.Equal("AI_BUDGET_EXCEEDED", (await student.JobAsync(JobTypes.Grade)).LastError);
+        Assert.Equal(1, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
+        // O gasto gravado nunca passa do limite rígido.
+        var spent = await api.QueryAsync(db => db.AiUsages.Where(u => u.EssayId == student.EssayId).SumAsync(u => u.CostMicroUsd ?? 0));
+        Assert.True(spent <= 330_000, $"gasto de {spent} milionésimos de dólar");
+        Assert.Equal(1, await student.BalanceAsync());
+    }
+
+    [Fact]
+    public async Task Call_that_fails_in_the_middle_of_the_stream_is_charged_and_counts_in_the_budget()
+    {
+        var student = await QueuedEssayAsync();
+        var before = api.Grader.Requests.Count;
+        api.Grader.Script.Enqueue(FakeGrader.FailedMidStream);
+
+        await RunAsync(JobTypes.Grade);
+
+        // A IA caiu no meio: a redação continua em correção e o job volta depois, como em toda queda da IA…
+        Assert.Equal(EssayStatus.Processing, await student.StatusAsync());
+        var job = await student.JobAsync(JobTypes.Grade);
+        Assert.Equal((JobStatus.Ready, "AI_UNAVAILABLE"), (job.Status, job.LastError));
+        // …mas o que já tinha sido gerado foi cobrado, pelo pior caso da saída, e entra no limite de gasto.
+        var usage = await api.QueryAsync(db => db.AiUsages.SingleAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading));
+        Assert.Equal(api.Grader.Requests.Skip(before).Single().MaxTokens, usage.OutputTokens);
+        Assert.True(usage.CostMicroUsd > 0);
+    }
+
+    [Fact]
+    public async Task Job_lock_is_renewed_while_the_ai_is_still_answering()
+    {
+        await using var factory = api.CreateFactory(builder => builder.UseSetting("Jobs:Heartbeat", "00:00:00.200"));
+        var student = await QueuedEssayAsync();
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.Grader.Hold = hold;
+        try
+        {
+            var running = RunAsync(JobTypes.Grade, factory);
+            await WaitUntilAsync(async () => (await student.JobAsync(JobTypes.Grade)).Status == JobStatus.Running);
+            var claimed = (await student.JobAsync(JobTypes.Grade)).LockedUntil!.Value;
+
+            // Enquanto a IA responde, a trava avança: nenhum outro worker pega o mesmo job.
+            await WaitUntilAsync(async () => (await student.JobAsync(JobTypes.Grade)).LockedUntil > claimed);
+
+            hold.SetResult();
+            await running;
+            Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+            Assert.Equal(JobStatus.Done, (await student.JobAsync(JobTypes.Grade)).Status);
+        }
+        finally
+        {
+            api.Grader.Hold = null;
+            hold.TrySetResult();
+        }
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (!await condition())
+        {
+            Assert.True(DateTimeOffset.UtcNow < deadline, "a condição não aconteceu a tempo");
+            await Task.Delay(50);
+        }
+    }
+
+    [Fact]
+    public async Task Doubled_max_tokens_never_passes_what_the_model_accepts()
+    {
+        await using var factory = WithoutSpendingLimit(gradingMaxTokens: "100000");
+        await QueuedEssayAsync();
+        var before = api.Grader.Requests.Count;
+        api.Grader.Script.Enqueue(FakeGrader.Truncated);
+
+        await RunAsync(JobTypes.Grade, factory);
+
+        Assert.Equal([100_000, 128_000], api.Grader.Requests.Skip(before).Select(request => request.MaxTokens));
     }
 
     [Fact]

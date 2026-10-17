@@ -2711,9 +2711,11 @@
           "score",
           "maxScore",
           "failureCode",
+          "failure",
           "sheetLines",
           "lines",
-          "illegibleWords"
+          "illegibleWords",
+          "timeline"
         ],
         "type": "object",
         "properties": {
@@ -2784,6 +2786,16 @@
               "string"
             ]
           },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EssayFailureDto"
+              }
+            ]
+          },
           "sheetLines": {
             "type": "integer",
             "format": "int32"
@@ -2799,6 +2811,104 @@
             "items": {
               "$ref": "#/components/schemas/IllegibleWordDto"
             }
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EssayEventDto"
+            }
+          }
+        }
+      },
+      "EssayEventDetailsDto": {
+        "required": [
+          "illegibleCount",
+          "failureCode"
+        ],
+        "type": "object",
+        "properties": {
+          "illegibleCount": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "EssayEventDto": {
+        "required": [
+          "at",
+          "type",
+          "details"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EssayEventType"
+          },
+          "details": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EssayEventDetailsDto"
+              }
+            ]
+          }
+        }
+      },
+      "EssayEventType": {
+        "enum": [
+          "submitted",
+          "transcribed",
+          "review_completed",
+          "grading_started",
+          "completed",
+          "failed",
+          "cancelled",
+          "credit_refunded"
+        ]
+      },
+      "EssayFailureDto": {
+        "required": [
+          "code",
+          "occurredAt",
+          "creditRefunded",
+          "details"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "creditRefunded": {
+            "type": "boolean"
+          },
+          "details": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EssayEventDetailsDto"
+              }
+            ]
           }
         }
       },
@@ -2850,7 +2960,8 @@
           "illegibleCount",
           "score",
           "maxScore",
-          "failureCode"
+          "failureCode",
+          "failure"
         ],
         "type": "object",
         "properties": {
@@ -2919,6 +3030,16 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EssayFailureDto"
+              }
             ]
           }
         }

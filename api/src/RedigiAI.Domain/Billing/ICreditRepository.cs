@@ -20,6 +20,9 @@ public interface ICreditRepository
     /// <summary>Devolve 1 correção ao bucket com <c>UPDATE … WHERE remaining &lt; granted</c>, na transação aberta.</summary>
     Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct);
 
+    /// <summary>Entre as redações informadas, as que tiveram a correção devolvida ao saldo.</summary>
+    Task<IReadOnlySet<Guid>> RefundedAsync(IReadOnlyCollection<Guid> essayIds, CancellationToken ct);
+
     /// <summary>Buckets com saldo e não vencidos.</summary>
     Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(Guid userId, DateTimeOffset now, CancellationToken ct);
 }

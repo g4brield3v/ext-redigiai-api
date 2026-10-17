@@ -30,7 +30,13 @@ public static class DependencyInjection
         services.AddScoped<IEssayService, EssayService>();
         services.AddScoped<EssayOutcomes>();
         services.AddScoped<ICorrectionService, CorrectionService>();
-        services.AddOptions<AiBudgetOptions>();
+        services.AddOptions<AiBudgetOptions>()
+            .Validate(
+                ai => ai.MaxOutputTokens > 0
+                    && ai.Grading.MaxTokens is > 0 && ai.Grading.MaxTokens <= ai.MaxOutputTokens
+                    && ai.Transcription.MaxTokens is > 0 && ai.Transcription.MaxTokens <= ai.MaxOutputTokens,
+                "Ai:Grading:MaxTokens e Ai:Transcription:MaxTokens vão de 1 até Ai:MaxOutputTokens.")
+            .ValidateOnStart();
         services.AddOptions<CollectionCopyOptions>();
         services.AddSingleton<AiBudget>();
         services.AddScoped<AiSpending>();

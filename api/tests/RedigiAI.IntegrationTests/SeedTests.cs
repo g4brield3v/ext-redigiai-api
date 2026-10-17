@@ -84,6 +84,34 @@ public class SeedTests(ApiFixture api)
         Assert.Equal(2, await CountAsync(factory, db => db.PromptTemplates.CountAsync(t => t.Kind == PromptKind.Grading)));
     }
 
+    [Fact]
+    public async Task Outdated_grader_manual_is_replaced_in_development_keeping_the_grading_instructions()
+    {
+        await using var factory = await SeededAsync("Development");
+        var before = await CountAsync(factory, db => db.GradingProfiles.Where(p => p.Status == GradingProfileStatus.Active).ToListAsync());
+
+        // O banco ficou com o manual do corretor de uma versão anterior do programa; as instruções estão em dia.
+        await CountAsync(factory, db => db.Database.ExecuteSqlRawAsync("UPDATE rubric_guideline_versions SET general_rules = 'Justificativa de até 60 palavras.'"));
+
+        Assert.True(await SeedAsync(factory));
+
+        // O manual antigo continua gravado; o novo entra como versão 2 e só ele muda nos perfis novos.
+        var manuals = await CountAsync(factory, db => db.GuidelinesVersions.Include(g => g.Criteria).OrderBy(g => g.Version).ToListAsync());
+        Assert.Equal([1, 2], manuals.Select(g => g.Version));
+        Assert.Equal("Justificativa de até 60 palavras.", manuals[0].GeneralRules);
+        Assert.DoesNotContain("60 palavras", manuals[1].GeneralRules);
+        Assert.Equal(manuals[0].Criteria.Count, manuals[1].Criteria.Count);
+        var active = await CountAsync(factory, db => db.GradingProfiles.Where(p => p.Status == GradingProfileStatus.Active).ToListAsync());
+        Assert.Equal(2, active.Count);
+        Assert.All(active, profile => Assert.Equal((2, manuals[1].Id), (profile.Version, profile.GuidelinesVersionId)));
+        Assert.Equal(before.Select(p => p.GradingPromptId).Order(), active.Select(p => p.GradingPromptId).Order());
+        Assert.Equal(1, await CountAsync(factory, db => db.PromptTemplates.CountAsync(t => t.Kind == PromptKind.Grading)));
+
+        // Com o manual em dia, rodar de novo não cria outra versão.
+        Assert.False(await SeedAsync(factory));
+        Assert.Equal(2, await CountAsync(factory, db => db.GuidelinesVersions.CountAsync()));
+    }
+
     /// <summary>A aplicação nesse ambiente, sobre um banco novo, já migrado e com a carga inicial.</summary>
     private async Task<WebApplicationFactory<Program>> SeededAsync(string environment)
     {

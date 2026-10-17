@@ -278,12 +278,18 @@ public sealed class FakeTranscriber : IEssayTranscriber
 
     public static TranscriptionCall Unavailable() => throw Errors.AiUnavailable();
 
+    /// <summary>Resposta cortada no <c>max_tokens</c>: sem leitura, com o consumo cobrado.</summary>
+    public static TranscriptionCall Truncated() => new(null, Model, new AiTokens(5000, 8000, 0, 0), Truncated: true);
+
     /// <summary>O último pedido recebido, para conferir instruções e modelo.</summary>
     public TranscriptionRequest? LastRequest { get; private set; }
+
+    public ConcurrentQueue<TranscriptionRequest> Requests { get; } = new();
 
     public Task<TranscriptionCall> TranscribeAsync(TranscriptionRequest request, CancellationToken ct)
     {
         LastRequest = request;
+        Requests.Enqueue(request);
         return Respond();
     }
 

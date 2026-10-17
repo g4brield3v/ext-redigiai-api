@@ -12,7 +12,6 @@ namespace RedigiAI.Infrastructure.Anthropic;
 internal sealed class ClaudeEssayTranscriber(ClaudeMessagesApi api) : IEssayTranscriber
 {
     private const string ToolName = "registrar_transcricao";
-    private const int MaxTokens = 4000;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -20,14 +19,15 @@ internal sealed class ClaudeEssayTranscriber(ClaudeMessagesApi api) : IEssayTran
     {
         using var document = await api.SendAsync(BuildRequest(transcription), "transcription", ct);
         var root = document.RootElement;
-        return new TranscriptionCall(ReadingOf(root), transcription.Model, ClaudeMessagesApi.TokensOf(root));
+        return new TranscriptionCall(
+            ReadingOf(root), transcription.Model, ClaudeMessagesApi.TokensOf(root), ClaudeMessagesApi.IsTruncated(root));
     }
 
     private static JsonObject BuildRequest(TranscriptionRequest transcription) =>
         new()
         {
             ["model"] = transcription.Model,
-            ["max_tokens"] = MaxTokens,
+            ["max_tokens"] = transcription.MaxTokens,
             ["system"] = transcription.Instructions,
             ["tools"] = new JsonArray(new JsonObject
             {
