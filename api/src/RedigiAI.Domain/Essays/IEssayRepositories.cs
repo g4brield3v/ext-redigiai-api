@@ -28,6 +28,16 @@ public interface IEssayRepository
     /// <summary>Redações à espera da revisão do aluno com o prazo vencido.</summary>
     Task<IReadOnlyList<Guid>> ListExpiredReviewsAsync(DateTimeOffset now, int limit, CancellationToken ct);
 
+    /// <summary>Redações à espera da revisão, ainda no prazo, que já passaram da hora do lembrete e não o receberam.</summary>
+    Task<IReadOnlyList<Guid>> ListReviewsDueForReminderAsync(DateTimeOffset now, int limit, CancellationToken ct);
+
+    /// <summary>
+    /// Marca o lembrete com <c>UPDATE … WHERE status = awaiting_review AND review_reminded_at IS NULL</c>, na hora,
+    /// dentro da transação aberta.
+    /// </summary>
+    /// <returns><c>false</c> se outro processo já lembrou ou a redação saiu da revisão.</returns>
+    Task<bool> TryMarkRemindedAsync(Guid essayId, DateTimeOffset now, CancellationToken ct);
+
     /// <summary>
     /// Registros da trilha de auditoria ligados à redação, do mais antigo para o mais novo. Quem chama já
     /// conferiu que a redação é do aluno.

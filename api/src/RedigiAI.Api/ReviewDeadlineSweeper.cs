@@ -3,8 +3,8 @@ using RedigiAI.Application.Essays;
 namespace RedigiAI.Api;
 
 /// <summary>
-/// A cada 15 minutos, cancela as redações cuja revisão de palavras ilegíveis passou do prazo de 24 h e
-/// devolve o crédito de cada uma (especificação, seção 7, jobs agendados).
+/// A cada 15 minutos, agenda o lembrete das redações com 12 h sem preencher as palavras ilegíveis e cancela as
+/// que passaram do prazo de 24 h, devolvendo o crédito de cada uma (especificação, seção 7, jobs agendados).
 /// </summary>
 internal sealed class ReviewDeadlineSweeper(IServiceScopeFactory scopes, ILogger<ReviewDeadlineSweeper> logger) : BackgroundService
 {
@@ -17,7 +17,14 @@ internal sealed class ReviewDeadlineSweeper(IServiceScopeFactory scopes, ILogger
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                var cancelled = await scope.ServiceProvider.GetRequiredService<IEssayService>().CancelExpiredReviewsAsync(stoppingToken);
+                var essays = scope.ServiceProvider.GetRequiredService<IEssayService>();
+                var reminded = await essays.ScheduleReviewRemindersAsync(stoppingToken);
+                if (reminded > 0)
+                {
+                    logger.LogInformation("Scheduled {Count} illegible-word reminders", reminded);
+                }
+
+                var cancelled = await essays.CancelExpiredReviewsAsync(stoppingToken);
                 if (cancelled > 0)
                 {
                     logger.LogInformation("Cancelled {Count} essays whose review deadline expired", cancelled);

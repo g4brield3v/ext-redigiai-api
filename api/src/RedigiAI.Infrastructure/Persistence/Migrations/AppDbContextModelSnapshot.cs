@@ -854,6 +854,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("review_deadline_at");
 
+                    b.Property<DateTimeOffset?>("ReviewRemindedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("review_reminded_at");
+
                     b.Property<Guid>("RubricVersionId")
                         .HasColumnType("uuid")
                         .HasColumnName("rubric_version_id");
@@ -1834,6 +1838,56 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.ToTable("jobs", (string)null);
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Notifications.EmailLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<Guid>("RefId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ref_id");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Template")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("template");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_log");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_email_log_user_id");
+
+                    b.HasIndex("Template", "RefId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_email_log_template_ref_id");
+
+                    b.ToTable("email_log", (string)null);
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Auditing.AccessLogEntry", b =>
                 {
                     b.HasOne("RedigiAI.Domain.Accounts.User", null)
@@ -2306,6 +2360,16 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_writing_rules_writing_rules_versions_writing_rules_version_");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Notifications.EmailLogEntry", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_email_log_users_user_id");
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Catalog.Prompt", b =>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
@@ -36,6 +37,10 @@ public interface IEssayService
     /// <summary>Cancela as redações cuja revisão passou do prazo e devolve o crédito de cada uma.</summary>
     /// <returns>Quantas foram canceladas agora.</returns>
     Task<int> CancelExpiredReviewsAsync(CancellationToken ct);
+
+    /// <summary>Agenda o lembrete das palavras ilegíveis, uma vez por redação, 12 h depois do aviso.</summary>
+    /// <returns>Quantos lembretes foram agendados agora.</returns>
+    Task<int> ScheduleReviewRemindersAsync(CancellationToken ct);
 }
 
 internal sealed class EssayService(
@@ -260,6 +265,34 @@ internal sealed class EssayService(
         }
 
         return cancelled;
+    }
+
+    public async Task<int> ScheduleReviewRemindersAsync(CancellationToken ct)
+    {
+        var scheduled = 0;
+        foreach (var essayId in await essays.ListReviewsDueForReminderAsync(time.GetUtcNow(), ExpiredReviewsPerSweep, ct))
+        {
+            var marked = await unitOfWork.InTransactionAsync(
+                async () =>
+                {
+                    // Marca e agenda juntos: outro processo que chegue ao mesmo tempo não agenda um segundo lembrete.
+                    if (!await essays.TryMarkRemindedAsync(essayId, time.GetUtcNow(), ct))
+                    {
+                        return false;
+                    }
+
+                    EmailJobs.Enqueue(jobs, EmailTemplates.IllegibleReminder, essayId);
+                    return true;
+                },
+                ct);
+
+            if (marked)
+            {
+                scheduled++;
+            }
+        }
+
+        return scheduled;
     }
 
     private async Task<PreparedEssay> PrepareAsync(

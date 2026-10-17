@@ -57,6 +57,8 @@ public sealed class ApiFixture : IAsyncLifetime
     /// <summary>Faz o papel da Backend API do Clerk: o e-mail principal de cada conta e se está verificado.</summary>
     public FakeIdentityDirectory Directory { get; } = new();
 
+    public FakeEmailSender Emails { get; } = new();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
     public async Task InitializeAsync()
@@ -98,6 +100,9 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("Proxy:TrustForwardedHeaders", "false");
             // O .env da máquina de desenvolvimento pode ligar o acesso sem login; nos testes ele fica desligado.
             builder.UseSetting("DevAuth:Enabled", "false");
+            builder.UseSetting("App:BaseUrl", WebOrigin);
+            // Com chave, a configuração vale em qualquer ambiente; o envio em si é o falso, abaixo.
+            builder.UseSetting("SendGrid:ApiKey", "test-key");
             configure?.Invoke(builder);
 
             builder.ConfigureTestServices(services =>
@@ -112,6 +117,7 @@ public sealed class ApiFixture : IAsyncLifetime
                 services.AddSingleton<IEssayGrader>(Grader);
                 services.AddSingleton<IIdentityDirectory>(Directory);
                 services.AddSingleton<IPromptImageStorage>(PromptImages);
+                services.AddSingleton<IEmailSender>(Emails);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
@@ -297,4 +303,25 @@ public sealed class FakeTranscriber : IEssayTranscriber
         Task.FromResult(Script.TryDequeue(out var next)
             ? next()
             : Reading(lines: ["A tecnologia mudou a forma de debater.", "Os algoritmos escolhem o que cada um vê."]));
+}
+
+/// <summary>Guarda os e-mails em vez de enviá-los. O roteiro faz as próximas chamadas falharem, na ordem.</summary>
+public sealed class FakeEmailSender : IEmailSender
+{
+    public ConcurrentQueue<EmailMessage> Sent { get; } = new();
+
+    public ConcurrentQueue<Exception> Failures { get; } = new();
+
+    public IReadOnlyList<EmailMessage> For(Guid essayId) => [.. Sent.Where(message => message.RefId == essayId)];
+
+    public Task<string?> SendAsync(EmailMessage message, CancellationToken ct)
+    {
+        if (Failures.TryDequeue(out var failure))
+        {
+            throw failure;
+        }
+
+        Sent.Enqueue(message);
+        return Task.FromResult<string?>($"fake-{Guid.NewGuid():N}");
+    }
 }

@@ -7,6 +7,7 @@ using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Domain.Grading;
+using RedigiAI.Domain.Notifications;
 using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Clerk;
 using RedigiAI.Infrastructure.Cloudinary;
@@ -46,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IGuidelinesRepository, GuidelinesRepository>();
         services.AddScoped<IWritingRulesRepository, WritingRulesRepository>();
         services.AddScoped<ICorrectionRepository, CorrectionRepository>();
+        services.AddScoped<IEmailLogRepository, EmailLogRepository>();
         services.AddScoped<IJobQueue, JobQueue>();
         services.AddSingleton<IJobRunner, JobRunner>();
         services.AddSingleton<JobSignal>();

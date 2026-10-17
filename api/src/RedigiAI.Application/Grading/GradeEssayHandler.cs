@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Essays;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Common;
@@ -10,9 +11,6 @@ using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Application.Grading;
-
-/// <summary>Payload do job <c>send_email</c>: o modelo do e-mail e a que ele se refere. Nunca o conteúdo.</summary>
-public sealed record EmailJobPayload(string Template, Guid RefId);
 
 /// <summary>
 /// Job <c>grade</c>: corrige a redação com as camadas do perfil de correção, valida a resposta da IA, calcula a
@@ -42,14 +40,11 @@ internal sealed class GradeEssayHandler(
     IOptions<CollectionCopyOptions> copyOptions,
     TimeProvider time) : IJobHandler
 {
-    public const string CorrectionReadyTemplate = "correction_ready";
-
     /// <summary>Resposta que não passa na validação: pede mais uma vez; repetida, a falha é definitiva.</summary>
     private const int InvalidResponseAttempts = 2;
 
     /// <summary>Resposta cortada no <c>max_tokens</c>: pede de novo com o dobro; cortada de novo, a falha é definitiva.</summary>
     private const int TruncatedResponseAttempts = 2;
-    private const int EmailAttempts = 6;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -104,7 +99,7 @@ internal sealed class GradeEssayHandler(
                 }
 
                 corrections.Add(correction);
-                jobs.Enqueue(JobTypes.SendEmail, new EmailJobPayload(CorrectionReadyTemplate, essay.Id), EmailAttempts);
+                EmailJobs.Enqueue(jobs, EmailTemplates.CorrectionReady, essay.Id);
                 audit.Record(
                     "system",
                     "essay.status_changed",

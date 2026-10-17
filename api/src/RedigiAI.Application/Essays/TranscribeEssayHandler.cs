@@ -1,5 +1,6 @@
 using System.Text.Json;
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
@@ -89,6 +90,10 @@ internal sealed class TranscribeEssayHandler(
                 if (transition.To == EssayStatus.Queued)
                 {
                     jobs.Enqueue(JobTypes.Grade, new EssayJobPayload(essay.Id), GradeAttempts);
+                }
+                else
+                {
+                    EmailJobs.Enqueue(jobs, EmailTemplates.IllegibleWords, essay.Id);
                 }
 
                 audit.Record(

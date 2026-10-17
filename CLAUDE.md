@@ -66,6 +66,8 @@ dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevAuth__Enabled=true, a própria API já roda a fila)
 # Em desenvolvimento a IA fica desligada (Ai__Enabled=false): os jobs transcribe e grade esperam na fila e nada é
 # cobrado. Ai__Enabled=true no .env liga as chamadas reais ao Claude.
+# E-mails em desenvolvimento: sem SendGrid__ApiKey, cada aviso vira um arquivo HTML em .outbox/ (abra no navegador);
+# nada é enviado. Os botões apontam para App__BaseUrl (padrão http://localhost:5173).
 # Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
 # carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova | admin).
 # O usuário admin só existe com Admin__Emails preenchido: usa o primeiro e-mail da lista e simula o segundo fator.
