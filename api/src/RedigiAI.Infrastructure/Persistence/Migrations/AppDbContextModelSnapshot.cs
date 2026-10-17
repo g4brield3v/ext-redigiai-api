@@ -677,6 +677,27 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.ToTable("rubric_versions", (string)null);
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Common.FeatureFlag", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("key");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Key")
+                        .HasName("pk_feature_flags");
+
+                    b.ToTable("feature_flags", (string)null);
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Essays.AiUsage", b =>
                 {
                     b.Property<Guid>("Id")

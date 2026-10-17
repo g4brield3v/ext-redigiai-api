@@ -26,23 +26,37 @@ public sealed class SendGridOptions
 public static class EmailRegistration
 {
     /// <summary>
-    /// Com chave, envia pelo SendGrid. Sem chave, só em desenvolvimento: grava cada e-mail como arquivo na pasta
-    /// local. Fora de desenvolvimento, sem chave, a validação recusa a configuração; quem sobe a API ou o worker
-    /// confere ao iniciar (ver <c>StartupChecks</c>).
+    /// Com chave, envia pelo SendGrid. Sem chave, em desenvolvimento, grava cada e-mail como arquivo na pasta local;
+    /// fora dele, cada envio falha com <c>EMAIL_NOT_CONFIGURED</c>. A chave não é exigida para subir: quem decide se
+    /// há envio é a flag <c>email_sending</c> no banco, desligada enquanto não há provedor de e-mail.
     /// </summary>
     /// <remarks>Quem chama liga a seção <see cref="SendGridOptions.Section"/> da configuração.</remarks>
     public static IServiceCollection AddEmailSender(this IServiceCollection services, bool isDevelopment)
     {
-        services.AddOptions<SendGridOptions>()
-            .Validate(sendGrid => isDevelopment || sendGrid.ApiKey.Length > 0, "SendGrid__ApiKey é obrigatória fora do ambiente Development.");
         services.AddSingleton<SendGridEmailSender>();
         services.AddSingleton<OutboxEmailSender>();
+        services.AddSingleton<UnconfiguredEmailSender>();
         services.AddSingleton<IEmailSender>(provider =>
-            provider.GetRequiredService<IOptions<SendGridOptions>>().Value.ApiKey.Length > 0
+            !string.IsNullOrWhiteSpace(provider.GetRequiredService<IOptions<SendGridOptions>>().Value.ApiKey)
                 ? provider.GetRequiredService<SendGridEmailSender>()
-                : provider.GetRequiredService<OutboxEmailSender>());
+                : isDevelopment
+                    ? provider.GetRequiredService<OutboxEmailSender>()
+                    : provider.GetRequiredService<UnconfiguredEmailSender>());
 
         return services;
+    }
+}
+
+/// <summary>Fora de desenvolvimento, sem chave: o envio está ligado no banco, mas não há provedor configurado.</summary>
+internal sealed class UnconfiguredEmailSender(ILogger<UnconfiguredEmailSender> logger) : IEmailSender
+{
+    public Task<string?> SendAsync(EmailMessage message, CancellationToken ct)
+    {
+        logger.LogError(
+            "E-mail sending is enabled but SendGrid__ApiKey is missing; {Template} for {RefId} was not sent",
+            message.Template,
+            message.RefId);
+        throw new AppError("EMAIL_NOT_CONFIGURED", 500, "Algo deu errado do nosso lado. Tente novamente em instantes.");
     }
 }
 
@@ -75,7 +89,7 @@ internal sealed class SendGridEmailSender(IOptions<SendGridOptions> options, ILo
                 tracking_settings = new { click_tracking = new { enable = false, enable_text = false } },
             }),
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey.Trim());
 
         using var response = await Http.SendAsync(request, ct);
         if (response.IsSuccessStatusCode)
@@ -115,7 +129,7 @@ internal sealed class OutboxEmailSender(IOptions<SendGridOptions> options, ILogg
         var header = $"<!-- Para: {WebUtility.HtmlEncode(message.To)} | Assunto: {WebUtility.HtmlEncode(message.Subject)} -->\n";
         await File.WriteAllTextAsync(Path.Combine(folder, id + ".html"), header + message.Html, Encoding.UTF8, ct);
 
-        logger.LogInformation("E-mail {Template} for {RefId} written to the local outbox", message.Template, message.RefId);
+        logger.LogWarning("E-mail {Template} for {RefId} written to the local outbox, not sent (no SendGrid__ApiKey)", message.Template, message.RefId);
         return $"outbox:{id}";
     }
 }

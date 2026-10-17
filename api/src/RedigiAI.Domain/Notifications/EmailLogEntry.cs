@@ -33,14 +33,22 @@ public sealed class EmailLogEntry
         };
 }
 
+/// <summary>Resultado da reserva: ou o envio é deste processo, ou já saiu, ou outro processo está enviando agora.</summary>
+/// <param name="Id">A linha reservada, quando a reserva é deste processo.</param>
+public sealed record EmailClaim(Guid? Id, bool AlreadySent)
+{
+    public static EmailClaim Busy { get; } = new(null, false);
+
+    public static EmailClaim Sent { get; } = new(null, true);
+}
+
 public interface IEmailLogRepository
 {
     /// <summary>
     /// Reserva o envio na hora, fora de transação: cria a linha ou retoma uma reserva sem envio mais antiga que
     /// <paramref name="staleBefore"/>.
     /// </summary>
-    /// <returns>O id da linha reservada; nulo se o e-mail já saiu ou outro processo está enviando.</returns>
-    Task<Guid?> TryClaimAsync(EmailLogEntry entry, DateTimeOffset staleBefore, CancellationToken ct);
+    Task<EmailClaim> TryClaimAsync(EmailLogEntry entry, DateTimeOffset staleBefore, CancellationToken ct);
 
     Task MarkSentAsync(Guid id, string? providerMessageId, DateTimeOffset now, CancellationToken ct);
 

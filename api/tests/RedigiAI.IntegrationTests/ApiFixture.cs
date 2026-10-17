@@ -14,6 +14,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Collections.Concurrent;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Infrastructure.Persistence;
@@ -101,8 +102,6 @@ public sealed class ApiFixture : IAsyncLifetime
             // O .env da máquina de desenvolvimento pode ligar o acesso sem login; nos testes ele fica desligado.
             builder.UseSetting("DevAuth:Enabled", "false");
             builder.UseSetting("App:BaseUrl", WebOrigin);
-            // Com chave, a configuração vale em qualquer ambiente; o envio em si é o falso, abaixo.
-            builder.UseSetting("SendGrid:ApiKey", "test-key");
             configure?.Invoke(builder);
 
             builder.ConfigureTestServices(services =>
@@ -118,6 +117,8 @@ public sealed class ApiFixture : IAsyncLifetime
                 services.AddSingleton<IIdentityDirectory>(Directory);
                 services.AddSingleton<IPromptImageStorage>(PromptImages);
                 services.AddSingleton<IEmailSender>(Emails);
+                // O site dos testes é o do Vite, em http.
+                services.PostConfigure<SiteOptions>(site => site.RequireHttps = false);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };

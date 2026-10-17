@@ -11,11 +11,82 @@ using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.IntegrationTests;
 
-/// <summary>Os avisos por e-mail da redação (especificação, seção 10).</summary>
+/// <summary>Os avisos por e-mail da redação (especificação, seção 10), com o envio ligado no banco.</summary>
 [Collection(ApiCollection.Name)]
-public class EmailTests(ApiFixture api)
+public class EmailTests(ApiFixture api) : IAsyncLifetime
 {
     private const string PromptSlug = "algoritmos-e-o-debate-publico";
+
+    public Task InitializeAsync() => SetSendingAsync(true);
+
+    /// <summary>Os outros testes rodam com o envio desligado, como ele nasce.</summary>
+    public Task DisposeAsync() => SetSendingAsync(false);
+
+    [Fact]
+    public async Task Sending_turned_off_in_the_database_drops_the_notice_without_sending()
+    {
+        await SetSendingAsync(false);
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        await RunAsync(JobTypes.Transcribe);
+        await RunAsync(JobTypes.Grade);
+
+        await RunAsync(JobTypes.SendEmail);
+
+        Assert.Empty(api.Emails.For(essayId));
+        Assert.False(await api.QueryAsync(db => db.EmailLog.AnyAsync(e => e.RefId == essayId)));
+        var job = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.SendEmail).ToListAsync()))
+            .Single(j => j.Payload.Contains(essayId.ToString()));
+        Assert.Equal(JobStatus.Done, job.Status);
+
+        // Ligar depois não reenvia o aviso descartado.
+        await SetSendingAsync(true);
+        await RunAsync(JobTypes.SendEmail);
+        Assert.Empty(api.Emails.For(essayId));
+    }
+
+    [Fact]
+    public async Task Recent_claim_from_another_process_makes_the_job_try_again_later()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        await RunAsync(JobTypes.Transcribe);
+        await RunAsync(JobTypes.Grade);
+        // Outro worker reservou o envio agora e pode ter caído no meio.
+        await api.QueryAsync(db =>
+        {
+            db.EmailLog.Add(RedigiAI.Domain.Notifications.EmailLogEntry.Claim(student.Id, EmailTemplates.CorrectionReady, essayId, DateTimeOffset.UtcNow));
+            return db.SaveChangesAsync();
+        });
+
+        var busy = await Assert.ThrowsAsync<RedigiAI.Domain.Common.AppError>(() => HandleAsync(EmailTemplates.CorrectionReady, essayId));
+        Assert.Equal(("EMAIL_BUSY", true), (busy.Code, busy.Retryable));
+        Assert.Empty(api.Emails.For(essayId));
+
+        // Passados 10 minutos sem envio, a reserva é retomada e o e-mail sai.
+        await api.QueryAsync(db => db.EmailLog.Where(e => e.RefId == essayId)
+            .ExecuteUpdateAsync(e => e.SetProperty(x => x.ClaimedAt, DateTimeOffset.UtcNow.AddMinutes(-11))));
+        await HandleAsync(EmailTemplates.CorrectionReady, essayId);
+        Assert.Single(api.Emails.For(essayId));
+    }
+
+    [Fact]
+    public async Task Timeout_keeps_the_claim_so_the_email_is_not_sent_twice()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        await RunAsync(JobTypes.Transcribe);
+        await RunAsync(JobTypes.Grade);
+        // O provedor pode ter aceitado a mensagem antes de a resposta demorar demais.
+        api.Emails.Failures.Enqueue(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout."));
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() => HandleAsync(EmailTemplates.CorrectionReady, essayId));
+
+        Assert.NotNull((await api.QueryAsync(db => db.EmailLog.SingleAsync(e => e.RefId == essayId))).ClaimedAt);
+        var busy = await Assert.ThrowsAsync<RedigiAI.Domain.Common.AppError>(() => HandleAsync(EmailTemplates.CorrectionReady, essayId));
+        Assert.Equal("EMAIL_BUSY", busy.Code);
+        Assert.Empty(api.Emails.For(essayId));
+    }
 
     [Fact]
     public async Task Correction_ready_is_sent_once_with_the_link_and_without_the_correction()
@@ -244,6 +315,11 @@ public class EmailTests(ApiFixture api)
 
         Assert.Empty(api.Emails.For(essayId));
     }
+
+    private Task<int> SetSendingAsync(bool enabled) =>
+        api.QueryAsync(db => db.FeatureFlags
+            .Where(f => f.Key == RedigiAI.Domain.Common.FeatureFlag.EmailSending)
+            .ExecuteUpdateAsync(f => f.SetProperty(x => x.Enabled, enabled)));
 
     /// <summary>Roda todos os jobs prontos do tipo, como o worker faria.</summary>
     private async Task RunAsync(string type)

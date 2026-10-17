@@ -5,7 +5,7 @@ namespace RedigiAI.Infrastructure.Persistence.Repositories;
 
 internal sealed class EmailLogRepository(AppDbContext db) : IEmailLogRepository
 {
-    public async Task<Guid?> TryClaimAsync(EmailLogEntry entry, DateTimeOffset staleBefore, CancellationToken ct)
+    public async Task<EmailClaim> TryClaimAsync(EmailLogEntry entry, DateTimeOffset staleBefore, CancellationToken ct)
     {
         // Um comando só: cria a linha ou, se ela existe sem envio e sem reserva recente, retoma a reserva. Com envio
         // feito ou reserva recente de outro processo, nada muda e nenhuma linha volta.
@@ -21,7 +21,14 @@ internal sealed class EmailLogRepository(AppDbContext db) : IEmailLogRepository
                 """)
             .ToListAsync(ct);
 
-        return claimed.Count == 1 ? claimed[0] : null;
+        if (claimed.Count == 1)
+        {
+            return new EmailClaim(claimed[0], AlreadySent: false);
+        }
+
+        var sent = await db.EmailLog.AsNoTracking()
+            .AnyAsync(e => e.Template == entry.Template && e.RefId == entry.RefId && e.SentAt != null, ct);
+        return sent ? EmailClaim.Sent : EmailClaim.Busy;
     }
 
     public Task MarkSentAsync(Guid id, string? providerMessageId, DateTimeOffset now, CancellationToken ct) =>

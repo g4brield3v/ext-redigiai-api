@@ -7,6 +7,9 @@ public sealed class SiteOptions
 
     /// <summary>Ex.: <c>https://redigiai.com.br</c>; em desenvolvimento, o endereço do Vite.</summary>
     public string BaseUrl { get; set; } = "";
+
+    /// <summary>Fora de desenvolvimento, só endereço <c>https</c> vai nos botões. Definido pelo host, pelo ambiente.</summary>
+    public bool RequireHttps { get; set; } = true;
 }
 
 /// <summary>Identificação da empresa no rodapé dos e-mails (especificação, seção 15). Campo vazio não aparece.</summary>

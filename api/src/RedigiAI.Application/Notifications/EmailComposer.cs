@@ -116,7 +116,25 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
             ? BrasiliaTime.At(at).ToString("dd/MM 'às' HH'h'mm", PtBr)
             : "o fim do prazo";
 
-    private string Link(string path) => site.Value.BaseUrl.TrimEnd('/') + path;
+    private string Link(string path) => BaseUrl() + path;
+
+    /// <summary>
+    /// O endereço do site, conferido na hora: absoluto, sem usuário, consulta nem fragmento e, fora de
+    /// desenvolvimento, <c>https</c>. Sem ele, nenhum e-mail sai com um botão errado.
+    /// </summary>
+    /// <exception cref="AppError"><c>EMAIL_NOT_CONFIGURED</c>, não retentável.</exception>
+    private string BaseUrl()
+    {
+        var options = site.Value;
+        var valid = Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var url)
+            && (url.Scheme == Uri.UriSchemeHttps || (!options.RequireHttps && url.Scheme == Uri.UriSchemeHttp))
+            && url.UserInfo.Length == 0
+            && url.Query.Length == 0
+            && url.Fragment.Length == 0;
+        return valid
+            ? options.BaseUrl.TrimEnd('/')
+            : throw new AppError("EMAIL_NOT_CONFIGURED", 500, "Algo deu errado do nosso lado. Tente novamente em instantes.");
+    }
 
     private static string Greeting(EssayEmailFacts facts) =>
         string.IsNullOrWhiteSpace(facts.Name) ? "Olá," : $"Olá, {facts.Name.Trim()},";

@@ -10,11 +10,12 @@ using RedigiAI.Domain.Notifications;
 namespace RedigiAI.Application.Notifications;
 
 /// <summary>
-/// Envia um aviso da redação. No máximo um envio por evento (<c>email_log</c> único em template + redação), e
-/// só se o aviso ainda faz sentido: a redação continua no estado do aviso, a conta existe e, nos avisos que podem
-/// ser desligados, o aluno não os desligou.
+/// Envia um aviso da redação, se o envio estiver ligado no banco (<c>feature_flags.email_sending</c>). No máximo um
+/// envio por evento (<c>email_log</c> único em template + redação), e só se o aviso ainda faz sentido: a redação
+/// continua no estado do aviso, a conta existe e, nos avisos que podem ser desligados, o aluno não os desligou.
 /// </summary>
 internal sealed class SendEmailHandler(
+    IFeatureFlagRepository flags,
     IEssayRepository essays,
     IUserRepository users,
     ITranscriptionRepository transcriptions,
@@ -35,6 +36,13 @@ internal sealed class SendEmailHandler(
 
     public async Task HandleAsync(string payload, CancellationToken ct)
     {
+        // Envio desligado no banco: o aviso é descartado (não fica para depois), para que ligar o envio não dispare
+        // de uma vez avisos que já perderam o sentido.
+        if (!await flags.IsEnabledAsync(FeatureFlag.EmailSending, ct))
+        {
+            return;
+        }
+
         var job = JsonSerializer.Deserialize<EmailJobPayload>(payload, Json)!;
         if (await essays.FindByIdAsync(job.RefId, ct) is not { } essay || !StillApplies(job.Template, essay))
         {
@@ -48,20 +56,26 @@ internal sealed class SendEmailHandler(
 
         var message = composer.Compose(job.Template, await FactsAsync(essay, user, ct));
         var now = time.GetUtcNow();
-        if (await emailLog.TryClaimAsync(EmailLogEntry.Claim(user.Id, job.Template, essay.Id, now), now - ClaimTimeout, ct)
-            is not { } claimed)
+        var claim = await emailLog.TryClaimAsync(EmailLogEntry.Claim(user.Id, job.Template, essay.Id, now), now - ClaimTimeout, ct);
+        if (claim.AlreadySent)
         {
-            // Já enviado, ou outro processo está enviando agora.
             return;
         }
+
+        // Outro processo reservou há pouco e pode ter caído no meio: o job tenta de novo mais tarde, quando a
+        // reserva já puder ser retomada, em vez de dar o e-mail por enviado.
+        var claimed = claim.Id ?? throw new AppError(
+            "EMAIL_BUSY", 503, "Algo deu errado do nosso lado. Tente novamente em instantes.", retryable: true);
 
         string? providerMessageId;
         try
         {
             providerMessageId = await sender.SendAsync(message, ct);
         }
-        catch
+        catch (Exception failure) when (failure is AppError or HttpRequestException)
         {
+            // Recusa ou indisponibilidade informada pelo provedor: nada saiu, a nova tentativa pode seguir. Tempo
+            // esgotado e cancelamento ficam com a reserva (o e-mail pode ter saído); ela vence em 10 minutos.
             await emailLog.ReleaseAsync(claimed, CancellationToken.None);
             throw;
         }

@@ -43,10 +43,7 @@ public static class DependencyInjection
         services.AddScoped<AiSpending>();
         services.AddScoped<Abstractions.IJobHandler, TranscribeEssayHandler>();
         services.AddScoped<Abstractions.IJobHandler, GradeEssayHandler>();
-        services.AddOptions<SiteOptions>()
-            .Validate(
-                site => Uri.TryCreate(site.BaseUrl, UriKind.Absolute, out var url) && url.Scheme is "https" or "http",
-                "App:BaseUrl é o endereço do site (https://…), usado nos botões dos e-mails.");
+        services.AddOptions<SiteOptions>();
         services.AddOptions<CompanyOptions>();
         services.AddSingleton<EmailComposer>();
         services.AddScoped<Abstractions.IJobHandler, SendEmailHandler>();

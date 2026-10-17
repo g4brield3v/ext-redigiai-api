@@ -3,6 +3,7 @@ using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Auditing;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
+using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Domain.Grading;
 using RedigiAI.Domain.Jobs;
@@ -35,6 +36,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<AccessLogEntry> AccessLogs => Set<AccessLogEntry>();
     public DbSet<EmailLogEntry> EmailLog => Set<EmailLogEntry>();
+    public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configuration)
     {

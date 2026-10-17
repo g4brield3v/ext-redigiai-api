@@ -49,6 +49,30 @@ public class EmailComposerTests
         Assert.DoesNotContain(code, email.Text);
     }
 
+    [Theory]
+    [InlineData("http://redigiai.com.br", true)]
+    [InlineData("https://user:pass@redigiai.com.br", false)]
+    [InlineData("https://redigiai.com.br/?next=x", false)]
+    [InlineData("", false)]
+    [InlineData("javascript:alert(1)", false)]
+    public void Site_address_that_is_not_a_plain_https_address_stops_the_email(string baseUrl, bool requireHttps)
+    {
+        var composer = new EmailComposer(
+            Options.Create(new SiteOptions { BaseUrl = baseUrl, RequireHttps = requireHttps }), Options.Create(new CompanyOptions()));
+
+        var refused = Assert.Throws<RedigiAI.Domain.Common.AppError>(() => composer.Compose(EmailTemplates.CorrectionReady, Facts()));
+        Assert.Equal(("EMAIL_NOT_CONFIGURED", false), (refused.Code, refused.Retryable));
+    }
+
+    [Fact]
+    public void Plain_http_is_accepted_only_where_https_is_not_required()
+    {
+        var composer = new EmailComposer(
+            Options.Create(new SiteOptions { BaseUrl = "http://localhost:5173", RequireHttps = false }), Options.Create(new CompanyOptions()));
+
+        Assert.Contains("http://localhost:5173/redacoes/", composer.Compose(EmailTemplates.CorrectionReady, Facts()).Text);
+    }
+
     [Fact]
     public void Footer_shows_only_the_company_fields_that_are_filled()
     {

@@ -47,10 +47,10 @@ internal static class WorkerHost
         builder.Services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
         builder.Services.Configure<CollectionCopyOptions>(builder.Configuration.GetSection(CollectionCopyOptions.Section));
         builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.Section));
+        builder.Services.PostConfigure<SiteOptions>(site => site.RequireHttps = !builder.Environment.IsDevelopment());
         builder.Services.Configure<CompanyOptions>(builder.Configuration.GetSection(CompanyOptions.Section));
         builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.Section));
         builder.Services.AddEmailSender(builder.Environment.IsDevelopment());
-        builder.Services.AddStartupChecks();
         builder.Services.Configure<RedigiAI.Infrastructure.Jobs.JobQueueOptions>(
             builder.Configuration.GetSection(RedigiAI.Infrastructure.Jobs.JobQueueOptions.Section));
         return builder;
