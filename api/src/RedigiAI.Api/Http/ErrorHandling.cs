@@ -1,10 +1,21 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using RedigiAI.Domain.Common;
 
 namespace RedigiAI.Api.Http;
 
-/// <summary>Formato único de erro da API (especificação, seção 12).</summary>
-public sealed record ErrorResponse(string Code, string Message, bool Retryable, string TraceId);
+/// <summary>
+/// Formato único de erro da API (especificação, seção 12). <c>Details</c> só vem em <c>VALIDATION_FAILED</c>
+/// (rotas de administração): cada pendência, com o campo a que se refere.
+/// </summary>
+public sealed record ErrorResponse(
+    string Code,
+    string Message,
+    bool Retryable,
+    string TraceId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ErrorDetail>? Details = null);
+
+public sealed record ErrorDetail(string Path, string Message);
 
 internal static class ErrorWriter
 {
@@ -15,7 +26,12 @@ internal static class ErrorWriter
     {
         context.Response.StatusCode = error.HttpStatus;
         return context.Response.WriteAsJsonAsync(
-            new ErrorResponse(error.Code, error.UserMessage, error.Retryable, TraceIdOf(context)),
+            new ErrorResponse(
+                error.Code,
+                error.UserMessage,
+                error.Retryable,
+                TraceIdOf(context),
+                error.Details is null ? null : [.. error.Details.Select(issue => new ErrorDetail(issue.Path, issue.Message))]),
             context.RequestAborted);
     }
 }

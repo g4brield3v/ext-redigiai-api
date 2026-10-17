@@ -11,13 +11,16 @@ public class DevAccessTests(ApiFixture api)
 {
     private const string Header = "X-Dev-User";
 
-    [Fact]
-    public async Task Dev_header_is_ignored_when_dev_access_is_off()
+    [Theory]
+    [InlineData("ana")]
+    [InlineData("admin")]
+    public async Task Dev_header_is_ignored_when_dev_access_is_off(string user)
     {
         var client = api.CreateClient();
-        client.DefaultRequestHeaders.Add(Header, "ana");
+        client.DefaultRequestHeaders.Add(Header, user);
 
         await AccountTests.AssertErrorAsync(await client.GetAsync("/v1/me"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
+        await AccountTests.AssertErrorAsync(await client.GetAsync("/v1/admin/prompts"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
     }
 
     [Theory]
@@ -51,6 +54,39 @@ public class DevAccessTests(ApiFixture api)
             await DevClient(factory, "nova").GetAsync("/v1/me"), HttpStatusCode.NotFound, "PROFILE_NOT_FOUND");
         await AccountTests.AssertErrorAsync(
             await DevClient(factory, "ninguem").GetAsync("/v1/me"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
+    }
+
+    [Fact]
+    public async Task Test_admin_enters_in_development_with_the_second_factor_simulated()
+    {
+        await using var factory = DevFactory();
+
+        var admin = await DevClient(factory, "admin").GetFromJsonAsync<JsonElement>("/v1/me");
+
+        Assert.Equal(ApiFixture.AdminEmail, admin.GetProperty("email").GetString());
+        Assert.Equal("admin", admin.GetProperty("role").GetString());
+        // Os alunos de teste continuam alunos.
+        var ana = await DevClient(factory, "ana").GetFromJsonAsync<JsonElement>("/v1/me");
+        Assert.Equal("student", ana.GetProperty("role").GetString());
+
+        // A exigência do segundo fator está ligada nos testes: o administrador de teste passa, a aluna não entra.
+        Assert.Equal(HttpStatusCode.OK, (await DevClient(factory, "admin").GetAsync("/v1/admin/prompts")).StatusCode);
+        await AccountTests.AssertErrorAsync(
+            await DevClient(factory, "ana").GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task Test_admin_does_not_exist_without_a_configured_admin_email()
+    {
+        await using var factory = api.CreateFactory(builder =>
+        {
+            builder.UseEnvironment("Development");
+            builder.UseSetting("DevAuth:Enabled", "true");
+            builder.UseSetting("Admin:Emails", "");
+        });
+
+        await AccountTests.AssertErrorAsync(
+            await DevClient(factory, "admin").GetAsync("/v1/me"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
     }
 
     [Fact]

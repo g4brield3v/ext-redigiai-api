@@ -13,6 +13,16 @@ internal sealed class GradingProfileRepository(AppDbContext db) : IGradingProfil
 
     public Task<GradingProfile?> FindAsync(Guid id, CancellationToken ct) =>
         db.GradingProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+
+    public async Task<bool> TryRetireAsync(Guid profileId, CancellationToken ct) =>
+        await db.GradingProfiles
+            .Where(p => p.Id == profileId && p.Status == GradingProfileStatus.Active)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, GradingProfileStatus.Retired), ct) == 1;
+
+    public async Task<int> MaxVersionAsync(Guid examId, Guid essayTypeId, CancellationToken ct) =>
+        await db.GradingProfiles
+            .Where(p => p.ExamId == examId && p.EssayTypeId == essayTypeId)
+            .MaxAsync(p => (int?)p.Version, ct) ?? 0;
 }
 
 internal sealed class PromptTemplateRepository(AppDbContext db) : IPromptTemplateRepository
@@ -89,10 +99,3 @@ internal sealed class CorrectionRepository(AppDbContext db) : ICorrectionReposit
     }
 }
 
-internal sealed class ThemeGradingNotesRepository(AppDbContext db) : IThemeGradingNotesRepository
-{
-    public void Add(ThemeGradingNotes notes) => db.ThemeGradingNotes.Add(notes);
-
-    public Task<ThemeGradingNotes?> FindLatestAsync(Guid themeId, CancellationToken ct) =>
-        db.ThemeGradingNotes.AsNoTracking().Where(n => n.ThemeId == themeId).OrderByDescending(n => n.Version).FirstOrDefaultAsync(ct);
-}

@@ -292,13 +292,12 @@ public class TranscriptionTests(ApiFixture api)
         }
     }
 
-    private sealed record Item(Guid ThemeId, Guid EssayTypeId, Guid AssetId);
+    private sealed record Item(Guid PromptId, Guid AssetId);
 
     private sealed class Student
     {
         private readonly ApiFixture _api;
-        private Guid _themeId;
-        private Guid _essayTypeId;
+        private Guid _promptId;
 
         private Student(ApiFixture api, HttpClient client)
         {
@@ -321,9 +320,8 @@ public class TranscriptionTests(ApiFixture api)
             var student = new Student(api, api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId())));
             var profile = await student.Client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true });
             student.Id = (await profile.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-            var theme = (await student.Client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes"))[0];
-            student._themeId = theme.GetProperty("id").GetGuid();
-            student._essayTypeId = theme.GetProperty("essayTypes")[0].GetProperty("id").GetGuid();
+            var prompt = await student.Client.GetFromJsonAsync<JsonElement>("/v1/prompts/algoritmos-e-o-debate-publico");
+            student._promptId = prompt.GetProperty("id").GetGuid();
             return student;
         }
 
@@ -348,7 +346,7 @@ public class TranscriptionTests(ApiFixture api)
 
             var request = new HttpRequestMessage(HttpMethod.Post, "/v1/essays/batch")
             {
-                Content = JsonContent.Create(new { essays = new[] { new Item(_themeId, _essayTypeId, assetId) }, aiNoticeAccepted = true }),
+                Content = JsonContent.Create(new { essays = new[] { new Item(_promptId, assetId) }, aiNoticeAccepted = true }),
             };
             request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
             var response = await Client.SendAsync(request);

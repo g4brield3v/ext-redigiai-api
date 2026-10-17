@@ -82,7 +82,9 @@ public sealed record CorrectionDto(
     Guid Id,
     Guid EssayId,
     string Title,
-    Guid ThemeId,
+    Guid PromptId,
+    string PromptSlug,
+    int PromptVersion,
     Guid EssayTypeId,
     DateTimeOffset SentAt,
     int Version,
@@ -123,6 +125,7 @@ internal sealed class CorrectionService(
     IUserRepository users,
     IEssayRepository essays,
     IExamRepository exams,
+    IPromptRepository proposals,
     IRubricRepository rubrics,
     IGradingProfileRepository profiles,
     IWritingRulesRepository writingRules,
@@ -138,6 +141,7 @@ internal sealed class CorrectionService(
         var correction = await corrections.FindByEssayAsync(essay.Id, ct) ?? throw Errors.InvalidState();
 
         var exam = await exams.FindByIdAsync(essay.ExamId, ct) ?? throw Errors.Internal();
+        var proposal = (await proposals.ReferencesAsync([essay.PromptId], ct)).GetValueOrDefault(essay.PromptId) ?? throw Errors.Internal();
         var rubric = await rubrics.FindAsync(correction.RubricVersionId, ct) ?? throw Errors.Internal();
         var profile = await profiles.FindAsync(correction.GradingProfileId, ct) ?? throw Errors.Internal();
         var rules = await writingRules.FindAsync(profile.WritingRulesVersionId, ct);
@@ -184,7 +188,9 @@ internal sealed class CorrectionService(
             correction.Id,
             essay.Id,
             essay.Title,
-            essay.ThemeId,
+            essay.PromptId,
+            proposal.Slug,
+            proposal.Version,
             essay.EssayTypeId,
             essay.CreatedAt,
             essay.Version,

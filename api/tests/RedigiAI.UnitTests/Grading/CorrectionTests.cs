@@ -26,10 +26,11 @@ public class CorrectionTests
         new(3, "", false),
     ];
 
-    private static GradingContext Context(bool identificationFound = false) =>
+    private static GradingContext Context(
+        bool identificationFound = false, IReadOnlyList<CopiedPassage>? copied = null, bool copyRequiresZero = false) =>
         new(
-            Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), 1, null, Lines, identificationFound,
-            new HashSet<string> { "CRASE_VERBO", WritingRulesVersion.OtherCode });
+            Guid.CreateVersion7(), Rubric, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Lines, identificationFound,
+            new HashSet<string> { "CRASE_VERBO", WritingRulesVersion.OtherCode }, copied ?? [], copyRequiresZero);
 
     private static GradedCriterion Criterion(int position, int level = 3, string? guidance = "Troque o parágrafo da linha 2 por um argumento próprio.") =>
         new(position, level, "Justificativa com as linhas 1 e 2.", [1, 2], guidance);
@@ -199,6 +200,26 @@ public class CorrectionTests
     }
 
     [Fact]
+    public void Essay_mostly_copied_from_the_collection_without_zero_is_rejected()
+    {
+        CopiedPassage[] copied = [new("Texto 2", 1, 2, 40, "Somente numa sociedade onde exista um clima cultural")];
+
+        AssertRejected(8, Output(), Context(copied: copied, copyRequiresZero: true));
+
+        var zeroed = Grade(
+            Output(zero: new GradedZero(true, "theme_not_addressed", "O texto é cópia da coletânea.")),
+            Context(copied: copied, copyRequiresZero: true));
+        Assert.Equal(0, zeroed.Score);
+        Assert.Equal(copied, zeroed.CollectionCopy);
+
+        // Cópia abaixo do limite: a correção vale, e os trechos ficam gravados.
+        var graded = Grade(Output(), Context(copied: copied));
+        Assert.Equal(27, graded.Score);
+        Assert.Equal("Texto 2", Assert.Single(graded.CollectionCopy).Label);
+        Assert.Empty(Grade(Output()).CollectionCopy);
+    }
+
+    [Fact]
     public void Identification_on_the_sheet_without_zero_is_rejected()
     {
         AssertRejected(7, Output(), Context(identificationFound: true));
@@ -238,28 +259,5 @@ public class CorrectionTests
             transcription.FinalLines().Select(line => line.Text));
         // A transcrição continua como a IA leu.
         Assert.Equal("Os [?] decidem o que [?] vemos", transcription.Lines[0].Text);
-    }
-
-    [Fact]
-    public void Published_theme_is_not_edited_and_a_revision_is_a_new_version()
-    {
-        var exam = Exam.Create("fuvest", "Fuvest", ExamStatus.Active, sheetLines: 30, position: 1);
-        var type = EssayType.Create(exam.Id, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
-        var rubric = RubricVersion.Publish(exam.Id, 1, 4, Now, [], [new CriterionSpec("C", 1, Enumerable.Range(1, 4).ToDictionary(l => l, l => "d"))]);
-        var theme = Theme.Draft(exam.Id, "Algoritmos e o debate público", "Enunciado original.");
-        theme.AddText(ThemeTextKind.Text, "Texto 1", "Fonte", "Trecho.");
-        theme.AcceptType(type, rubric, "Defenda um ponto de vista.");
-
-        Assert.Throws<InvalidOperationException>(() => theme.Revise("Ainda é rascunho."));
-        theme.Publish(Now);
-        Assert.Throws<InvalidOperationException>(() => theme.AddText(ThemeTextKind.Text, "Texto 2", "Fonte", "Outro."));
-
-        var revision = theme.Revise("Enunciado revisado.");
-
-        Assert.Equal((1, "Enunciado original.", 1), (theme.Version, theme.Statement, theme.Texts.Count));
-        Assert.Equal((2, theme.Id, ThemeStatus.Draft, "Enunciado revisado."), (revision.Version, revision.SupersedesThemeId, revision.Status, revision.Statement));
-        Assert.NotEqual(theme.Id, revision.Id);
-        Assert.Equal(type.Id, Assert.Single(revision.AcceptedTypes).EssayTypeId);
-        Assert.Empty(revision.Texts);
     }
 }

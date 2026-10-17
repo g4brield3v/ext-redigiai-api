@@ -1,3 +1,4 @@
+using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
 
 namespace RedigiAI.Application.Accounts;
@@ -6,6 +7,7 @@ public sealed record ProfileDto(
     Guid Id,
     string Email,
     string? Name,
+    UserRole Role,
     bool TermsAcceptanceRequired,
     bool AiNoticeAccepted,
     EmailPreferencesDto EmailPreferences,

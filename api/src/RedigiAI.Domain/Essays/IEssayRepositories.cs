@@ -45,6 +45,9 @@ public interface IAssetRepository
     Task<Asset?> FindAsync(Guid assetId, Guid userId, CancellationToken ct);
 
     Task<Asset?> FindByIdAsync(Guid assetId, CancellationToken ct);
+
+    /// <summary>Entre os ids pedidos, os que são imagens de proposta, com o identificador de cada uma no provedor.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> PromptImagePublicIdsAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken ct);
 }
 
 public interface ITranscriptionRepository

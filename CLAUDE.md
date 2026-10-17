@@ -1,6 +1,6 @@
 # RedigiAI · back-end
 
-SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestibular → tema → tipo, envia a foto da folha e recebe na plataforma a nota de cada critério, com as linhas que pesaram e o que corrigir. Domínio: redigiai.com.br. Público: estudantes a partir de 16 anos.
+SaaS que corrige redações manuscritas da Fuvest com IA. O aluno escolhe vestibular → proposta de redação, envia a foto da folha e recebe na plataforma a nota de cada critério, com as linhas que pesaram e o que corrigir. Domínio: redigiai.com.br. Público: estudantes a partir de 16 anos.
 
 Este repositório tem a API, o worker e a especificação do produto. O front-end fica em outro repositório (`ext-redigiai-front`), que consome o contrato publicado em `api/openapi.json`.
 
@@ -10,6 +10,7 @@ Este repositório tem a API, o worker e a especificação do produto. O front-en
 |---|---|
 | `docs/01-especificacao-tecnica.md` | **Fonte da verdade:** regras de negócio, estados, modelo de dados, API, fila, IA, pagamentos, e-mails, segurança, erros |
 | `docs/03-plano-de-implementacao.md` | Etapas, critérios de aceite e checklist de segurança |
+| `docs/07-propostas-de-redacao.md` | Propostas de redação: modelo em blocos ordenados, um tipo por proposta, área de administração (`/admin`, papel admin por e-mail verificado e segundo fator) e guia de cadastro. Substitui o modelo de temas da especificação |
 
 Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente regra de negócio. Se a especificação não cobre um caso, proponha a solução mais simples, implemente só depois de aprovada e registre a decisão em `docs/decisoes.md` (data, contexto, decisão).
 
@@ -40,7 +41,7 @@ docker-compose.yml
 
 Monólito modular em camadas: `Api → Application → Domain` e `Infrastructure → Application/Domain`. O Domain não referencia nenhum outro projeto nem pacote de infraestrutura.
 
-- **Contextos delimitados**, uma pasta por contexto em cada camada: `Catalog` (vestibular, tema, grade), `Accounts` (usuário, aceite, idade), `Essays` (envio, transcrição, revisão), `Grading` (correção, perfil de correção), `Billing` (créditos, pagamentos, assinatura), `Notifications` (e-mails).
+- **Contextos delimitados**, uma pasta por contexto em cada camada: `Catalog` (vestibular, proposta de redação, grade), `Accounts` (usuário, aceite, idade), `Essays` (envio, transcrição, revisão), `Grading` (correção, perfil de correção), `Billing` (créditos, pagamentos, assinatura), `Notifications` (e-mails).
 - **Agregados** guardam as invariantes e expõem as transições como métodos (`Essay.MarkQueued()`); nada de setters públicos. Um agregado referencia outro só pelo id.
 - **Objetos de valor** para conceitos com regra própria: `EssayTitle`, `Score`, `Level`, `BirthDate`, `Money`, `EssayStatus`.
 - **Fluxo de uma requisição:** controller → serviço de aplicação → domínio → repositório. O controller só traduz HTTP (token, cabeçalhos, corpo, código de resposta) e chama **um** serviço; nunca usa `AppDbContext`, repositório nem classe do Infrastructure.
@@ -66,7 +67,8 @@ dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevA
 # Em desenvolvimento a IA fica desligada (Ai__Enabled=false): os jobs transcribe e grade esperam na fila e nada é
 # cobrado. Ai__Enabled=true no .env liga as chamadas reais ao Claude.
 # Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
-# carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova).
+# carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova | admin).
+# O usuário admin só existe com Admin__Emails preenchido: usa o primeiro e-mail da lista e simula o segundo fator.
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 ```
 
@@ -77,8 +79,8 @@ Atualize esta seção sempre que um comando mudar.
 ## Regras inegociáveis
 
 **Produto**
-1. Ordem de escolha fixa: vestibular → tema → tipo → foto. Cada redação responde a exatamente uma proposta (tema + tipo).
-2. Título sempre "Vestibular – Tipo – Tema", sem ano. É gerado pelo backend.
+1. Ordem de escolha fixa: vestibular → proposta → foto. O tipo é definido no cadastro da proposta; o aluno não escolhe tipo nem opção. Cada redação responde a exatamente uma proposta, na versão publicada no envio.
+2. Título sempre "Vestibular – Tipo – Tema" (vestibular, categoria de correção, título da proposta), sem ano. É gerado pelo backend.
 3. Somente foto JPG, até 10 MB, uma face. Sem envio de texto digitado.
 4. Depois de confirmar o envio, o aluno não troca a foto nem cancela.
 5. A transcrição copia exatamente o que está escrito, sem corrigir nada. O aluno só digita as palavras ilegíveis (1 a 10); mais de 10 → `PHOTO_UNREADABLE` e o crédito volta.
@@ -92,11 +94,11 @@ Atualize esta seção sempre que um comando mudar.
 11. Status, job seguinte e lançamento de crédito na **mesma transação**.
 12. `credit_ledger` só recebe `INSERT`. Saldo debitado com `UPDATE credit_buckets SET remaining = remaining - 1 WHERE id = @id AND remaining >= 1`.
 13. Todo handler de job é idempotente. Todo `POST` que cria redação ou pagamento exige `Idempotency-Key`.
-14. Versões publicadas (grade, prompt, manual, regras, perfil de correção) nunca são editadas: editar = inserir versão nova.
+14. Versões publicadas (grade, prompt, manual, regras, perfil de correção, proposta de redação) nunca são editadas: editar = inserir versão nova.
 15. Chaves primárias UUID v7; datas em `timestamptz` UTC; horário de Brasília só na exibição e nas regras de calendário (segunda 00h, dia 1º 00h).
 
 **Segurança**
-16. Toda consulta de dados do aluno filtra por `user_id` do token. Recurso de outro aluno → 404.
+16. Toda consulta de dados do aluno filtra por `user_id` do token. Recurso de outro aluno → 404. Rota `/v1/admin/*` para quem não é administrador → 404; o papel é conferido no banco a cada requisição.
 17. Nenhum segredo no código, em logs ou no front-end. Configuração só por variável de ambiente; `.env.example` lista as chaves sem valores.
 18. Texto do aluno vai para a IA delimitado como dado (`<redacao>…</redacao>`) com instrução para ignorar ordens dentro dele.
 19. Crédito de pagamento só depois de consultar a API do Mercado Pago; nunca pelo retorno do navegador nem pelo corpo do webhook.

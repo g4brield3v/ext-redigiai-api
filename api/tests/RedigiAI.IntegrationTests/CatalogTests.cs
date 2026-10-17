@@ -24,17 +24,20 @@ public class CatalogTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task Themes_list_accepted_types_and_number_of_texts()
+    public async Task Prompts_list_brings_title_type_and_number_of_texts()
     {
-        var themes = await _client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes");
+        var prompts = await _client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts");
 
-        var theme = Assert.Single(themes.EnumerateArray());
-        Assert.Equal("Algoritmos e o debate público", theme.GetProperty("title").GetString());
-        Assert.Equal("Fuvest", theme.GetProperty("examName").GetString());
-        Assert.Equal(4, theme.GetProperty("textCount").GetInt32());
-        Assert.Equal(
-            ["Dissertação", "Narrativa"],
-            theme.GetProperty("essayTypes").EnumerateArray().Select(t => t.GetProperty("name").GetString()));
+        var prompt = prompts.EnumerateArray().Single(p => p.GetProperty("slug").GetString() == "algoritmos-e-o-debate-publico");
+        Assert.Equal("Algoritmos e o debate público", prompt.GetProperty("title").GetString());
+        Assert.Equal("Fuvest", prompt.GetProperty("examName").GetString());
+        Assert.Equal(4, prompt.GetProperty("textCount").GetInt32());
+        var essayType = prompt.GetProperty("essayType");
+        Assert.Equal(("dissertacao-em-prosa", "Dissertação em prosa"), (essayType.GetProperty("slug").GetString(), essayType.GetProperty("name").GetString()));
+        // O aluno não escolhe tipo: a lista não oferece tipos. Linhas e título ficam nos itens das Instruções.
+        Assert.False(prompt.TryGetProperty("essayTypes", out _));
+        Assert.False(prompt.TryGetProperty("genreLabel", out _));
+        Assert.False(prompt.TryGetProperty("minLines", out _));
     }
 
     [Theory]
@@ -44,51 +47,56 @@ public class CatalogTests(ApiFixture api)
     [InlineData("%", 0)]
     [InlineData("_lgoritmos", 0)]
     [InlineData("algo\u0000ritmos", 1)] // caractere de controle é descartado, não derruba a consulta
-    public async Task Theme_search_matches_the_title_literally(string search, int expected)
+    public async Task Prompt_search_matches_the_title_literally(string search, int expected)
     {
-        var themes = await _client.GetFromJsonAsync<JsonElement>($"/v1/exams/fuvest/themes?q={Uri.EscapeDataString(search)}");
+        var prompts = await _client.GetFromJsonAsync<JsonElement>($"/v1/exams/fuvest/prompts?q={Uri.EscapeDataString(search)}");
 
-        Assert.Equal(expected, themes.GetArrayLength());
+        Assert.Equal(expected, prompts.EnumerateArray().Count(p => p.GetProperty("slug").GetString() == "algoritmos-e-o-debate-publico"));
     }
 
     [Theory]
     [InlineData("unicamp")]
     [InlineData("inexistente")]
-    public async Task Themes_of_an_unavailable_exam_are_not_found(string slug)
+    public async Task Prompts_of_an_unavailable_exam_are_not_found(string slug)
     {
-        var response = await _client.GetAsync($"/v1/exams/{slug}/themes");
+        var response = await _client.GetAsync($"/v1/exams/{slug}/prompts");
 
         await AccountTests.AssertErrorAsync(response, HttpStatusCode.NotFound, "NOT_FOUND");
     }
 
     [Fact]
-    public async Task Theme_detail_brings_statement_texts_and_types()
+    public async Task Prompt_detail_brings_the_blocks_in_order_and_the_type()
     {
-        var themeId = (await _client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes"))[0].GetProperty("id").GetGuid();
+        var prompt = await _client.GetFromJsonAsync<JsonElement>("/v1/prompts/algoritmos-e-o-debate-publico");
 
-        var theme = await _client.GetFromJsonAsync<JsonElement>($"/v1/themes/{themeId}");
-
-        Assert.Equal("fuvest", theme.GetProperty("examSlug").GetString());
-        Assert.Equal(30, theme.GetProperty("sheetLines").GetInt32());
-        Assert.False(string.IsNullOrEmpty(theme.GetProperty("statement").GetString()));
-        var texts = theme.GetProperty("texts").EnumerateArray().ToList();
-        Assert.Equal([1, 2, 3, 4], texts.Select(t => t.GetProperty("position").GetInt32()));
-        Assert.Equal(["text", "text", "image", "text"], texts.Select(t => t.GetProperty("kind").GetString()));
+        Assert.Equal(("fuvest", 30, 1, "published"), (
+            prompt.GetProperty("examSlug").GetString(), prompt.GetProperty("sheetLines").GetInt32(),
+            prompt.GetProperty("version").GetInt32(), prompt.GetProperty("status").GetString()));
+        Assert.Equal(("Dissertação em prosa", "Fuvest – Dissertação em prosa – Algoritmos e o debate público"), (
+            prompt.GetProperty("essayType").GetProperty("name").GetString(), prompt.GetProperty("essayTitle").GetString()));
+        Assert.Equal(4, prompt.GetProperty("textCount").GetInt32());
+        Assert.False(prompt.TryGetProperty("titleRequired", out _));
+        var blocks = prompt.GetProperty("blocks").EnumerateArray().ToList();
+        Assert.Equal([10, 20, 30, 40, 50, 60], blocks.Select(b => b.GetProperty("position").GetInt32()));
         Assert.Equal(
-            ["dissertacao", "narrativa"],
-            theme.GetProperty("essayTypes").EnumerateArray().Select(t => t.GetProperty("slug").GetString()));
-        Assert.All(
-            theme.GetProperty("essayTypes").EnumerateArray(),
-            type => Assert.False(string.IsNullOrWhiteSpace(type.GetProperty("instruction").GetString())));
+            ["collection_item", "collection_item", "collection_item", "collection_item", "command", "instructions"],
+            blocks.Select(b => b.GetProperty("kind").GetString()));
+        Assert.Equal(["prose", "prose", "verse", "prose"], blocks.Take(4).Select(b => b.GetProperty("data").GetProperty("format").GetString()));
+        Assert.Equal(2, blocks[2].GetProperty("data").GetProperty("columns").GetArrayLength());
+        Assert.False(string.IsNullOrEmpty(blocks[4].GetProperty("data").GetProperty("body").GetString()));
+        // As abordagens esperadas são só para a IA.
+        Assert.False(prompt.TryGetProperty("gradingNotes", out _));
     }
 
-    [Fact]
-    public async Task Unknown_theme_is_not_available()
+    [Theory]
+    [InlineData("/v1/prompts/nao-existe")]
+    [InlineData("/v1/prompts/algoritmos-e-o-debate-publico?version=2")]
+    public async Task Unknown_prompt_is_not_available(string path)
     {
-        var response = await _client.GetAsync($"/v1/themes/{Guid.CreateVersion7()}");
+        var response = await _client.GetAsync(path);
 
-        var error = await AccountTests.AssertErrorAsync(response, HttpStatusCode.NotFound, "THEME_NOT_AVAILABLE");
-        Assert.Equal("Esse tema não está disponível. Escolha outro.", error.GetProperty("message").GetString());
+        var error = await AccountTests.AssertErrorAsync(response, HttpStatusCode.NotFound, "PROMPT_NOT_AVAILABLE");
+        Assert.Equal("Essa proposta não está disponível. Escolha outra.", error.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -118,6 +126,7 @@ public class CatalogTests(ApiFixture api)
     [Theory]
     [InlineData("/v1/rubrics/0198f0c0-0000-7000-8000-000000000000")]
     [InlineData("/v1/themes/not-a-guid")]
+    [InlineData("/v1/exams/fuvest/themes")]
     [InlineData("/v1/unknown")]
     public async Task Unknown_resources_use_the_error_format(string path)
     {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Catalog;
 
 namespace RedigiAI.Infrastructure.Persistence.Configurations;
@@ -59,43 +60,56 @@ internal sealed class RubricCriterionConfiguration : IEntityTypeConfiguration<Ru
     }
 }
 
-internal sealed class ThemeConfiguration : IEntityTypeConfiguration<Theme>
+internal sealed class PromptConfiguration : IEntityTypeConfiguration<Prompt>
 {
-    public void Configure(EntityTypeBuilder<Theme> builder)
+    public void Configure(EntityTypeBuilder<Prompt> builder)
     {
-        builder.ToTable("themes");
-        builder.Property(t => t.Title).HasMaxLength(200);
-        builder.Property(t => t.Status).HasMaxLength(20);
-        builder.HasOne<Exam>().WithMany().HasForeignKey(t => t.ExamId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasMany(t => t.Texts).WithOne().HasForeignKey(x => x.ThemeId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasMany(t => t.AcceptedTypes).WithOne().HasForeignKey(x => x.ThemeId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<Theme>().WithMany().HasForeignKey(t => t.SupersedesThemeId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(t => new { t.ExamId, t.Status });
-        // Cada versão publicada tem no máximo uma revisão.
-        builder.HasIndex(t => t.SupersedesThemeId).IsUnique();
+        builder.ToTable("prompts");
+        builder.Property(p => p.Slug).HasMaxLength(PromptRules.MaxSlugLength);
+        builder.Property(p => p.Status).HasMaxLength(20);
+        builder.Property(p => p.Title).HasMaxLength(PromptRules.MaxTitleLength);
+        builder.Property(p => p.Summary).HasMaxLength(PromptRules.MaxSummaryLength);
+        builder.Property(p => p.SourceLabel).HasMaxLength(PromptRules.MaxSourceLabelLength);
+        builder.Property(p => p.CreationKey).HasMaxLength(Prompt.MaxCreationKeyLength);
+        builder.HasIndex(p => new { p.CreatedBy, p.CreationKey }).IsUnique();
+        builder.HasOne<Exam>().WithMany().HasForeignKey(p => p.ExamId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<EssayType>().WithMany().HasForeignKey(p => p.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.PublishedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(p => p.Blocks).WithOne().HasForeignKey(b => b.PromptId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(p => p.GradingNotes).WithOne().HasForeignKey<PromptGradingNotes>(n => n.PromptId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(p => new { p.Slug, p.Version }).IsUnique();
+        // Só uma versão publicada por endereço, garantido pelo banco.
+        builder.HasIndex(p => p.Slug, "ux_prompts_published_per_slug")
+            .HasDatabaseName("ux_prompts_published_per_slug")
+            .IsUnique()
+            .HasFilter("status = 'published'");
+        builder.HasIndex(p => new { p.ExamId, p.Status });
     }
 }
 
-internal sealed class ThemeTextConfiguration : IEntityTypeConfiguration<ThemeText>
+internal sealed class PromptBlockConfiguration : IEntityTypeConfiguration<PromptBlock>
 {
-    public void Configure(EntityTypeBuilder<ThemeText> builder)
+    public void Configure(EntityTypeBuilder<PromptBlock> builder)
     {
-        builder.ToTable("theme_texts");
-        builder.Property(t => t.Kind).HasMaxLength(20);
-        builder.Property(t => t.Title).HasMaxLength(200);
-        builder.Property(t => t.Source).HasMaxLength(300);
-        builder.HasIndex(t => new { t.ThemeId, t.Position }).IsUnique();
+        // A posição é única por proposta por uma restrição adiável (ux_prompt_blocks_position), criada na migração:
+        // assim a troca de posição entre dois blocos vale no fim da transação, e não a cada linha gravada.
+        builder.ToTable("prompt_blocks", table => table.HasCheckConstraint("ck_prompt_blocks_position", "position >= 0"));
+        builder.Property(b => b.Kind).HasMaxLength(20);
+        builder.Property(b => b.Data)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<PromptBlockData>, JsonComparer<PromptBlockData>>();
     }
 }
 
-internal sealed class ThemeEssayTypeConfiguration : IEntityTypeConfiguration<ThemeEssayType>
+internal sealed class PromptGradingNotesConfiguration : IEntityTypeConfiguration<PromptGradingNotes>
 {
-    public void Configure(EntityTypeBuilder<ThemeEssayType> builder)
+    public void Configure(EntityTypeBuilder<PromptGradingNotes> builder)
     {
-        builder.ToTable("theme_essay_types");
-        builder.HasKey(t => new { t.ThemeId, t.EssayTypeId });
-        builder.Property(t => t.Instruction).HasMaxLength(2000).HasDefaultValue("");
-        builder.HasOne<EssayType>().WithMany().HasForeignKey(t => t.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<RubricVersion>().WithMany().HasForeignKey(t => t.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable("prompt_grading_notes");
+        builder.Property(n => n.KeyData)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<IReadOnlyList<string>>, JsonComparer<IReadOnlyList<string>>>();
     }
 }
+

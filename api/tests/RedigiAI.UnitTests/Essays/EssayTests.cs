@@ -14,56 +14,85 @@ public class EssayTests
     private readonly Exam _exam = Exam.Create("fuvest", "Fuvest", ExamStatus.Active, sheetLines: 30, position: 1);
     private readonly EssayType _dissertacao;
     private readonly EssayType _narrativa;
-    private readonly Theme _theme;
+    private readonly Guid _rubricVersionId = Guid.CreateVersion7();
+    private readonly Prompt _prompt;
 
     public EssayTests()
     {
-        _dissertacao = EssayType.Create(_exam.Id, "dissertacao", "Dissertação", "Texto dissertativo-argumentativo");
+        _dissertacao = EssayType.Create(_exam.Id, "dissertacao-em-prosa", "Dissertação em prosa", "Texto dissertativo-argumentativo");
         _narrativa = EssayType.Create(_exam.Id, "narrativa", "Narrativa", "Texto narrativo com reflexão");
-        _theme = Theme.Draft(_exam.Id, "Algoritmos e o debate público", "Enunciado");
-        _theme.AcceptType(_dissertacao, Rubric(_exam.Id), "Defenda um ponto de vista.");
-        _theme.Publish(Now);
+        _prompt = Published("algoritmos");
     }
 
+    private static readonly PublicationContext Context = new(true, new HashSet<Guid>());
+
+    private Prompt Draft(string slug) => Prompt.Draft(
+        new PromptContent(
+            _exam.Id,
+            slug,
+            "Algoritmos e o debate público",
+            null,
+            null,
+            _dissertacao.Id,
+            [
+                new(null, 10, PromptBlockKind.CollectionItem, new PromptBlockData { Label = "Texto 1", Format = CollectionFormat.Prose, Source = "Fonte", Body = "Trecho." }),
+                new(null, 20, PromptBlockKind.Command, new PromptBlockData { Body = "Redija uma dissertação." }),
+                new(null, 30, PromptBlockKind.Instructions, new PromptBlockData { Title = "Instruções" }),
+            ],
+            new PromptNotesContent("Recorte.", "Tangente.", null, null, null)),
+        createdBy: null,
+        Now);
+
+    private Prompt Published(string slug)
+    {
+        var prompt = Draft(slug);
+        prompt.Publish(Context, publishedBy: null, Now);
+        return prompt;
+    }
+
+    private Essay Submit(Guid userId, Prompt prompt, Asset photo, Essay? rewriteOf = null, Exam? exam = null, EssayType? essayType = null) =>
+        Essay.Submit(userId, Guid.CreateVersion7(), exam ?? _exam, prompt, essayType ?? _dissertacao, _rubricVersionId, photo, rewriteOf, Now);
+
     [Fact]
-    public void Submitted_essay_starts_uploaded_with_the_title_and_the_rubric_of_the_proposal()
+    public void Submitted_essay_starts_uploaded_with_the_title_and_the_type_of_the_prompt()
     {
         var photo = Asset.Reserve(UserId, Now);
 
-        var essay = Essay.Submit(UserId, Guid.CreateVersion7(), _exam, _theme, _dissertacao, photo, rewriteOf: null, Now);
+        var essay = Submit(UserId, _prompt, photo);
 
         Assert.Equal(EssayStatus.Uploaded, essay.Status);
-        Assert.Equal("Fuvest – Dissertação – Algoritmos e o debate público", essay.Title);
-        Assert.Equal(_theme.AcceptedTypes[0].RubricVersionId, essay.RubricVersionId);
+        // Vestibular, nome da categoria de correção (o tipo de redação) e título da proposta.
+        Assert.Equal("Fuvest – Dissertação em prosa – Algoritmos e o debate público", essay.Title);
+        Assert.Equal((_prompt.Id, _dissertacao.Id, _rubricVersionId), (essay.PromptId, essay.EssayTypeId, essay.RubricVersionId));
         Assert.Equal((1, (Guid?)null, photo.Id), (essay.Version, essay.ParentEssayId, essay.PhotoAssetId));
     }
 
     [Fact]
-    public void Type_not_accepted_by_the_theme_is_refused()
+    public void Type_that_is_not_the_one_of_the_prompt_is_refused()
     {
-        var error = Assert.Throws<AppError>(() => Essay.Submit(
-            UserId, Guid.CreateVersion7(), _exam, _theme, _narrativa, Asset.Reserve(UserId, Now), null, Now));
+        var error = Assert.Throws<AppError>(() => Submit(UserId, _prompt, Asset.Reserve(UserId, Now), essayType: _narrativa));
 
-        Assert.Equal("ESSAY_TYPE_NOT_ACCEPTED", error.Code);
+        Assert.Equal("PROMPT_NOT_AVAILABLE", error.Code);
     }
 
     [Fact]
-    public void Draft_theme_or_inactive_exam_is_not_available()
+    public void Draft_or_archived_prompt_or_inactive_exam_is_not_available()
     {
-        var draft = Theme.Draft(_exam.Id, "Rascunho", "Enunciado");
+        var archived = Published("arquivada");
+        archived.Archive(Now);
         var comingSoon = Exam.Create("enem", "Enem", ExamStatus.ComingSoon, sheetLines: 30, position: 2);
 
-        Assert.Equal("THEME_NOT_AVAILABLE", Assert.Throws<AppError>(() => Essay.Submit(
-            UserId, Guid.CreateVersion7(), _exam, draft, _dissertacao, Asset.Reserve(UserId, Now), null, Now)).Code);
-        Assert.Equal("THEME_NOT_AVAILABLE", Assert.Throws<AppError>(() => Essay.Submit(
-            UserId, Guid.CreateVersion7(), comingSoon, _theme, _dissertacao, Asset.Reserve(UserId, Now), null, Now)).Code);
+        Assert.Equal("PROMPT_NOT_AVAILABLE", Assert.Throws<AppError>(() => Submit(UserId, Draft("rascunho"), Asset.Reserve(UserId, Now))).Code);
+        Assert.Equal("PROMPT_NOT_AVAILABLE", Assert.Throws<AppError>(() => Submit(UserId, archived, Asset.Reserve(UserId, Now))).Code);
+        Assert.Equal(
+            "PROMPT_NOT_AVAILABLE",
+            Assert.Throws<AppError>(() => Submit(UserId, _prompt, Asset.Reserve(UserId, Now), exam: comingSoon)).Code);
     }
 
     [Fact]
     public void Photo_of_another_student_is_refused()
     {
-        var error = Assert.Throws<AppError>(() => Essay.Submit(
-            UserId, Guid.CreateVersion7(), _exam, _theme, _dissertacao, Asset.Reserve(Guid.CreateVersion7(), Now), null, Now));
+        var error = Assert.Throws<AppError>(() => Submit(UserId, _prompt, Asset.Reserve(Guid.CreateVersion7(), Now)));
 
         Assert.Equal("INVALID_FILE", error.Code);
     }
@@ -71,15 +100,31 @@ public class EssayTests
     [Fact]
     public void Rewrite_is_the_next_version_and_only_of_the_students_own_essay()
     {
-        var first = Essay.Submit(UserId, Guid.CreateVersion7(), _exam, _theme, _dissertacao, Asset.Reserve(UserId, Now), null, Now);
+        var first = Submit(UserId, _prompt, Asset.Reserve(UserId, Now));
         var stranger = Guid.CreateVersion7();
-        var foreign = Essay.Submit(stranger, Guid.CreateVersion7(), _exam, _theme, _dissertacao, Asset.Reserve(stranger, Now), null, Now);
+        var foreign = Submit(stranger, _prompt, Asset.Reserve(stranger, Now));
 
-        var rewrite = Essay.Submit(UserId, Guid.CreateVersion7(), _exam, _theme, _dissertacao, Asset.Reserve(UserId, Now), first, Now);
+        var rewrite = Submit(UserId, _prompt, Asset.Reserve(UserId, Now), first);
 
         Assert.Equal((2, (Guid?)first.Id), (rewrite.Version, rewrite.ParentEssayId));
-        Assert.Equal("ESSAY_NOT_FOUND", Assert.Throws<AppError>(() => Essay.Submit(
-            UserId, Guid.CreateVersion7(), _exam, _theme, _dissertacao, Asset.Reserve(UserId, Now), foreign, Now)).Code);
+        Assert.Equal("ESSAY_NOT_FOUND", Assert.Throws<AppError>(() => Submit(UserId, _prompt, Asset.Reserve(UserId, Now), foreign)).Code);
+    }
+
+    [Fact]
+    public void Rewrite_uses_the_prompt_version_of_the_original_even_after_it_is_archived()
+    {
+        var first = Submit(UserId, _prompt, Asset.Reserve(UserId, Now));
+        _prompt.Archive(Now.AddDays(1));
+        var newer = _prompt.NewVersion(2, createdBy: null, Now.AddDays(1));
+        newer.Publish(Context, publishedBy: null, Now.AddDays(1));
+
+        var rewrite = Submit(UserId, _prompt, Asset.Reserve(UserId, Now), first);
+
+        Assert.Equal((2, _prompt.Id), (rewrite.Version, rewrite.PromptId));
+        // Com outra versão da proposta, não é uma reescrita daquela redação.
+        Assert.Equal("ESSAY_NOT_FOUND", Assert.Throws<AppError>(() => Submit(UserId, newer, Asset.Reserve(UserId, Now), first)).Code);
+        // E uma redação nova não entra numa versão arquivada.
+        Assert.Equal("PROMPT_NOT_AVAILABLE", Assert.Throws<AppError>(() => Submit(UserId, _prompt, Asset.Reserve(UserId, Now))).Code);
     }
 
     [Theory]

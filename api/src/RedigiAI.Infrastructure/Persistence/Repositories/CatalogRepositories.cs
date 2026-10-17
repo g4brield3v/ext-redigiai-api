@@ -53,44 +53,127 @@ internal sealed class RubricRepository(AppDbContext db) : IRubricRepository
     public void Add(RubricVersion rubric) => db.RubricVersions.Add(rubric);
 }
 
-internal sealed class ThemeRepository(AppDbContext db) : IThemeRepository
+internal sealed class PromptRepository(AppDbContext db) : IPromptRepository
 {
-    public async Task<IReadOnlyList<Theme>> ListActiveAsync(Guid examId, string? titleSearch, CancellationToken ct)
+    public void Add(Prompt prompt) => db.Prompts.Add(prompt);
+
+    public Task<Prompt?> FindForUpdateAsync(Guid promptId, CancellationToken ct) =>
+        Whole(db.Prompts).FirstOrDefaultAsync(p => p.Id == promptId, ct);
+
+    public Task<Prompt?> FindAsync(Guid promptId, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.Id == promptId, ct);
+
+    public Task<Prompt?> FindPublishedAsync(string slug, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.Slug == slug && p.Status == PromptStatus.Published, ct);
+
+    public Task<Prompt?> FindReleasedAsync(string slug, int version, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking())
+            .FirstOrDefaultAsync(p => p.Slug == slug && p.Version == version && p.Status != PromptStatus.Draft, ct);
+
+    public async Task<IReadOnlyList<PromptListItem>> ListPublishedAsync(Guid examId, string? titleSearch, CancellationToken ct) =>
+        await Summaries(
+            Search(db.Prompts.AsNoTracking().Where(p => p.ExamId == examId && p.Status == PromptStatus.Published), titleSearch)
+                .OrderByDescending(p => p.PublishedAt)
+                .ThenBy(p => p.Title))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyDictionary<Guid, PromptReference>> ReferencesAsync(
+        IReadOnlyCollection<Guid> promptIds, CancellationToken ct)
     {
-        var themes = Active().Where(t => t.ExamId == examId);
-        if (!string.IsNullOrEmpty(titleSearch))
+        if (promptIds.Count == 0)
         {
-            var pattern = $"%{EscapeLike(titleSearch)}%";
-            themes = themes.Where(t => EF.Functions.ILike(t.Title, pattern, @"\"));
+            return new Dictionary<Guid, PromptReference>();
         }
 
-        return await themes.OrderByDescending(t => t.PublishedAt).ThenBy(t => t.Title).ToListAsync(ct);
+        return await db.Prompts
+            .AsNoTracking()
+            .Where(p => promptIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => new PromptReference(p.Slug, p.Version), ct);
     }
 
-    public async Task<IReadOnlyList<Theme>> ListForUpdateAsync(Guid examId, CancellationToken ct) =>
-        await db.Themes.Include(t => t.AcceptedTypes).Where(t => t.ExamId == examId).ToListAsync(ct);
+    public Task<bool> AnyAsync(Guid examId, CancellationToken ct) => db.Prompts.AnyAsync(p => p.ExamId == examId, ct);
 
-    public Task<Theme?> FindActiveAsync(Guid themeId, CancellationToken ct) =>
-        Active().FirstOrDefaultAsync(t => t.Id == themeId, ct);
+    public Task LockAsync(Guid promptId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM prompts WHERE id = {promptId} FOR UPDATE", ct);
 
-    public Task<Theme?> FindAsync(Guid themeId, CancellationToken ct) =>
-        db.Themes
-            .AsNoTracking()
-            .Include(t => t.Texts)
-            .Include(t => t.AcceptedTypes)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(t => t.Id == themeId, ct);
+    public Task<Prompt?> FindByCreationKeyAsync(Guid adminId, string creationKey, CancellationToken ct) =>
+        Whole(db.Prompts.AsNoTracking()).FirstOrDefaultAsync(p => p.CreatedBy == adminId && p.CreationKey == creationKey, ct);
 
-    public void Add(Theme theme) => db.Themes.Add(theme);
+    public async Task<IReadOnlyList<PromptListItem>> ListAsync(Guid? examId, string? titleSearch, CancellationToken ct)
+    {
+        var prompts = db.Prompts.AsNoTracking();
+        if (examId is not null)
+        {
+            prompts = prompts.Where(p => p.ExamId == examId);
+        }
 
-    private IQueryable<Theme> Active() =>
-        db.Themes
-            .AsNoTracking()
-            .Include(t => t.Texts)
-            .Include(t => t.AcceptedTypes)
-            .AsSplitQuery()
-            .Where(t => t.Status == ThemeStatus.Active);
+        return await Summaries(
+            Search(prompts, titleSearch).OrderByDescending(p => p.UpdatedAt).ThenBy(p => p.Slug).ThenByDescending(p => p.Version))
+            .ToListAsync(ct);
+    }
 
-    private static string EscapeLike(string value) =>
+    private static IQueryable<Prompt> Search(IQueryable<Prompt> prompts, string? titleSearch)
+    {
+        if (string.IsNullOrEmpty(titleSearch))
+        {
+            return prompts;
+        }
+
+        var pattern = $"%{LikePattern.Escape(titleSearch)}%";
+        return prompts.Where(p => EF.Functions.ILike(p.Title, pattern, @"\"));
+    }
+
+    private static IQueryable<PromptListItem> Summaries(IQueryable<Prompt> prompts) =>
+        prompts.Select(p => new PromptListItem(
+            p.Id,
+            p.ExamId,
+            p.Slug,
+            p.Version,
+            p.Status,
+            p.Title,
+            p.Summary,
+            p.EssayTypeId,
+            p.Blocks.Count(b => b.Kind == PromptBlockKind.CollectionItem),
+            p.UpdatedAt));
+
+    public async Task<int> MaxVersionAsync(string slug, CancellationToken ct) =>
+        await db.Prompts.Where(p => p.Slug == slug).MaxAsync(p => (int?)p.Version, ct) ?? 0;
+
+    public Task<bool> HasDraftAsync(string slug, CancellationToken ct) =>
+        db.Prompts.AnyAsync(p => p.Slug == slug && p.Status == PromptStatus.Draft, ct);
+
+    public Task<int> ArchivePublishedAsync(string slug, DateTimeOffset now, CancellationToken ct) =>
+        db.Prompts
+            .Where(p => p.Slug == slug && p.Status == PromptStatus.Published)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, PromptStatus.Archived).SetProperty(x => x.UpdatedAt, now), ct);
+
+    public async Task<bool> TryPublishAsync(Guid promptId, Guid? publishedBy, DateTimeOffset now, CancellationToken ct) =>
+        await db.Prompts
+            .Where(p => p.Id == promptId && p.Status == PromptStatus.Draft)
+            .ExecuteUpdateAsync(
+                p => p
+                    .SetProperty(x => x.Status, PromptStatus.Published)
+                    .SetProperty(x => x.PublishedAt, now)
+                    .SetProperty(x => x.PublishedBy, publishedBy)
+                    .SetProperty(x => x.UpdatedAt, now),
+                ct) == 1;
+
+    public async Task<bool> TryArchiveAsync(Guid promptId, DateTimeOffset now, CancellationToken ct) =>
+        await db.Prompts
+            .Where(p => p.Id == promptId && p.Status == PromptStatus.Published)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, PromptStatus.Archived).SetProperty(x => x.UpdatedAt, now), ct) == 1;
+
+    public async Task<bool> TryDeleteDraftAsync(Guid promptId, CancellationToken ct) =>
+        await db.Prompts.Where(p => p.Id == promptId && p.Status == PromptStatus.Draft).ExecuteDeleteAsync(ct) == 1;
+
+    /// <summary>A proposta inteira, com os blocos na ordem de posição.</summary>
+    private static IQueryable<Prompt> Whole(IQueryable<Prompt> prompts) =>
+        prompts.Include(p => p.Blocks.OrderBy(b => b.Position)).Include(p => p.GradingNotes).AsSplitQuery();
+}
+
+internal static class LikePattern
+{
+    /// <summary>O texto procurado vale literalmente: <c>%</c> e <c>_</c> não são curingas.</summary>
+    public static string Escape(string value) =>
         value.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");
 }

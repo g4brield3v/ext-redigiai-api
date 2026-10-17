@@ -38,10 +38,14 @@ internal static class DevAuthentication
     }
 }
 
-/// <summary>Aluno de teste. Sem <c>Age</c>, a conta fica sem cadastro, para testar o primeiro acesso.</summary>
-internal sealed record DevUser(string Key, string ClerkUserId, string Email, string Name, int? Age, int ExtraCredits)
+/// <summary>
+/// Usuário de teste. Sem <c>Age</c>, a conta fica sem cadastro, para testar o primeiro acesso. Com
+/// <c>SecondFactor</c>, a sessão simula a verificação em duas etapas (só o administrador de teste).
+/// </summary>
+internal sealed record DevUser(
+    string Key, string ClerkUserId, string Email, string Name, int? Age, int ExtraCredits, bool SecondFactor = false)
 {
-    public static readonly DevUser[] All =
+    public static readonly DevUser[] Students =
     [
         new("ana", "dev_ana", "ana.souza@example.com", "Ana Souza", 26, 5),
         new("bruno", "dev_bruno", "bruno.lima@example.com", "Bruno Lima", 16, 0),
@@ -49,14 +53,29 @@ internal sealed record DevUser(string Key, string ClerkUserId, string Email, str
     ];
 }
 
+/// <summary>
+/// Os usuários de teste: os alunos e, quando <c>Admin__Emails</c> está configurado, o administrador <c>admin</c>,
+/// com o primeiro e-mail da lista e o segundo fator simulado. Só é registrado com o acesso de desenvolvimento.
+/// </summary>
+internal sealed class DevUsers(IOptions<AdminOptions> admin) : ITestIdentities
+{
+    public IReadOnlyList<DevUser> All { get; } = admin.Value.EmailList is [var email, ..]
+        ? [.. DevUser.Students, new DevUser("admin", "dev_admin", email, "Administração", 30, 0, SecondFactor: true)]
+        : DevUser.Students;
+
+    /// <summary>Os usuários de teste não existem no Clerk: aqui o e-mail deles vale como verificado.</summary>
+    public PrimaryEmail? FindPrimaryEmail(string clerkUserId) =>
+        All.FirstOrDefault(user => user.ClerkUserId == clerkUserId) is { } user ? new PrimaryEmail(user.Email, Verified: true) : null;
+}
+
 internal sealed class DevAuthHandler(
-    IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
+    IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, DevUsers users)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var key = Request.Headers[DevAuthentication.Header].ToString();
-        var user = DevUser.All.FirstOrDefault(candidate => candidate.Key == key);
+        var user = users.All.FirstOrDefault(candidate => candidate.Key == key);
         if (user is null)
         {
             return Task.FromResult(AuthenticateResult.Fail("Unknown development user."));
@@ -73,6 +92,13 @@ internal sealed class DevAuthHandler(
             nameType: "sub",
             roleType: null);
 
+        if (user.SecondFactor)
+        {
+            // Como no token do Clerk: minutos desde o primeiro e desde o segundo fator.
+            identity.AddClaim(new Claim("fva", "0"));
+            identity.AddClaim(new Claim("fva", "0"));
+        }
+
         return Task.FromResult(AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), DevAuthentication.Scheme)));
     }
@@ -82,7 +108,7 @@ internal sealed class DevAuthHandler(
 }
 
 /// <summary>
-/// Deixa o banco local pronto ao subir a API em modo de desenvolvimento: migrações, catálogo e os alunos
+/// Deixa o banco local pronto ao subir a API em modo de desenvolvimento: migrações, catálogo e os usuários
 /// de teste já cadastrados (a "Conta Nova" fica de fora, para testar o primeiro acesso).
 /// </summary>
 internal sealed class DevEnvironmentSetup(IServiceScopeFactory scopes, ILogger<DevEnvironmentSetup> logger) : IHostedService
@@ -96,7 +122,7 @@ internal sealed class DevEnvironmentSetup(IServiceScopeFactory scopes, ILogger<D
         await services.GetRequiredService<ICatalogSeedService>().SeedAsync(ct);
 
         var accounts = services.GetRequiredService<ITestAccountService>();
-        foreach (var user in DevUser.All)
+        foreach (var user in services.GetRequiredService<DevUsers>().All)
         {
             if (user.Age is { } age)
             {

@@ -199,6 +199,1026 @@
         ]
       }
     },
+    "/v1/admin/assets": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Envia uma imagem de proposta (JPG, PNG ou WebP, até 5 MB) para a pasta pública. O `assetId` devolvido\r\nvai no bloco de imagem da coletânea.",
+        "operationId": "uploadPromptImage",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptImageDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/exams/{slug}/essay-types": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "As categorias de correção do vestibular, para a lista do cartão Instruções, com a indicação de quais têm\r\nperfil de correção ativo. Vestibular desconhecido responde 404.",
+        "operationId": "listEssayTypes",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EssayTypeOptionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Cria um rascunho, vazio ou a partir do JSON completo da proposta (importação). Exige `Idempotency-Key`;\r\nrepetir a chave devolve o mesmo rascunho.",
+        "operationId": "createPrompt",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PromptDocument"
+                  }
+                ]
+              }
+            },
+            "text/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PromptDocument"
+                  }
+                ]
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PromptDocument"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Todas as versões, com situação, tipo, número de textos e data de atualização. `status` filtra por\r\nsituação (`draft`, `published`, `archived`), `exam` pelo vestibular e `q` pelo título.",
+        "operationId": "listAdminPrompts",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exam",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptListDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts/{id}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "A proposta no formato de cadastro, o mesmo da importação. É o que \"Exportar JSON\" entrega.",
+        "operationId": "getAdminPrompt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptAdminDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Substitui o rascunho inteiro. Proposta publicada responde `PROMPT_NOT_DRAFT`; com\r\n`expectedUpdatedAt`, se houve outro salvamento antes, `PROMPT_CHANGED`.",
+        "operationId": "savePrompt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptDocument"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptDocument"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptDocument"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Apaga só rascunho. Versão publicada ou arquivada responde `PROMPT_NOT_DRAFT`.",
+        "operationId": "deletePrompt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts/{id}/order": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Muda só a ordem dos blocos do rascunho. Posição repetida responde `VALIDATION_FAILED`.",
+        "operationId": "reorderPromptBlocks",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderBlocksRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderBlocksRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderBlocksRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts/{id}/validate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "A validação de publicação, sem publicar.",
+        "operationId": "validatePrompt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptValidationDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts/{id}/publish": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Valida e publica. A versão publicada anterior do mesmo endereço passa a arquivada.",
+        "operationId": "publishPrompt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts/{id}/new-version": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Cria um rascunho da versão seguinte, com o conteúdo desta versão publicada ou arquivada.",
+        "operationId": "createPromptVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/admin/prompts/{id}/archive": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Tira a proposta da lista dos alunos. Nada é apagado.",
+        "operationId": "archivePrompt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptSavedDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/v1/exams": {
       "get": {
         "tags": [
@@ -223,13 +1243,13 @@
         }
       }
     },
-    "/v1/exams/{slug}/themes": {
+    "/v1/exams/{slug}/prompts": {
       "get": {
         "tags": [
           "Catalog"
         ],
-        "summary": "Temas ativos do vestibular, com os tipos aceitos e o número de textos da coletânea.",
-        "operationId": "listThemes",
+        "summary": "Propostas publicadas do vestibular, com o título, o resumo, o tipo de redação e o número de textos da\r\ncoletânea. `q` filtra pelo título.",
+        "operationId": "listPrompts",
         "parameters": [
           {
             "name": "slug",
@@ -255,7 +1275,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ThemeSummaryDto"
+                    "$ref": "#/components/schemas/PromptSummaryDto"
                   }
                 }
               }
@@ -274,21 +1294,28 @@
         }
       }
     },
-    "/v1/themes/{id}": {
+    "/v1/prompts/{slug}": {
       "get": {
         "tags": [
           "Catalog"
         ],
-        "summary": "Enunciado, coletânea e tipos de redação aceitos pelo tema.",
-        "operationId": "getTheme",
+        "summary": "A versão publicada da proposta, com os blocos na ordem da página, o tipo de redação, as linhas e os endereços\r\ndas imagens. Com `version`, devolve essa versão se ela já foi publicada: é o que a redação feita numa\r\nversão antiga continua mostrando.",
+        "operationId": "getPrompt",
         "parameters": [
           {
-            "name": "id",
+            "name": "slug",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -298,7 +1325,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ThemeDetailDto"
+                  "$ref": "#/components/schemas/PromptDetailDto"
                 }
               }
             }
@@ -1038,18 +2065,13 @@
     "schemas": {
       "BatchEssayItem": {
         "required": [
-          "themeId",
-          "essayTypeId",
+          "promptId",
           "assetId",
           "parentEssayId"
         ],
         "type": "object",
         "properties": {
-          "themeId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "essayTypeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
           },
@@ -1064,7 +2086,8 @@
             ],
             "format": "uuid"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "BatchEssayRequest": {
         "required": [
@@ -1102,6 +2125,29 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        }
+      },
+      "BlockPositionRequest": {
+        "required": [
+          "id",
+          "position"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "position": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -1251,7 +2297,9 @@
           "id",
           "essayId",
           "title",
-          "themeId",
+          "promptId",
+          "promptSlug",
+          "promptVersion",
           "essayTypeId",
           "sentAt",
           "version",
@@ -1285,9 +2333,16 @@
           "title": {
             "type": "string"
           },
-          "themeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
+          },
+          "promptSlug": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "essayTypeId": {
             "type": "string",
@@ -1591,6 +2646,21 @@
           }
         }
       },
+      "ErrorDetail": {
+        "required": [
+          "path",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "ErrorResponse": {
         "required": [
           "code",
@@ -1611,15 +2681,26 @@
           },
           "traceId": {
             "type": "string"
+          },
+          "details": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            }
           }
         },
-        "description": "Formato único de erro da API (especificação, seção 12)."
+        "description": "Formato único de erro da API (especificação, seção 12). `Details` só vem em `VALIDATION_FAILED`\r\n(rotas de administração): cada pendência, com o campo a que se refere."
       },
       "EssayDetailDto": {
         "required": [
           "id",
           "title",
-          "themeId",
+          "promptId",
+          "promptSlug",
+          "promptVersion",
           "essayTypeId",
           "status",
           "version",
@@ -1643,9 +2724,16 @@
           "title": {
             "type": "string"
           },
-          "themeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
+          },
+          "promptSlug": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "essayTypeId": {
             "type": "string",
@@ -1750,7 +2838,9 @@
         "required": [
           "id",
           "title",
-          "themeId",
+          "promptId",
+          "promptSlug",
+          "promptVersion",
           "essayTypeId",
           "status",
           "version",
@@ -1771,9 +2861,16 @@
           "title": {
             "type": "string"
           },
-          "themeId": {
+          "promptId": {
             "type": "string",
             "format": "uuid"
+          },
+          "promptSlug": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "essayTypeId": {
             "type": "string",
@@ -1828,34 +2925,35 @@
       },
       "EssayTypeDto": {
         "required": [
-          "id",
           "slug",
-          "name",
-          "description",
-          "rubricVersionId",
-          "instruction"
+          "name"
         ],
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
+          "slug": {
+            "type": "string"
           },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "EssayTypeOptionDto": {
+        "required": [
+          "slug",
+          "name",
+          "hasActiveProfile"
+        ],
+        "type": "object",
+        "properties": {
           "slug": {
             "type": "string"
           },
           "name": {
             "type": "string"
           },
-          "description": {
-            "type": "string"
-          },
-          "rubricVersionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "instruction": {
-            "type": "string"
+          "hasActiveProfile": {
+            "type": "boolean"
           }
         }
       },
@@ -1914,6 +3012,10 @@
             "type": "string"
           }
         }
+      },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
       },
       "IllegibleAnswer": {
         "required": [
@@ -1991,6 +3093,7 @@
           "id",
           "email",
           "name",
+          "role",
           "termsAcceptanceRequired",
           "aiNoticeAccepted",
           "emailPreferences",
@@ -2011,6 +3114,9 @@
               "string"
             ]
           },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
           "termsAcceptanceRequired": {
             "type": "boolean"
           },
@@ -2022,6 +3128,835 @@
           },
           "credits": {
             "$ref": "#/components/schemas/CreditBalanceDto"
+          }
+        }
+      },
+      "PromptAdminDto": {
+        "required": [
+          "id",
+          "exam",
+          "slug",
+          "version",
+          "status",
+          "title",
+          "summary",
+          "sourceLabel",
+          "essayType",
+          "blocks",
+          "gradingNotes",
+          "updatedAt",
+          "publishedAt",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "exam": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PromptStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "essayType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptBlockDto"
+            }
+          },
+          "gradingNotes": {
+            "$ref": "#/components/schemas/PromptNotesDto"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptIssueDto"
+            }
+          }
+        }
+      },
+      "PromptBlockDataDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "columns": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "assetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "aiDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardItems": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PromptCardItemDto"
+            }
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptBlockDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "position": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PromptBlockDataDto"
+              }
+            ]
+          }
+        }
+      },
+      "PromptBlockPublicDataDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "columns": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardItems": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PromptCardItemPublicDto"
+            }
+          }
+        }
+      },
+      "PromptBlockPublicDto": {
+        "required": [
+          "position",
+          "kind",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PromptBlockPublicDataDto"
+          }
+        }
+      },
+      "PromptCardItemDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "aiDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caption": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptCardItemPublicDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "alt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caption": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptCountsDto": {
+        "required": [
+          "all",
+          "draft",
+          "published",
+          "archived"
+        ],
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "draft": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "published": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "archived": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PromptDetailDto": {
+        "required": [
+          "id",
+          "slug",
+          "version",
+          "status",
+          "title",
+          "summary",
+          "essayType",
+          "essayTitle",
+          "examSlug",
+          "examName",
+          "sheetLines",
+          "textCount",
+          "blocks"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PromptStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "essayType": {
+            "$ref": "#/components/schemas/EssayTypeDto"
+          },
+          "essayTitle": {
+            "type": "string"
+          },
+          "examSlug": {
+            "type": "string"
+          },
+          "examName": {
+            "type": "string"
+          },
+          "sheetLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "textCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptBlockPublicDto"
+            }
+          }
+        }
+      },
+      "PromptDocument": {
+        "type": "object",
+        "properties": {
+          "exam": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "slug": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "essayType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PromptBlockDto"
+            }
+          },
+          "gradingNotes": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PromptNotesDto"
+              }
+            ]
+          },
+          "expectedUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PromptImageDto": {
+        "required": [
+          "assetId",
+          "url",
+          "width",
+          "height"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PromptIssueDto": {
+        "required": [
+          "path",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PromptListDto": {
+        "required": [
+          "items",
+          "counts"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptListItemDto"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PromptCountsDto"
+          }
+        }
+      },
+      "PromptListItemDto": {
+        "required": [
+          "id",
+          "exam",
+          "examName",
+          "slug",
+          "version",
+          "status",
+          "title",
+          "essayTypeName",
+          "textCount",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "exam": {
+            "type": "string"
+          },
+          "examName": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PromptStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "essayTypeName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "textCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PromptNotesDto": {
+        "type": "object",
+        "properties": {
+          "expectedFocus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tangentSignals": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "offTopicSignals": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "keyData": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "extra": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptSavedDto": {
+        "required": [
+          "id",
+          "slug",
+          "version",
+          "status",
+          "updatedAt",
+          "blocks",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PromptStatus"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedBlockDto"
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptIssueDto"
+            }
+          }
+        }
+      },
+      "PromptStatus": {
+        "enum": [
+          "draft",
+          "published",
+          "archived"
+        ]
+      },
+      "PromptSummaryDto": {
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "essayType",
+          "textCount",
+          "examSlug",
+          "examName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "essayType": {
+            "$ref": "#/components/schemas/EssayTypeDto"
+          },
+          "textCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "examSlug": {
+            "type": "string"
+          },
+          "examName": {
+            "type": "string"
+          }
+        }
+      },
+      "PromptValidationDto": {
+        "required": [
+          "valid",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromptIssueDto"
+            }
           }
         }
       },
@@ -2041,6 +3976,23 @@
           },
           "termsAccepted": {
             "type": "boolean"
+          }
+        }
+      },
+      "ReorderBlocksRequest": {
+        "required": [
+          "blocks"
+        ],
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/BlockPositionRequest"
+            }
           }
         }
       },
@@ -2142,16 +4094,10 @@
           }
         }
       },
-      "ThemeDetailDto": {
+      "SavedBlockDto": {
         "required": [
           "id",
-          "title",
-          "statement",
-          "examSlug",
-          "examName",
-          "sheetLines",
-          "texts",
-          "essayTypes"
+          "position"
         ],
         "type": "object",
         "properties": {
@@ -2159,108 +4105,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "title": {
-            "type": "string"
-          },
-          "statement": {
-            "type": "string"
-          },
-          "examSlug": {
-            "type": "string"
-          },
-          "examName": {
-            "type": "string"
-          },
-          "sheetLines": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "texts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ThemeTextDto"
-            }
-          },
-          "essayTypes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EssayTypeDto"
-            }
-          }
-        }
-      },
-      "ThemeSummaryDto": {
-        "required": [
-          "id",
-          "title",
-          "examSlug",
-          "examName",
-          "essayTypes",
-          "textCount"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "examSlug": {
-            "type": "string"
-          },
-          "examName": {
-            "type": "string"
-          },
-          "essayTypes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EssayTypeDto"
-            }
-          },
-          "textCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "ThemeTextDto": {
-        "required": [
-          "position",
-          "kind",
-          "title",
-          "source",
-          "body"
-        ],
-        "type": "object",
-        "properties": {
           "position": {
             "type": "integer",
             "format": "int32"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/ThemeTextKind"
-          },
-          "title": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "body": {
-            "type": [
-              "null",
-              "string"
-            ]
           }
         }
-      },
-      "ThemeTextKind": {
-        "enum": [
-          "text",
-          "image"
-        ]
       },
       "TranscriptionLineDto": {
         "required": [
@@ -2358,6 +4207,12 @@
           }
         }
       },
+      "UserRole": {
+        "enum": [
+          "student",
+          "admin"
+        ]
+      },
       "ZeroRuleDto": {
         "required": [
           "code",
@@ -2386,6 +4241,9 @@
   "tags": [
     {
       "name": "Account"
+    },
+    {
+      "name": "Admin"
     },
     {
       "name": "Catalog"

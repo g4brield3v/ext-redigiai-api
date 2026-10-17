@@ -33,20 +33,58 @@ public interface IRubricRepository
     void Add(RubricVersion rubric);
 }
 
-public interface IThemeRepository
+public interface IPromptRepository
 {
-    /// <summary>Temas ativos do vestibular, do mais recente para o mais antigo, com textos e tipos aceitos.</summary>
+    void Add(Prompt prompt);
+
+    /// <summary>A versão, com os blocos e as abordagens esperadas, pronta para ser alterada.</summary>
+    Task<Prompt?> FindForUpdateAsync(Guid promptId, CancellationToken ct);
+
+    /// <summary>A versão em qualquer situação, só para leitura: a correção usa a versão com que a redação foi enviada.</summary>
+    Task<Prompt?> FindAsync(Guid promptId, CancellationToken ct);
+
+    /// <summary>A versão publicada desse endereço; <c>null</c> se não há nenhuma.</summary>
+    Task<Prompt?> FindPublishedAsync(string slug, CancellationToken ct);
+
+    /// <summary>Uma versão que já foi publicada (publicada ou arquivada) desse endereço: a que uma redação antiga usou.</summary>
+    Task<Prompt?> FindReleasedAsync(string slug, int version, CancellationToken ct);
+
+    /// <summary>Propostas publicadas do vestibular, da mais recente para a mais antiga.</summary>
     /// <param name="titleSearch">Trecho do título, comparado literalmente e sem diferenciar maiúsculas.</param>
-    Task<IReadOnlyList<Theme>> ListActiveAsync(Guid examId, string? titleSearch, CancellationToken ct);
+    Task<IReadOnlyList<PromptListItem>> ListPublishedAsync(Guid examId, string? titleSearch, CancellationToken ct);
 
-    /// <summary>Todos os temas do vestibular, com os tipos aceitos, prontos para serem alterados.</summary>
-    Task<IReadOnlyList<Theme>> ListForUpdateAsync(Guid examId, CancellationToken ct);
+    /// <summary>Endereço e versão de cada proposta pedida, para os links das redações.</summary>
+    Task<IReadOnlyDictionary<Guid, PromptReference>> ReferencesAsync(IReadOnlyCollection<Guid> promptIds, CancellationToken ct);
 
-    /// <summary>O tema ativo, com textos e tipos aceitos.</summary>
-    Task<Theme?> FindActiveAsync(Guid themeId, CancellationToken ct);
+    Task<bool> AnyAsync(Guid examId, CancellationToken ct);
 
-    /// <summary>O tema em qualquer situação, com textos e tipos aceitos: a correção usa a versão com que a redação foi enviada.</summary>
-    Task<Theme?> FindAsync(Guid themeId, CancellationToken ct);
+    /// <summary>
+    /// Segura a linha da versão até o fim da transação: dois salvamentos, ou um salvamento e uma publicação, da mesma
+    /// versão passam um de cada vez.
+    /// </summary>
+    Task LockAsync(Guid promptId, CancellationToken ct);
 
-    void Add(Theme theme);
+    /// <summary>O rascunho criado por esse administrador com essa chave de idempotência.</summary>
+    Task<Prompt?> FindByCreationKeyAsync(Guid adminId, string creationKey, CancellationToken ct);
+
+    /// <summary>Todas as versões, da alterada mais recentemente para a mais antiga.</summary>
+    /// <param name="titleSearch">Trecho do título, comparado literalmente e sem diferenciar maiúsculas.</param>
+    Task<IReadOnlyList<PromptListItem>> ListAsync(Guid? examId, string? titleSearch, CancellationToken ct);
+
+    /// <summary>A maior versão que existe nesse endereço; 0 se o endereço está livre.</summary>
+    Task<int> MaxVersionAsync(string slug, CancellationToken ct);
+
+    Task<bool> HasDraftAsync(string slug, CancellationToken ct);
+
+    /// <summary>Arquiva a versão publicada desse endereço, se houver. Devolve quantas linhas mudaram.</summary>
+    Task<int> ArchivePublishedAsync(string slug, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary><c>draft → published</c>. Devolve se a linha mudou (regra 10).</summary>
+    Task<bool> TryPublishAsync(Guid promptId, Guid? publishedBy, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary><c>published → archived</c>. Devolve se a linha mudou (regra 10).</summary>
+    Task<bool> TryArchiveAsync(Guid promptId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Apaga a versão só se ela ainda é rascunho. Devolve se apagou.</summary>
+    Task<bool> TryDeleteDraftAsync(Guid promptId, CancellationToken ct);
 }

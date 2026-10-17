@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Catalog;
+using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Domain.Grading;
 
@@ -15,20 +17,24 @@ internal sealed record GradingLayers(
     WritingRulesVersion WritingRules,
     Exam Exam,
     EssayType EssayType,
-    Theme Theme,
-    ThemeGradingNotes? ThemeNotes);
+    Prompt Proposal);
 
 /// <summary>
 /// Monta a chamada da correção preenchendo as instruções do perfil com as camadas da base de conhecimento
 /// (especificação, seção 8). As partes saem na ordem de cache: vestibular e tipo, tema, redação.
 /// </summary>
-internal static class GradingPromptBuilder
+internal static partial class GradingPromptBuilder
 {
     private const string EssayTag = "<redacao";
 
     /// <param name="identificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
+    /// <param name="copiedPassages">Trechos copiados da coletânea que a verificação automática encontrou.</param>
     public static GradingRequest Build(
-        GradingLayers layers, IReadOnlyList<TranscribedLine> lines, bool identificationFound, string model)
+        GradingLayers layers,
+        IReadOnlyList<TranscribedLine> lines,
+        bool identificationFound,
+        IReadOnlyList<CopiedPassage> copiedPassages,
+        string model)
     {
         var rubric = layers.Rubric;
         var system = Fill(layers.Prompt.SystemText, new Dictionary<string, string>
@@ -42,17 +48,25 @@ internal static class GradingPromptBuilder
             ["writing_rules"] = WritingRules(layers.WritingRules),
         });
 
-        var instruction = layers.Theme.AcceptedTypes.FirstOrDefault(t => t.EssayTypeId == layers.EssayType.Id)?.Instruction;
+        var proposal = layers.Proposal;
+        // O tipo de redação é o nome da categoria de correção da proposta.
+        var genre = layers.EssayType.Name;
         var user = Fill(layers.Prompt.UserText ?? "", new Dictionary<string, string>
         {
-            ["theme_title"] = layers.Theme.Title,
-            ["essay_type_name"] = layers.EssayType.Name,
-            ["theme_statement"] = string.IsNullOrWhiteSpace(instruction)
-                ? layers.Theme.Statement
-                : $"{layers.Theme.Statement}\n{instruction}",
-            ["theme_texts"] = "\n" + string.Join("\n", layers.Theme.Texts.OrderBy(t => t.Position).Select(Text)) + "\n",
-            ["theme_grading_notes"] = layers.ThemeNotes?.Notes ?? "",
-            ["line_count"] = Number(lines.Count),
+            ["prompt_title"] = PromptText.Attribute(proposal.Title),
+            ["essay_type"] = PromptText.Attribute(genre),
+            ["sheet_lines"] = Number(layers.Exam.SheetLines),
+            // Campos das instruções anteriores, que um perfil ainda ativo pode usar: a proposta não tem mais limites
+            // de linha nem título obrigatório no cadastro (essas regras estão nos itens das Instruções).
+            ["genre_label"] = PromptText.Attribute(genre),
+            ["min_lines"] = "",
+            ["max_lines"] = Number(layers.Exam.SheetLines),
+            ["title_required"] = "ver instruções",
+            ["prompt_blocks"] = PromptText.Blocks(proposal, genre),
+            ["expected_approaches"] = PromptText.GradingNotes(proposal.GradingNotes),
+            ["collection_copy"] = PromptText.CopiedPassages(copiedPassages),
+            // Linhas escritas: as que ficaram em branco não contam para o mínimo da proposta.
+            ["line_count"] = Number(lines.Count(line => !string.IsNullOrWhiteSpace(line.Text))),
             ["identification_found"] = identificationFound ? "sim" : "nao",
             ["numbered_lines"] = string.Join("\n", lines.Select(line => $"{Number(line.Number)}| {AsData(line.Text)}")),
         });
@@ -124,22 +138,19 @@ internal static class GradingPromptBuilder
         return string.IsNullOrWhiteSpace(rules.Notes) ? text.ToString().TrimEnd() : text.Append(rules.Notes.Trim()).ToString();
     }
 
-    /// <summary>A correção recebe só texto: de uma imagem da coletânea vão o título e a fonte.</summary>
-    private static string Text(ThemeText text) =>
-        text.Kind == ThemeTextKind.Image || string.IsNullOrWhiteSpace(text.Body)
-            ? $"Texto {Number(text.Position)} · {text.Title} ({text.Source}) [imagem]"
-            : $"Texto {Number(text.Position)} · {text.Title} ({text.Source})\n{text.Body}";
-
-    private static string Fill(string template, Dictionary<string, string> values)
-    {
-        var text = new StringBuilder(template);
-        foreach (var (name, value) in values)
-        {
-            text.Replace("{{" + name + "}}", value);
-        }
-
-        return text.ToString();
-    }
+    /// <summary>
+    /// Preenche os marcadores numa passada só: o que entra no lugar de um marcador não é lido de novo, então um texto
+    /// cadastrado ou escrito pelo aluno que contenha "{{...}}" continua sendo só texto.
+    /// </summary>
+    private static string Fill(string template, Dictionary<string, string> values) =>
+        Placeholder().Replace(template, marker => values.TryGetValue(marker.Groups[1].Value, out var value)
+            ? value
+            // Instruções escritas para outra versão do programa pedem um campo que não existe mais: melhor a correção
+            // falhar (e o crédito voltar) do que a IA receber o marcador no lugar da proposta.
+            : throw Errors.AiFailed("PROMPT_TEMPLATE_OUTDATED"));
 
     private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+    [GeneratedRegex(@"\{\{([a-z_]+)\}\}")]
+    private static partial Regex Placeholder();
 }

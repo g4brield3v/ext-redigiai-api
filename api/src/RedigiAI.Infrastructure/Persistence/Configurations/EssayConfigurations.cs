@@ -19,7 +19,7 @@ internal sealed class EssayConfiguration : IEntityTypeConfiguration<Essay>
         builder.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EssayBatch>().WithMany().HasForeignKey(e => e.BatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Exam>().WithMany().HasForeignKey(e => e.ExamId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Theme>().WithMany().HasForeignKey(e => e.ThemeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Prompt>().WithMany().HasForeignKey(e => e.PromptId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EssayType>().WithMany().HasForeignKey(e => e.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RubricVersion>().WithMany().HasForeignKey(e => e.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Essay>().WithMany().HasForeignKey(e => e.ParentEssayId).OnDelete(DeleteBehavior.Restrict);
@@ -53,6 +53,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.Provider).HasMaxLength(20);
         builder.Property(a => a.PublicId).HasMaxLength(200);
         builder.Property(a => a.Mime).HasMaxLength(40);
+        builder.Property(a => a.Scope).HasMaxLength(20).HasDefaultValue(AssetScope.EssayPhoto);
         builder.Ignore(a => a.IsConfirmed);
         builder.HasOne<User>().WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(a => a.PublicId).IsUnique();

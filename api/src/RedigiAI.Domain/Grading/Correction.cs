@@ -39,23 +39,33 @@ public sealed record NextStep(string Text, int? Criterion);
 /// <summary>Linha da redação como foi para a correção: a transcrição com as palavras que o aluno digitou.</summary>
 public sealed record EssayLine(int Number, string Text, bool Indent);
 
+/// <summary>Um trecho da redação igual a um texto da coletânea, achado pela verificação automática.</summary>
+/// <param name="Label">O texto da coletânea de onde veio ("Texto 2").</param>
+/// <param name="Words">Quantas palavras seguidas são iguais.</param>
+/// <param name="Text">O trecho como o aluno escreveu.</param>
+public sealed record CopiedPassage(string Label, int LineStart, int LineEnd, int Words, string Text);
+
 /// <summary>Com que a correção foi feita: tudo o que é preciso para explicar e reproduzir a nota depois.</summary>
-/// <param name="ThemeGradingNotesId">Notas do tema usadas; nulo quando o tema não tem notas.</param>
+/// <param name="PromptId">A versão da proposta usada.</param>
+/// <param name="PromptGradingNotesId">As abordagens esperadas dessa versão.</param>
 /// <param name="IdentificationFound">A transcrição encontrou nome, assinatura ou outra identificação na folha.</param>
 /// <param name="WritingRuleCodes">Códigos do catálogo de regras de escrita do perfil.</param>
+/// <param name="CopiedPassages">Trechos copiados da coletânea que a verificação automática encontrou.</param>
+/// <param name="CopyRequiresZero">A cópia passa do limite: a correção só é aceita com nota zero.</param>
 public sealed record GradingContext(
     Guid EssayId,
     RubricVersion Rubric,
     Guid GradingProfileId,
-    Guid ThemeId,
-    int ThemeVersion,
-    Guid? ThemeGradingNotesId,
+    Guid PromptId,
+    Guid PromptGradingNotesId,
     IReadOnlyList<EssayLine> Lines,
     bool IdentificationFound,
-    IReadOnlySet<string> WritingRuleCodes);
+    IReadOnlySet<string> WritingRuleCodes,
+    IReadOnlyList<CopiedPassage> CopiedPassages,
+    bool CopyRequiresZero);
 
 /// <summary>A resposta da IA não passa em uma das regras de validação; vale pedir de novo.</summary>
-/// <param name="rule">Número da regra da seção 8 da especificação (1 a 7).</param>
+/// <param name="rule">Número da regra da seção 8 da especificação (1 a 8).</param>
 public sealed class InvalidGradingException(int rule, string reason) : Exception(reason)
 {
     public int Rule { get; } = rule;
@@ -79,9 +89,11 @@ public sealed class Correction
     public Guid EssayId { get; private set; }
     public Guid RubricVersionId { get; private set; }
     public Guid GradingProfileId { get; private set; }
-    public Guid ThemeId { get; private set; }
-    public int ThemeVersion { get; private set; }
-    public Guid? ThemeGradingNotesId { get; private set; }
+    public Guid PromptId { get; private set; }
+    public Guid PromptGradingNotesId { get; private set; }
+
+    /// <summary>Trechos copiados da coletânea que a verificação automática encontrou e informou à IA.</summary>
+    public IReadOnlyList<CopiedPassage> CollectionCopy { get; private set; } = [];
 
     /// <summary>Código da hipótese de nota zero aplicada; nulo quando os critérios foram pontuados.</summary>
     public string? ZeroReason { get; private set; }
@@ -102,7 +114,7 @@ public sealed class Correction
     public IReadOnlyList<CorrectionCriterion> Criteria => _criteria;
     public IReadOnlyList<CorrectionMark> Marks => _marks;
 
-    /// <exception cref="InvalidGradingException">A resposta não passa nas regras 2 a 7 da validação.</exception>
+    /// <exception cref="InvalidGradingException">A resposta não passa nas regras 2 a 8 da validação.</exception>
     public static Correction Grade(
         GradingContext context, GradingOutput output, string model, string rawResponse, DateTimeOffset now)
     {
@@ -117,6 +129,11 @@ public sealed class Correction
         if (context.IdentificationFound && !zero)
         {
             throw new InvalidGradingException(7, "The sheet has an identification but the grading did not apply zero.");
+        }
+
+        if (context.CopyRequiresZero && !zero)
+        {
+            throw new InvalidGradingException(8, "Most of the essay was copied from the collection but the grading did not apply zero.");
         }
 
         if (output.Marks.Count > MaxMarks)
@@ -157,9 +174,9 @@ public sealed class Correction
             EssayId = context.EssayId,
             RubricVersionId = rubric.Id,
             GradingProfileId = context.GradingProfileId,
-            ThemeId = context.ThemeId,
-            ThemeVersion = context.ThemeVersion,
-            ThemeGradingNotesId = context.ThemeGradingNotesId,
+            PromptId = context.PromptId,
+            PromptGradingNotesId = context.PromptGradingNotesId,
+            CollectionCopy = context.CopiedPassages,
             ZeroReason = zero ? output.Zero.Reason : null,
             ZeroExplanation = zero ? output.Zero.Explanation : null,
             MaxScore = rubric.MaxScore,

@@ -7,6 +7,13 @@ public sealed record EmailPreferences(bool CorrectionReady, bool IllegibleRemind
     public static EmailPreferences Default { get; } = new(true, true, false);
 }
 
+/// <summary>Aluno é o padrão. Administrador cadastra as propostas de redação; o papel vem da configuração, nunca do navegador.</summary>
+public enum UserRole
+{
+    Student,
+    Admin,
+}
+
 /// <summary>Usuário local, ligado à conta do Clerk por <see cref="ClerkUserId"/>.</summary>
 public sealed class User
 {
@@ -23,6 +30,10 @@ public sealed class User
     public DateTimeOffset TermsAcceptedAt { get; private set; }
     public DateTimeOffset? AiNoticeAcceptedAt { get; private set; }
     public EmailPreferences EmailPreferences { get; private set; } = EmailPreferences.Default;
+    public UserRole Role { get; private set; }
+
+    /// <summary>Sessão de login em que o papel foi conferido pela última vez.</summary>
+    public string? RoleCheckedSessionId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset LastActiveAt { get; private set; }
     public DateTimeOffset? DeletionWarnedAt { get; private set; }
@@ -73,6 +84,18 @@ public sealed class User
     }
 
     public void ChangeEmailPreferences(EmailPreferences preferences) => EmailPreferences = preferences;
+
+    /// <summary>O papel é conferido de novo a cada login, isto é, a cada sessão nova.</summary>
+    public bool NeedsRoleCheck(string? sessionId) => sessionId is null || sessionId != RoleCheckedSessionId;
+
+    /// <summary>Grava o papel conferido nesta sessão. Devolve se o papel mudou.</summary>
+    public bool ConfirmRole(UserRole role, string? sessionId)
+    {
+        var changed = Role != role;
+        Role = role;
+        RoleCheckedSessionId = sessionId ?? RoleCheckedSessionId;
+        return changed;
+    }
 
     private static string? NormalizeName(string? name)
     {

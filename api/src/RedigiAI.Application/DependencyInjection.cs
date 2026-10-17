@@ -14,11 +14,16 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddOptions<LegalOptions>();
 
+        services.AddOptions<AdminOptions>();
+        services.AddScoped<AdminRole>();
+        services.AddScoped<IAdminAccessService, AdminAccessService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IClerkWebhookService, ClerkWebhookService>();
         services.AddScoped<ITestAccountService, TestAccountService>();
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<IPromptAdminService, PromptAdminService>();
+        services.AddOptions<SeedOptions>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
         services.AddScoped<GradingSeedService>();
         services.AddScoped<IUploadService, UploadService>();
@@ -26,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<EssayOutcomes>();
         services.AddScoped<ICorrectionService, CorrectionService>();
         services.AddOptions<AiBudgetOptions>();
+        services.AddOptions<CollectionCopyOptions>();
         services.AddSingleton<AiBudget>();
         services.AddScoped<AiSpending>();
         services.AddScoped<Abstractions.IJobHandler, TranscribeEssayHandler>();

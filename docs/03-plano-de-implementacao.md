@@ -24,13 +24,13 @@ Especificação: seções 2, 5, 6 (Conta e Catálogo), 11, 12, 13 e 15.
 - `AppError` + middleware de erros no formato `{code, message, retryable, traceId}`; logs JSON com `traceId`; `/health` e `/ready`.
 - `GET/POST/PATCH /v1/me` com data de nascimento, recusa de menores de 16, aceite de termos e concessão única do crédito grátis (o ledger completo entra na etapa 4; aqui basta o bucket `trial` com o lançamento no ledger).
 - Endpoints de catálogo; `openapi.json` publicado em build.
-- Script de seed: Fuvest, grade v1 do Simulado Fuvest 2027, 2ª edição (4 critérios, pesos 3, 2, 3, 2, níveis de 1 a `max_level` = 4, máximo 40, hipóteses de nota zero), tipos Dissertação e Narrativa, 1 tema de exemplo.
+- Script de seed: Fuvest, grade v1 do Simulado Fuvest 2027, 2ª edição (4 critérios, pesos 3, 2, 3, 2, níveis de 1 a `max_level` = 4, máximo 40, hipóteses de nota zero), tipos Dissertação e Narrativa. Só no ambiente Development entra também 1 proposta de exemplo; em staging e produção as propostas vêm do admin.
 - Limites de requisição, CORS restrito, cabeçalhos de segurança.
 
 **Front-end**
 - Projeto Vite + React + TS estrito; tokens do design system; componentes base (botão, cartão, campo, navegação, chip, modal); cliente gerado do OpenAPI.
 - Login com Clerk no nosso visual, com data de nascimento no primeiro acesso.
-- Páginas Início (`/`), Temas (`/temas`) e Proposta e coletânea (`/temas/:themeId`) com dados reais do catálogo.
+- Páginas Início (`/`), Propostas (`/propostas`, antes `/temas`) e Proposta e coletânea (`/propostas/:slug`) com dados reais do catálogo. O modelo de temas desta etapa foi substituído pelo de propostas na etapa 3b.
 
 **Infra**
 - GitHub Actions: build, testes, lint e tipos em todo pull request; CodeQL, gitleaks e auditoria de dependências.
@@ -66,9 +66,9 @@ Especificação: seções 3 (Seleção, Envio, Transcrição e revisão), 4, 6 (
 
 Especificação: seções 3 (Correção e nota), 8 inteira, 10 e 12.
 
-- Tabelas da base de conhecimento: `prompt_templates`, `rubric_guidelines`, `writing_rules`, `anchor_essays`, `anchor_scores`, `theme_grading_notes`, `grading_profiles` (índice único parcial do ativo), `reference_essays`, `eval_runs`; `corrections`, `correction_criteria`, `correction_marks`, `correction_feedback`.
+- Tabelas da base de conhecimento: `prompt_templates`, `rubric_guidelines`, `writing_rules`, `anchor_essays`, `anchor_scores`, `prompt_grading_notes` (na etapa 3b, no lugar de `theme_grading_notes`), `grading_profiles` (índice único parcial do ativo), `reference_essays`, `eval_runs`; `corrections`, `correction_criteria`, `correction_marks`, `correction_feedback`.
 - Job `grade`: lê o perfil ativo, monta as camadas na ordem de cache, chama o modelo, valida as 7 regras, calcula a nota (soma de nível × peso), consome o crédito, `completed`, e-mail `correction_ready`.
-- Controle de custo: teto de referência US$ 0,15 (alerta) e limite rígido US$ 0,225 (falha com devolução).
+- Controle de custo: teto de referência US$ 0,15 (alerta) e limite rígido US$ 0,33 (falha com devolução).
 - Defesa contra prompt injection: redação delimitada como dado.
 - Comando de linha `eval` que roda um perfil sobre o conjunto de referência (Batch API) e grava em `eval_runs`; comando `activate-profile` e `rollback-profile`.
 - Testes sem professor: defeitos plantados, consistência (3 execuções) e transcrição contra digitação.
@@ -79,6 +79,27 @@ Especificação: seções 3 (Correção e nota), 8 inteira, 10 e 12.
 - Mesma redação corrigida 3 vezes varia no máximo 1 nível por critério.
 - Nome escrito na folha resulta em nota zero por identificação.
 - Correção igual ao design, com comentário da margem na mesma linha da marca.
+
+## Etapa 3b · Propostas de redação e área de administração
+
+Documento: `docs/07-propostas-de-redacao.md` inteiro. Substitui o modelo de temas das etapas 1 a 3. A tela de correção v2 precisa estar concluída antes.
+
+- Acesso de administrador: `users.role`, `Admin__Emails`, `Admin__Require2fa`; e-mail principal verificado consultado na Backend API do Clerk no `POST /v1/me` e a cada login; segundo fator pela claim `fva`; limite de 120 requisições por minuto e `audit_log` em toda escrita.
+- Modelo: `prompts`, `prompt_blocks`, `prompt_grading_notes`, `assets.scope`; migração que converte os temas existentes em propostas.
+- Validação de rascunho (lista de pendências) e de publicação (seção A4).
+- API de administração: as 11 rotas da seção A5, com `Idempotency-Key` na criação e `expectedUpdatedAt` no salvamento.
+- Fluxo do aluno: `GET /v1/exams/{slug}/prompts`, `GET /v1/prompts/{slug}`, `POST /v1/essays/batch` com `promptId`; saem as rotas `/themes`.
+- Correção: `<proposta>` e `<abordagens_esperadas>` na chamada, verificação automática de cópia da coletânea e contagem de linhas (seção A6).
+- Telas, no repositório do front: `/propostas`, `/propostas/:slug`, `/propostas/:slug/enviar`, `/admin/propostas` e `/admin/propostas/:id` (referências 02b, 03, 11 e 11b).
+- Fica para uma branch própria, depois desta: a folha pautada (`GET /v1/prompts/{id}/sheet.pdf`).
+
+**Aceite**
+- Todos os testes da seção A8.
+- Rota de administração sem token responde 401; com token de aluno, 404; sem segundo fator, 403.
+- O administrador de teste do ambiente local não existe fora de `Development`.
+- Publicar a versão 2 arquiva a versão 1, e uma redação feita na versão 1 continua mostrando a versão 1.
+- A redação sempre recebe o tipo da proposta; um tipo enviado pelo navegador não vale.
+- Proposta, envio e as duas telas de administração iguais ao design em 360 px e 1440 px.
 
 ## Etapa 4 · Créditos e pagamentos
 

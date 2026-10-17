@@ -166,24 +166,6 @@ public sealed class WritingRule
         };
 }
 
-/// <summary>
-/// Camada 6 · Notas de correção de um tema: recortes esperados, sinais de tangenciamento, dados-chave da
-/// coletânea. Tem versão própria, fora do perfil, porque muda a cada tema.
-/// </summary>
-public sealed class ThemeGradingNotes
-{
-    private ThemeGradingNotes() { }
-
-    public Guid Id { get; private set; }
-    public Guid ThemeId { get; private set; }
-    public int Version { get; private set; }
-    public string Notes { get; private set; } = null!;
-    public DateTimeOffset CreatedAt { get; private set; }
-
-    public static ThemeGradingNotes Create(Guid themeId, int version, string notes, DateTimeOffset now) =>
-        new() { Id = Guid.CreateVersion7(), ThemeId = themeId, Version = version, Notes = notes, CreatedAt = now };
-}
-
 public enum GradingProfileStatus
 {
     Draft,
@@ -325,7 +307,7 @@ public sealed class ReferenceEssay
     public Guid Id { get; private set; }
     public Guid ExamId { get; private set; }
     public Guid EssayTypeId { get; private set; }
-    public Guid? ThemeId { get; private set; }
+    public Guid? PromptId { get; private set; }
     public string Source { get; private set; } = null!;
     public string Lines { get; private set; } = null!;
     public string Levels { get; private set; } = null!;

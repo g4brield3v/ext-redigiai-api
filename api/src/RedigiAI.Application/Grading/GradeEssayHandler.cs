@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Essays;
 using RedigiAI.Domain.Billing;
@@ -22,13 +23,12 @@ internal sealed class GradeEssayHandler(
     IEssayRepository essays,
     IExamRepository exams,
     IEssayTypeRepository essayTypes,
-    IThemeRepository themes,
+    IPromptRepository proposals,
     IRubricRepository rubrics,
     IGradingProfileRepository profiles,
     IPromptTemplateRepository prompts,
     IGuidelinesRepository guidelines,
     IWritingRulesRepository writingRules,
-    IThemeGradingNotesRepository themeNotes,
     ITranscriptionRepository transcriptions,
     ICorrectionRepository corrections,
     ICreditRepository credits,
@@ -38,6 +38,7 @@ internal sealed class GradeEssayHandler(
     IUnitOfWork unitOfWork,
     EssayOutcomes outcomes,
     AiSpending spending,
+    IOptions<CollectionCopyOptions> copyOptions,
     TimeProvider time) : IJobHandler
 {
     public const string CorrectionReadyTemplate = "correction_ready";
@@ -71,18 +72,22 @@ internal sealed class GradeEssayHandler(
         var layers = await LoadLayersAsync(essay, profile, ct);
         var transcription = await transcriptions.FindByEssayAsync(essay.Id, ct) ?? throw Errors.AiFailed("TRANSCRIPTION_MISSING");
         var lines = transcription.FinalLines();
+
+        // Antes da chamada: o que o aluno copiou da coletânea vai para a IA e fica gravado na correção.
+        var copy = CollectionCopyDetector.Find(layers.Proposal, lines, copyOptions.Value.MinWords);
         var context = new GradingContext(
             essay.Id,
             layers.Rubric,
             profile.Id,
-            layers.Theme.Id,
-            layers.Theme.Version,
-            layers.ThemeNotes?.Id,
+            layers.Proposal.Id,
+            layers.Proposal.GradingNotes.Id,
             [.. lines.Select(line => new EssayLine(line.Number, line.Text, line.Indent))],
             transcription.IdentificationFound,
-            layers.WritingRules.Rules.Select(rule => rule.Code).ToHashSet(StringComparer.Ordinal));
+            layers.WritingRules.Rules.Select(rule => rule.Code).ToHashSet(StringComparer.Ordinal),
+            copy.Passages,
+            CopyRequiresZero: copy.CopiedWords > 0 && copy.Share >= copyOptions.Value.ZeroShare);
 
-        var request = GradingPromptBuilder.Build(layers, lines, transcription.IdentificationFound, profile.GradingModel);
+        var request = GradingPromptBuilder.Build(layers, lines, transcription.IdentificationFound, copy.Passages, profile.GradingModel);
         var correction = await GradeAsync(essay.Id, context, request, ct);
 
         await unitOfWork.InTransactionAsync(
@@ -147,10 +152,9 @@ internal sealed class GradeEssayHandler(
         return started ? profile : null;
     }
 
-    /// <summary>Só as versões apontadas pelo perfil; o tema é a versão com que a redação foi enviada.</summary>
+    /// <summary>Só as versões apontadas pelo perfil; a proposta é a versão com que a redação foi enviada.</summary>
     private async Task<GradingLayers> LoadLayersAsync(Essay essay, GradingProfile profile, CancellationToken ct)
     {
-        var theme = await themes.FindAsync(essay.ThemeId, ct) ?? throw Errors.AiFailed("THEME_MISSING");
         return new GradingLayers(
             await prompts.FindAsync(profile.GradingPromptId, ct) ?? throw Errors.AiFailed("PROMPT_MISSING"),
             await rubrics.FindAsync(profile.RubricVersionId, ct) ?? throw Errors.AiFailed("RUBRIC_MISSING"),
@@ -159,8 +163,7 @@ internal sealed class GradeEssayHandler(
             await exams.FindByIdAsync(essay.ExamId, ct) ?? throw Errors.AiFailed("EXAM_MISSING"),
             (await essayTypes.ListByExamAsync(essay.ExamId, ct)).FirstOrDefault(type => type.Id == essay.EssayTypeId)
                 ?? throw Errors.AiFailed("ESSAY_TYPE_MISSING"),
-            theme,
-            await themeNotes.FindLatestAsync(theme.Id, ct));
+            await proposals.FindAsync(essay.PromptId, ct) ?? throw Errors.AiFailed("PROMPT_VERSION_MISSING"));
     }
 
     private async Task<Correction> GradeAsync(Guid essayId, GradingContext context, GradingRequest request, CancellationToken ct)

@@ -62,16 +62,6 @@ internal sealed class WritingRuleConfiguration : IEntityTypeConfiguration<Writin
     }
 }
 
-internal sealed class ThemeGradingNotesConfiguration : IEntityTypeConfiguration<ThemeGradingNotes>
-{
-    public void Configure(EntityTypeBuilder<ThemeGradingNotes> builder)
-    {
-        builder.ToTable("theme_grading_notes");
-        builder.HasOne<Theme>().WithMany().HasForeignKey(n => n.ThemeId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(n => new { n.ThemeId, n.Version }).IsUnique();
-    }
-}
-
 internal sealed class GradingProfileConfiguration : IEntityTypeConfiguration<GradingProfile>
 {
     public void Configure(EntityTypeBuilder<GradingProfile> builder)
@@ -144,7 +134,7 @@ internal sealed class ReferenceEssayConfiguration : IEntityTypeConfiguration<Ref
         builder.Property(r => r.Levels).HasColumnType("jsonb");
         builder.HasOne<Exam>().WithMany().HasForeignKey(r => r.ExamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<EssayType>().WithMany().HasForeignKey(r => r.EssayTypeId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Theme>().WithMany().HasForeignKey(r => r.ThemeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Prompt>().WithMany().HasForeignKey(r => r.PromptId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -166,14 +156,18 @@ internal sealed class CorrectionConfiguration : IEntityTypeConfiguration<Correct
         builder.Property(c => c.ZeroReason).HasMaxLength(60);
         builder.Property(c => c.Model).HasMaxLength(80);
         builder.Property(c => c.RawResponse).HasColumnType("jsonb");
+        builder.Property(c => c.CollectionCopy)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
+            .HasConversion<JsonConverter<IReadOnlyList<CopiedPassage>>, JsonComparer<IReadOnlyList<CopiedPassage>>>();
         builder.Property(c => c.NextSteps)
             .HasColumnType("jsonb")
             .HasConversion<JsonConverter<IReadOnlyList<NextStep>>, JsonComparer<IReadOnlyList<NextStep>>>();
         builder.HasOne<Essay>().WithMany().HasForeignKey(c => c.EssayId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RubricVersion>().WithMany().HasForeignKey(c => c.RubricVersionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<GradingProfile>().WithMany().HasForeignKey(c => c.GradingProfileId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Theme>().WithMany().HasForeignKey(c => c.ThemeId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ThemeGradingNotes>().WithMany().HasForeignKey(c => c.ThemeGradingNotesId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Prompt>().WithMany().HasForeignKey(c => c.PromptId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<PromptGradingNotes>().WithMany().HasForeignKey(c => c.PromptGradingNotesId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(c => c.Criteria).WithOne().HasForeignKey(x => x.CorrectionId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(c => c.Marks).WithOne().HasForeignKey(x => x.CorrectionId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(c => c.Criteria).UsePropertyAccessMode(PropertyAccessMode.Field);

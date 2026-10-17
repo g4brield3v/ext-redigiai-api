@@ -32,11 +32,15 @@ public sealed class ApiFixture : IAsyncLifetime
 {
     public const string Issuer = "https://clerk.test";
     public const string WebOrigin = "http://localhost:5173";
+    public const string AdminEmail = "admin@redigiai.test";
 
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:16-alpine").Build();
     private readonly RsaSecurityKey _signingKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
     public byte[] WebhookKey { get; } = RandomNumberGenerator.GetBytes(24);
+
+    /// <summary>O servidor de banco dos testes, para quem precisa de um banco à parte.</summary>
+    public string ConnectionString => _database.GetConnectionString();
 
     /// <summary>Faz o papel do Cloudinary: o que o teste "enviou" e a assinatura devolvida ao navegador.</summary>
     public FakePhotoStorage Photos { get; } = new();
@@ -46,6 +50,12 @@ public sealed class ApiFixture : IAsyncLifetime
 
     /// <summary>Faz o papel do Claude na correção: devolve o JSON que o teste roteirizar.</summary>
     public FakeGrader Grader { get; } = new();
+
+    /// <summary>Faz o papel da pasta pública do Cloudinary, onde ficam as imagens das propostas.</summary>
+    public FakePromptImageStorage PromptImages { get; } = new();
+
+    /// <summary>Faz o papel da Backend API do Clerk: o e-mail principal de cada conta e se está verificado.</summary>
+    public FakeIdentityDirectory Directory { get; } = new();
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
@@ -65,7 +75,11 @@ public sealed class ApiFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
-    public WebApplicationFactory<Program> CreateFactory(Action<IWebHostBuilder>? configure = null) =>
+    /// <param name="examplePrompt">
+    /// Os testes usam a proposta de exemplo da carga inicial, que fora deles só existe em Development. Com
+    /// <c>false</c>, vale o que o programa decide pelo ambiente.
+    /// </param>
+    public WebApplicationFactory<Program> CreateFactory(Action<IWebHostBuilder>? configure = null, bool examplePrompt = true) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -76,6 +90,8 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("Clerk:WebhookSecret", "whsec_" + Convert.ToBase64String(WebhookKey));
             builder.UseSetting("Cors:AllowedOrigins", WebOrigin);
             builder.UseSetting("Legal:TermsVersion", "1");
+            builder.UseSetting("Admin:Emails", AdminEmail);
+            builder.UseSetting("Admin:Require2fa", "true");
             builder.UseSetting("RateLimit:PerUserPerMinute", "10000");
             builder.UseSetting("RateLimit:PerIpPerMinute", "10000");
             builder.UseSetting("RateLimit:EssayBatchPerHour", "10000");
@@ -86,9 +102,16 @@ public sealed class ApiFixture : IAsyncLifetime
 
             builder.ConfigureTestServices(services =>
             {
+                if (examplePrompt)
+                {
+                    services.Configure<SeedOptions>(seed => seed.ExamplePrompt = true);
+                }
+
                 services.AddSingleton<IPhotoStorage>(Photos);
                 services.AddSingleton<IEssayTranscriber>(Transcriber);
                 services.AddSingleton<IEssayGrader>(Grader);
+                services.AddSingleton<IIdentityDirectory>(Directory);
+                services.AddSingleton<IPromptImageStorage>(PromptImages);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
                 {
                     var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
@@ -121,7 +144,8 @@ public sealed class ApiFixture : IAsyncLifetime
         string issuer = Issuer,
         string? authorizedParty = WebOrigin,
         DateTime? expires = null,
-        SecurityKey? signingKey = null)
+        SecurityKey? signingKey = null,
+        bool secondFactor = false)
     {
         var claims = new Dictionary<string, object>
         {
@@ -129,6 +153,8 @@ public sealed class ApiFixture : IAsyncLifetime
             ["email"] = email ?? $"{clerkUserId}@example.com",
             ["sid"] = sessionId ?? $"sess_{Guid.NewGuid():N}",
         };
+        // Como no token do Clerk: minutos desde o primeiro e desde o segundo fator (-1 = sem segundo fator).
+        claims["fva"] = new[] { 3, secondFactor ? 2 : -1 };
         if (name is not null)
         {
             claims["name"] = name;
@@ -173,6 +199,42 @@ public sealed class ApiFixture : IAsyncLifetime
         await using var scope = Factory.Services.CreateAsyncScope();
         return await query(scope.ServiceProvider.GetRequiredService<AppDbContext>());
     }
+}
+
+public sealed class FakeIdentityDirectory : IIdentityDirectory
+{
+    /// <summary>Contas conhecidas; as demais não existem no provedor.</summary>
+    public ConcurrentDictionary<string, PrimaryEmail> Accounts { get; } = new();
+
+    public ConcurrentQueue<string> Lookups { get; } = new();
+
+    /// <summary>Contas para as quais o provedor não responde agora (fora do ar, limite de chamadas).</summary>
+    public ConcurrentDictionary<string, bool> Unavailable { get; } = new();
+
+    public Task<PrimaryEmail?> FindPrimaryEmailAsync(string clerkUserId, CancellationToken ct)
+    {
+        Lookups.Enqueue(clerkUserId);
+        if (Unavailable.ContainsKey(clerkUserId))
+        {
+            throw new IdentityDirectoryUnavailableException("test");
+        }
+
+        return Task.FromResult(Accounts.TryGetValue(clerkUserId, out var email) ? email : null);
+    }
+}
+
+public sealed class FakePromptImageStorage : IPromptImageStorage
+{
+    /// <summary>O que foi enviado, pelo identificador: o tipo detectado e o conteúdo.</summary>
+    public ConcurrentDictionary<string, (string ContentType, byte[] Content)> Uploaded { get; } = new();
+
+    public Task<StoredImage> UploadAsync(string publicId, byte[] content, string contentType, CancellationToken ct)
+    {
+        Uploaded[publicId] = (contentType, content);
+        return Task.FromResult(new StoredImage(content.Length, 800, 240));
+    }
+
+    public string PublicUrl(string publicId) => $"https://res.cloudinary.com/test/image/upload/{publicId}";
 }
 
 public sealed class FakePhotoStorage : IPhotoStorage

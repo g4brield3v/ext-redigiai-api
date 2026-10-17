@@ -124,7 +124,7 @@ public class KnowledgeBaseTests(ApiFixture api)
     {
         var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
         await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true });
-        var theme = (await client.GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/themes"))[0];
+        var prompt = await client.GetFromJsonAsync<JsonElement>("/v1/prompts/algoritmos-e-o-debate-publico");
         var assetId = (await (await client.PostAsync("/v1/uploads/sign", null)).Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("assetId").GetGuid();
         var publicId = await api.QueryAsync(db => db.Assets.Where(a => a.Id == assetId).Select(a => a.PublicId).SingleAsync());
@@ -133,7 +133,7 @@ public class KnowledgeBaseTests(ApiFixture api)
         {
             Content = JsonContent.Create(new
             {
-                essays = new[] { new { themeId = theme.GetProperty("id").GetGuid(), essayTypeId = theme.GetProperty("essayTypes")[0].GetProperty("id").GetGuid(), assetId } },
+                essays = new[] { new { promptId = prompt.GetProperty("id").GetGuid(), assetId } },
                 aiNoticeAccepted = true,
             }),
         };
