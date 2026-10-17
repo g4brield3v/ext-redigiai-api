@@ -109,9 +109,8 @@ public class CorrectionTests
     }
 
     [Fact]
-    public void More_than_12_marks_is_rejected() =>
-        AssertRejected(1, Output(marks: [.. Enumerable.Repeat(new GradedMark(1, MarkKind.Good, 1, 0, 3, null, null), 13)]));
-
+    public void Marks_have_no_upper_limit() =>
+        Assert.Equal(40, Grade(Output(marks: [.. Enumerable.Repeat(new GradedMark(1, MarkKind.Good, 1, 0, 3, null, null), 40)])).Marks.Count);
     [Fact]
     public void Rule_outside_the_catalog_is_recorded_as_other()
     {

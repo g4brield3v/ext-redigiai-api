@@ -78,7 +78,6 @@ public sealed class InvalidGradingException(int rule, string reason) : Exception
 public sealed class Correction
 {
     public const int MaxNextSteps = 3;
-    public const int MaxMarks = 12;
 
     private readonly List<CorrectionCriterion> _criteria = [];
     private readonly List<CorrectionMark> _marks = [];
@@ -136,11 +135,8 @@ public sealed class Correction
             throw new InvalidGradingException(8, "Most of the essay was copied from the collection but the grading did not apply zero.");
         }
 
-        if (output.Marks.Count > MaxMarks)
-        {
-            throw new InvalidGradingException(1, "More than 12 marks.");
-        }
-
+        // Sem limite de marcas: a IA marca todos os trechos que afetam a nota (docs/08-ajustes-correcao.md, item 1).
+        // Os 3 próximos passos são limite pedagógico, não de tamanho.
         if (output.NextSteps.Count > MaxNextSteps)
         {
             throw new InvalidGradingException(5, "More than 3 next steps.");

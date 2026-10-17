@@ -141,6 +141,34 @@ public class GradingTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Correction_with_more_than_twelve_marks_is_accepted()
+    {
+        // Sem limite de marcas: a IA marca todos os trechos que afetam a nota (docs/08-ajustes-correcao.md, item 1).
+        var student = await QueuedEssayAsync();
+        var response = FakeGrader.Good();
+        var marks = response["marks"]!.AsArray();
+        for (var i = 0; i < 18; i++)
+        {
+            marks.Add(new JsonObject
+            {
+                ["criterion"] = 3, ["kind"] = "issue", ["line"] = 1, ["start"] = 2, ["end"] = 6,
+                ["note"] = $"Apontamento {i + 1}.", ["rule"] = null, ["fix"] = null,
+            });
+        }
+
+        api.Grader.Script.Enqueue(() => response.ToJsonString());
+
+        await RunAsync(JobTypes.Grade);
+
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
+        Assert.Equal(20, correction.Marks.Count);
+        Assert.Contains("todos os trechos que afetam a nota", api.Grader.LastRequest!.System);
+        Assert.DoesNotContain("até 12", api.Grader.LastRequest.System);
+        Assert.DoesNotContain("60 palavras", api.Grader.LastRequest.System);
+    }
+
+    [Fact]
     public async Task Two_bad_responses_fail_the_essay_and_give_the_credit_back_once()
     {
         var student = await QueuedEssayAsync();

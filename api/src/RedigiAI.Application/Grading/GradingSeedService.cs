@@ -110,18 +110,26 @@ internal sealed class GradingSeedService(
     }
 
     /// <summary>
-    /// Só em desenvolvimento: se as instruções de correção do programa mudaram, grava a versão seguinte delas e troca
-    /// cada perfil ativo por um perfil novo, igual em tudo o mais, que aponta para ela. Nada publicado é editado: as
-    /// correções já feitas continuam ligadas ao perfil e às instruções com que foram feitas.
+    /// Só em desenvolvimento: se as instruções de correção ou o manual do corretor do programa mudaram, grava a
+    /// versão seguinte do que mudou e troca cada perfil ativo por um perfil novo, igual em tudo o mais, que aponta
+    /// para ela. Nada publicado é editado: as correções já feitas continuam ligadas ao perfil, às instruções e ao
+    /// manual com que foram feitas.
     /// </summary>
-    /// <returns><c>true</c> se as instruções foram trocadas.</returns>
+    /// <returns><c>true</c> se algo foi trocado.</returns>
     public async Task<bool> ReplaceOutdatedInstructionsAsync(CancellationToken ct)
     {
         var fuvest = await exams.FindBySlugAsync("fuvest", ct);
         var latest = await prompts.FindLatestAsync(PromptKind.Grading, ct);
-        if (fuvest is null
-            || latest is null
-            || (latest.SystemText == FuvestKnowledgeBaseV1.GradingSystem && latest.UserText == FuvestKnowledgeBaseV1.GradingUser))
+        var latestManual = fuvest is null ? null : await guidelines.FindLatestAsync(fuvest.Id, ct);
+        if (fuvest is null || latest is null || latestManual is null)
+        {
+            return false;
+        }
+
+        var promptOutdated = latest.SystemText != FuvestKnowledgeBaseV1.GradingSystem || latest.UserText != FuvestKnowledgeBaseV1.GradingUser;
+        var manualOutdated = latestManual.GeneralRules != FuvestKnowledgeBaseV1.GeneralRules
+            || latestManual.GuidanceWriting != FuvestKnowledgeBaseV1.GuidanceWriting;
+        if (!promptOutdated && !manualOutdated)
         {
             return false;
         }
@@ -130,14 +138,32 @@ internal sealed class GradingSeedService(
         return await unitOfWork.InTransactionAsync(
             async () =>
             {
-                var current = PromptTemplate.Create(
-                    PromptKind.Grading, latest.Version + 1, FuvestKnowledgeBaseV1.GradingSystem, FuvestKnowledgeBaseV1.GradingUser, now);
-                prompts.Add(current);
+                PromptTemplate? newPrompt = null;
+                if (promptOutdated)
+                {
+                    newPrompt = PromptTemplate.Create(
+                        PromptKind.Grading, latest.Version + 1, FuvestKnowledgeBaseV1.GradingSystem, FuvestKnowledgeBaseV1.GradingUser, now);
+                    prompts.Add(newPrompt);
+                }
+
+                GuidelinesVersion? newManual = null;
+                if (manualOutdated)
+                {
+                    newManual = GuidelinesVersion.Create(
+                        fuvest.Id,
+                        latestManual.Version + 1,
+                        FuvestKnowledgeBaseV1.GeneralRules,
+                        FuvestKnowledgeBaseV1.GuidanceWriting,
+                        FuvestKnowledgeBaseV1.CriterionGuidelines,
+                        now);
+                    guidelines.Add(newManual);
+                }
 
                 foreach (var essayType in await essayTypes.ListByExamAsync(fuvest.Id, ct))
                 {
                     if (await profiles.FindActiveAsync(fuvest.Id, essayType.Id, ct) is not { } active
                         || await prompts.FindAsync(active.TranscriptionPromptId, ct) is not { } transcriptionPrompt
+                        || (newPrompt ?? await prompts.FindAsync(active.GradingPromptId, ct)) is not { } gradingPrompt
                         || !await profiles.TryRetireAsync(active.Id, ct))
                     {
                         continue;
@@ -148,9 +174,9 @@ internal sealed class GradingSeedService(
                         essayType.Id,
                         await profiles.MaxVersionAsync(fuvest.Id, essayType.Id, ct) + 1,
                         transcriptionPrompt,
-                        current,
+                        gradingPrompt,
                         active.RubricVersionId,
-                        active.GuidelinesVersionId,
+                        newManual?.Id ?? active.GuidelinesVersionId,
                         active.WritingRulesVersionId,
                         active.TranscriptionModel,
                         active.GradingModel,
