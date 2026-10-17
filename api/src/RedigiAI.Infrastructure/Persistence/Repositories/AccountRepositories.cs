@@ -60,4 +60,21 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
             .Where(b => b.UserId == userId && b.Remaining > 0 && (b.ExpiresAt == null || b.ExpiresAt > now))
             .OrderBy(b => b.CreatedAt)
             .ToListAsync(ct);
+
+    public async Task<IReadOnlySet<Guid>> RefundedAsync(IReadOnlyCollection<Guid> essayIds, CancellationToken ct)
+    {
+        if (essayIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var refunded = await db.CreditLedger
+            .AsNoTracking()
+            .Where(e => e.Source == CreditSource.Refund && e.EssayId != null && essayIds.Contains(e.EssayId.Value))
+            .Select(e => e.EssayId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return refunded.ToHashSet();
+    }
 }

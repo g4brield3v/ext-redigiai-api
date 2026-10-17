@@ -24,6 +24,8 @@ internal sealed class EssayRepository(AppDbContext db) : IEssayRepository
                     .SetProperty(e => e.Status, transition.To)
                     .SetProperty(e => e.ReviewDeadlineAt, transition.ReviewDeadlineAt)
                     .SetProperty(e => e.FailureCode, transition.FailureCode)
+                    .SetProperty(e => e.FailedAt, transition.FailedAt)
+                    .SetProperty(e => e.FailureDetails, transition.FailureDetails)
                     // Só a passagem que inicia a correção traz o perfil; nas outras, o que está gravado fica.
                     .SetProperty(e => e.GradingProfileId, e => transition.GradingProfileId ?? e.GradingProfileId),
                 ct) == 1;
@@ -35,6 +37,15 @@ internal sealed class EssayRepository(AppDbContext db) : IEssayRepository
             .OrderBy(e => e.ReviewDeadlineAt)
             .Take(limit)
             .Select(e => e.Id)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<EssayHistoryEntry>> ListHistoryAsync(Guid essayId, CancellationToken ct) =>
+        await db.AuditLog
+            .AsNoTracking()
+            .Where(e => e.Entity == "essay" && e.EntityId == essayId)
+            .OrderBy(e => e.CreatedAt)
+            .ThenBy(e => e.Id)
+            .Select(e => new EssayHistoryEntry(e.Action, e.Data, e.CreatedAt))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Essay>> ListByUserAsync(

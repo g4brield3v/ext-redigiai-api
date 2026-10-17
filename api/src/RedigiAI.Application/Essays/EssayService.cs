@@ -142,9 +142,11 @@ internal sealed class EssayService(
         var illegible = await transcriptions.IllegibleCountsAsync(ids, ct);
         var scores = await corrections.ScoresAsync(ids, ct);
         var references = await prompts.ReferencesAsync([.. page.Select(e => e.PromptId).Distinct()], ct);
+        var refunded = await credits.RefundedAsync([.. page.Where(e => e.FailureCode is not null).Select(e => e.Id)], ct);
 
         return new EssayListDto(
-            [.. page.Select(e => ToSummary(e, references, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id), scores))],
+            [.. page.Select(e => ToSummary(
+                e, references, rewritten.Contains(e.Id), illegible.GetValueOrDefault(e.Id), scores, refunded.Contains(e.Id)))],
             found.Count > PageSize ? page[^1].Id.ToString("N") : null);
     }
 
@@ -160,7 +162,9 @@ internal sealed class EssayService(
             await prompts.ReferencesAsync([essay.PromptId], ct),
             rewritten.Contains(essay.Id),
             transcription?.IllegibleCount ?? 0,
-            await corrections.ScoresAsync([essay.Id], ct));
+            await corrections.ScoresAsync([essay.Id], ct),
+            essay.FailureCode is not null && (await credits.RefundedAsync([essay.Id], ct)).Contains(essay.Id));
+        var timeline = EssayTimeline.Build(essay, await essays.ListHistoryAsync(essay.Id, ct));
         var lines = transcription?.Lines ?? [];
         var textByLine = lines.ToDictionary(line => line.Number, line => line.Text);
 
@@ -180,12 +184,14 @@ internal sealed class EssayService(
             summary.Score,
             summary.MaxScore,
             summary.FailureCode,
+            summary.Failure,
             exam.SheetLines,
             [.. lines.Select(line => new TranscriptionLineDto(line.Number, line.Text, line.Indent))],
             [.. (transcription?.Words ?? [])
                 .OrderBy(word => word.LineNumber)
                 .ThenBy(word => word.CharStart)
-                .Select(word => ToDto(word, textByLine[word.LineNumber]))]);
+                .Select(word => ToDto(word, textByLine[word.LineNumber]))],
+            timeline);
     }
 
     public async Task FillIllegibleAsync(
@@ -202,7 +208,7 @@ internal sealed class EssayService(
         if (essay.ReviewDeadlineAt <= now)
         {
             // O prazo acabou antes de a varredura passar: cancela e devolve o crédito já.
-            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.ReviewExpired(), ct);
+            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.ReviewExpired(time.GetUtcNow()), ct);
             throw Errors.ReviewExpired();
         }
 
@@ -247,7 +253,7 @@ internal sealed class EssayService(
         var cancelled = 0;
         foreach (var essayId in await essays.ListExpiredReviewsAsync(time.GetUtcNow(), ExpiredReviewsPerSweep, ct))
         {
-            if (await outcomes.EndWithRefundAsync(essayId, EssayTransition.ReviewExpired(), ct))
+            if (await outcomes.EndWithRefundAsync(essayId, EssayTransition.ReviewExpired(time.GetUtcNow()), ct))
             {
                 cancelled++;
             }
@@ -362,7 +368,8 @@ internal sealed class EssayService(
         IReadOnlyDictionary<Guid, PromptReference> references,
         bool rewritten,
         int illegibleCount,
-        IReadOnlyDictionary<Guid, (int Score, int MaxScore)> scores) =>
+        IReadOnlyDictionary<Guid, (int Score, int MaxScore)> scores,
+        bool creditRefunded) =>
         new(
             essay.Id,
             essay.Title,
@@ -378,7 +385,14 @@ internal sealed class EssayService(
             illegibleCount,
             Score: scores.TryGetValue(essay.Id, out var graded) ? graded.Score : null,
             MaxScore: scores.TryGetValue(essay.Id, out graded) ? graded.MaxScore : null,
-            essay.FailureCode);
+            essay.FailureCode,
+            essay is { FailureCode: { } code, FailedAt: { } failedAt }
+                ? new EssayFailureDto(
+                    code,
+                    failedAt,
+                    creditRefunded,
+                    essay.FailureDetails is { } details ? new EssayEventDetailsDto(details.IllegibleCount, null) : null)
+                : null);
 
     private sealed record PreparedEssay(
         Exam Exam, Prompt Prompt, EssayType EssayType, Guid RubricVersionId, Asset Photo, StoredPhoto Stored, Essay? RewriteOf);

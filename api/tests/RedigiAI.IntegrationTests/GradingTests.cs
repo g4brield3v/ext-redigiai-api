@@ -243,6 +243,19 @@ public class GradingTests(ApiFixture api)
         Assert.Equal((JobStatus.Dead, 1, "AI_OUTPUT_TRUNCATED"), (job.Status, job.Attempts, job.LastError));
         Assert.Equal(1, await student.BalanceAsync());
         Assert.Equal(2, await api.QueryAsync(db => db.AuditLog.CountAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_truncated")));
+        Assert.NotNull(essay.FailedAt);
+
+        // O aluno vê GRADING_FAILED; o motivo interno e as tentativas da IA ficam só na trilha de auditoria.
+        var body = await student.Client.GetStringAsync($"/v1/essays/{student.EssayId}");
+        Assert.DoesNotContain("AI_", body);
+        Assert.DoesNotContain("truncated", body);
+        var detail = JsonDocument.Parse(body).RootElement;
+        Assert.Equal(("GRADING_FAILED", true), (
+            detail.GetProperty("failure").GetProperty("code").GetString(),
+            detail.GetProperty("failure").GetProperty("creditRefunded").GetBoolean()));
+        Assert.Equal(
+            ["submitted", "transcribed", "grading_started", "failed", "credit_refunded"],
+            detail.GetProperty("timeline").EnumerateArray().Select(e => e.GetProperty("type").GetString()));
     }
 
     [Fact]

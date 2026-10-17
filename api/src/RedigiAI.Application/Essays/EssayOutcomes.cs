@@ -21,13 +21,14 @@ internal sealed class EssayOutcomes(
                     return false;
                 }
 
-                await RefundAsync(essayId, ct);
+                // A mudança de status vem antes da devolução na trilha: é a ordem que a linha do tempo mostra.
                 audit.Record(
                     "system",
                     "essay.status_changed",
                     "essay",
                     essayId,
                     new { from = transition.From.ToString(), to = transition.To.ToString(), failureCode = transition.FailureCode });
+                await RefundAsync(essayId, ct);
                 return true;
             },
             ct);

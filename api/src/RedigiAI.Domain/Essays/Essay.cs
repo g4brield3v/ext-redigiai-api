@@ -44,6 +44,12 @@ public sealed class Essay
     public DateTimeOffset? ReviewDeadlineAt { get; private set; }
     public string? FailureCode { get; private set; }
 
+    /// <summary>Quando a redação falhou ou foi cancelada.</summary>
+    public DateTimeOffset? FailedAt { get; private set; }
+
+    /// <summary>Dados da falha para a tela (jsonb), como a quantidade de palavras ilegíveis.</summary>
+    public EssayFailureDetails? FailureDetails { get; private set; }
+
     /// <summary>Perfil de correção fixado quando a correção começa; uma nova tentativa usa o mesmo.</summary>
     public Guid? GradingProfileId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -121,6 +127,10 @@ public sealed record EssayTransition
 
     public string? FailureCode { get; private init; }
 
+    public DateTimeOffset? FailedAt { get; private init; }
+
+    public EssayFailureDetails? FailureDetails { get; private init; }
+
     /// <summary>Perfil de correção que passa a valer para a redação; nulo mantém o que já está gravado.</summary>
     public Guid? GradingProfileId { get; private init; }
 
@@ -132,18 +142,22 @@ public sealed record EssayTransition
         new(EssayStatus.Uploaded, EssayStatus.AwaitingReview) { ReviewDeadlineAt = now + ReviewWindow };
 
     /// <summary>Mais de 10 palavras ilegíveis ou foto que não dá para ler.</summary>
-    public static EssayTransition PhotoUnreadable() =>
-        new(EssayStatus.Uploaded, EssayStatus.Failed) { FailureCode = "PHOTO_UNREADABLE" };
+    /// <param name="illegibleCount">Quantas palavras ficaram ilegíveis; nulo quando nem deu para ler a folha.</param>
+    public static EssayTransition PhotoUnreadable(int? illegibleCount, DateTimeOffset now) =>
+        Failure(EssayStatus.Uploaded, EssayStatus.Failed, "PHOTO_UNREADABLE", now) with
+        {
+            FailureDetails = illegibleCount is null ? null : new EssayFailureDetails(illegibleCount),
+        };
 
-    public static EssayTransition TranscriptionFailed() =>
-        new(EssayStatus.Uploaded, EssayStatus.Failed) { FailureCode = "TRANSCRIPTION_FAILED" };
+    public static EssayTransition TranscriptionFailed(DateTimeOffset now) =>
+        Failure(EssayStatus.Uploaded, EssayStatus.Failed, "TRANSCRIPTION_FAILED", now);
 
     /// <summary>O aluno preencheu todas as palavras.</summary>
     public static EssayTransition ReviewCompleted() => new(EssayStatus.AwaitingReview, EssayStatus.Queued);
 
     /// <summary>24 h sem preencher: cancelada pelo sistema.</summary>
-    public static EssayTransition ReviewExpired() =>
-        new(EssayStatus.AwaitingReview, EssayStatus.Cancelled) { FailureCode = "REVIEW_EXPIRED" };
+    public static EssayTransition ReviewExpired(DateTimeOffset now) =>
+        Failure(EssayStatus.AwaitingReview, EssayStatus.Cancelled, "REVIEW_EXPIRED", now);
 
     /// <summary>O worker pegou o job de correção: o perfil ativo fica fixado na redação.</summary>
     public static EssayTransition GradingStarted(Guid gradingProfileId) =>
@@ -154,9 +168,17 @@ public sealed record EssayTransition
 
     /// <summary>Falha definitiva da correção.</summary>
     /// <param name="started">A correção chegou a começar (<c>processing</c>) ou falhou ainda na fila.</param>
-    public static EssayTransition GradingFailed(bool started) =>
-        new(started ? EssayStatus.Processing : EssayStatus.Queued, EssayStatus.Failed) { FailureCode = "GRADING_FAILED" };
+    public static EssayTransition GradingFailed(bool started, DateTimeOffset now) =>
+        Failure(started ? EssayStatus.Processing : EssayStatus.Queued, EssayStatus.Failed, "GRADING_FAILED", now);
+
+    /// <summary>Toda passagem para <c>failed</c> ou <c>cancelled</c> grava código e data; o banco recusa sem código.</summary>
+    private static EssayTransition Failure(EssayStatus from, EssayStatus to, string code, DateTimeOffset now) =>
+        new(from, to) { FailureCode = code, FailedAt = now };
 }
+
+/// <summary>Dados da falha que a tela mostra. Só números e códigos, nunca conteúdo de redação.</summary>
+/// <param name="IllegibleCount">Palavras ilegíveis, em <c>PHOTO_UNREADABLE</c>.</param>
+public sealed record EssayFailureDetails(int? IllegibleCount);
 
 public static class EssayTitle
 {

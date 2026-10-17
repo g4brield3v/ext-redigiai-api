@@ -70,7 +70,7 @@ internal sealed class TranscribeEssayHandler(
         var transcription = await ReadAsync(essay, request, ct);
         if (transcription is null || transcription.IsUnreadable)
         {
-            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.PhotoUnreadable(), ct);
+            await outcomes.EndWithRefundAsync(essay.Id, EssayTransition.PhotoUnreadable(transcription?.IllegibleCount, time.GetUtcNow()), ct);
             return;
         }
 
@@ -105,7 +105,7 @@ internal sealed class TranscribeEssayHandler(
     public Task OnDeadAsync(string payload, CancellationToken ct)
     {
         var essayId = JsonSerializer.Deserialize<EssayJobPayload>(payload, Json)!.EssayId;
-        return outcomes.EndWithRefundAsync(essayId, EssayTransition.TranscriptionFailed(), ct);
+        return outcomes.EndWithRefundAsync(essayId, EssayTransition.TranscriptionFailed(time.GetUtcNow()), ct);
     }
 
     /// <summary>

@@ -112,6 +112,8 @@ public class TranscriptionTests(ApiFixture api)
 
         var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
         Assert.Equal((EssayStatus.Failed, "PHOTO_UNREADABLE"), (essay.Status, essay.FailureCode));
+        Assert.NotNull(essay.FailedAt);
+        Assert.Equal(reason == "eleven-illegible" ? 11 : null, essay.FailureDetails?.IllegibleCount);
         Assert.Equal(1, await student.BalanceAsync());
         var ledger = await api.QueryAsync(db => db.CreditLedger.Where(e => e.EssayId == essayId).OrderBy(e => e.Id).ToListAsync());
         Assert.Equal([(-1, CreditSource.Trial), (1, CreditSource.Refund)], ledger.Select(e => (e.Delta, e.Source)));
@@ -122,6 +124,71 @@ public class TranscriptionTests(ApiFixture api)
         var handler = scope.ServiceProvider.GetServices<IJobHandler>().Single(h => h.Type == JobTypes.Transcribe);
         await handler.OnDeadAsync(JsonSerializer.Serialize(new { essayId }), CancellationToken.None);
         Assert.Equal(1, await student.BalanceAsync());
+    }
+
+    [Fact]
+    public async Task Failed_essay_shows_the_reason_and_the_timeline_to_its_owner_only()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        api.Transcriber.Script.Enqueue(() => FakeTranscriber.Reading(lines: [string.Join(' ', Enumerable.Repeat("[?]", 14))]));
+        await RunTranscriptionsAsync();
+
+        var detail = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{essayId}");
+        var failure = detail.GetProperty("failure");
+        Assert.Equal("PHOTO_UNREADABLE", failure.GetProperty("code").GetString());
+        Assert.True(failure.GetProperty("creditRefunded").GetBoolean());
+        Assert.Equal(14, failure.GetProperty("details").GetProperty("illegibleCount").GetInt32());
+        var failedAt = await api.QueryAsync(db => db.Essays.Where(e => e.Id == essayId).Select(e => e.FailedAt).SingleAsync());
+        Assert.Equal(failedAt, failure.GetProperty("occurredAt").GetDateTimeOffset());
+
+        // Enviada, falhou e correção devolvida, nessa ordem; o evento de falha traz o código e as palavras ilegíveis.
+        var timeline = detail.GetProperty("timeline").EnumerateArray().ToList();
+        Assert.Equal(["submitted", "failed", "credit_refunded"], timeline.Select(e => e.GetProperty("type").GetString()));
+        Assert.Equal("PHOTO_UNREADABLE", timeline[1].GetProperty("details").GetProperty("failureCode").GetString());
+        Assert.Equal(14, timeline[1].GetProperty("details").GetProperty("illegibleCount").GetInt32());
+
+        // A lista do painel traz o mesmo motivo, sem a linha do tempo.
+        var listed = (await student.Client.GetFromJsonAsync<JsonElement>("/v1/essays")).GetProperty("items").EnumerateArray()
+            .Single(e => e.GetProperty("id").GetGuid() == essayId);
+        Assert.Equal("PHOTO_UNREADABLE", listed.GetProperty("failure").GetProperty("code").GetString());
+        Assert.False(listed.TryGetProperty("timeline", out _));
+
+        // Redação de outro aluno continua 404.
+        var other = await Student.CreateAsync(api);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.Client.GetAsync($"/v1/essays/{essayId}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Essay_in_progress_has_no_failure_and_shows_the_steps_so_far()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+        api.Transcriber.Script.Enqueue(() => FakeTranscriber.Reading(lines: ["Uma [?] ilegivel."]));
+        await RunTranscriptionsAsync();
+
+        var detail = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{essayId}");
+
+        Assert.Equal(JsonValueKind.Null, detail.GetProperty("failure").ValueKind);
+        var timeline = detail.GetProperty("timeline").EnumerateArray().ToList();
+        Assert.Equal(["submitted", "transcribed"], timeline.Select(e => e.GetProperty("type").GetString()));
+        Assert.Equal(1, timeline[1].GetProperty("details").GetProperty("illegibleCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task Failed_or_cancelled_status_without_a_code_is_refused_by_the_database()
+    {
+        var student = await Student.CreateAsync(api);
+        var essayId = await student.SubmitAsync();
+
+        foreach (var status in new[] { "failed", "cancelled" })
+        {
+            var refused = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => api.QueryAsync(db => db.Database.ExecuteSqlRawAsync(
+                "UPDATE essays SET status = {0}, failure_code = NULL, failed_at = now() WHERE id = {1}", status, essayId)));
+            Assert.Equal(("23514", "ck_essays_failure_code"), (refused.SqlState, refused.ConstraintName));
+        }
+
+        Assert.Equal(EssayStatus.Uploaded, await student.StatusAsync(essayId));
     }
 
     [Fact]
@@ -139,6 +206,7 @@ public class TranscriptionTests(ApiFixture api)
 
         var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
         Assert.Equal((EssayStatus.Failed, "TRANSCRIPTION_FAILED"), (essay.Status, essay.FailureCode));
+        Assert.NotNull(essay.FailedAt);
         var job = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.Transcribe).ToListAsync()))
             .Single(j => j.Payload.Contains(essayId.ToString()));
         Assert.Equal((JobStatus.Dead, 1, "AI_INVALID_RESPONSE"), (job.Status, job.Attempts, job.LastError));
@@ -223,6 +291,7 @@ public class TranscriptionTests(ApiFixture api)
         Assert.Contains("voltou para o seu saldo", error.GetProperty("message").GetString());
         var cancelled = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == essayId));
         Assert.Equal((EssayStatus.Cancelled, "REVIEW_EXPIRED"), (cancelled.Status, cancelled.FailureCode));
+        Assert.NotNull(cancelled.FailedAt);
         Assert.Equal(1, await student.BalanceAsync());
 
         // A varredura cancela a outra e não mexe de novo na que já foi cancelada.

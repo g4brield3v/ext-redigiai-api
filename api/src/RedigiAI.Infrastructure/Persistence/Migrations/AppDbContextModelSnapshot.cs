@@ -821,10 +821,18 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("exam_id");
 
+                    b.Property<DateTimeOffset?>("FailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("failed_at");
+
                     b.Property<string>("FailureCode")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("failure_code");
+
+                    b.Property<string>("FailureDetails")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("failure_details");
 
                     b.Property<Guid?>("GradingProfileId")
                         .HasColumnType("uuid")
@@ -904,7 +912,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "Id")
                         .HasDatabaseName("ix_essays_user_id_id");
 
-                    b.ToTable("essays", (string)null);
+                    b.ToTable("essays", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_essays_failure_code", "status NOT IN ('failed', 'cancelled') OR (failure_code IS NOT NULL AND failed_at IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Essays.EssayBatch", b =>

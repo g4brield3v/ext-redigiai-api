@@ -123,9 +123,9 @@ internal sealed class GradeEssayHandler(
     public async Task OnDeadAsync(string payload, CancellationToken ct)
     {
         var essayId = JsonSerializer.Deserialize<EssayJobPayload>(payload, Json)!.EssayId;
-        if (!await outcomes.EndWithRefundAsync(essayId, EssayTransition.GradingFailed(started: true), ct))
+        if (!await outcomes.EndWithRefundAsync(essayId, EssayTransition.GradingFailed(started: true, time.GetUtcNow()), ct))
         {
-            await outcomes.EndWithRefundAsync(essayId, EssayTransition.GradingFailed(started: false), ct);
+            await outcomes.EndWithRefundAsync(essayId, EssayTransition.GradingFailed(started: false, time.GetUtcNow()), ct);
         }
     }
 
