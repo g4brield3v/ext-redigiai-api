@@ -215,7 +215,19 @@ internal sealed class GradeEssayHandler(
             {
                 try
                 {
-                    return Correction.Grade(context, output, call.Model, call.ToolInput!, time.GetUtcNow());
+                    var correction = Correction.Grade(context, output, call.Model, call.ToolInput!, time.GetUtcNow());
+                    if (correction.Marks.Count < output.Marks.Count)
+                    {
+                        // Marcas repetidas ou acima do teto: a correção vale, mas o corte fica registrado.
+                        audit.Record(
+                            "system",
+                            "grading.marks_trimmed",
+                            "essay",
+                            essayId,
+                            new { received = output.Marks.Count, kept = correction.Marks.Count });
+                    }
+
+                    return correction;
                 }
                 catch (InvalidGradingException invalid)
                 {

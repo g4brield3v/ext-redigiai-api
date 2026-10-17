@@ -109,8 +109,41 @@ public class CorrectionTests
     }
 
     [Fact]
-    public void Marks_have_no_upper_limit() =>
-        Assert.Equal(40, Grade(Output(marks: [.. Enumerable.Repeat(new GradedMark(1, MarkKind.Good, 1, 0, 3, null, null), 40)])).Marks.Count);
+    public void Many_distinct_marks_up_to_the_cap_are_all_kept() =>
+        Assert.Equal(Correction.MaxMarks, Grade(Output(marks: DistinctMarks(Correction.MaxMarks, MarkKind.Issue))).Marks.Count);
+
+    [Fact]
+    public void Repeated_mark_is_kept_once_without_rejecting_the_correction()
+    {
+        var correction = Grade(Output(marks: [.. Enumerable.Repeat(new GradedMark(1, MarkKind.Good, 1, 0, 3, null, null), 40)]));
+
+        var mark = Assert.Single(correction.Marks);
+        Assert.Equal((1, 1, 0, 3), (mark.CriterionPosition, mark.LineStart, mark.CharStart, mark.CharEnd));
+    }
+
+    [Fact]
+    public void Above_the_cap_the_marks_that_cost_points_come_first_in_the_original_order()
+    {
+        // 60 acertos e depois 30 desvios: passam do teto de 80, então saem 10 acertos e nenhum desvio.
+        var good = DistinctMarks(60, MarkKind.Good);
+        var issues = DistinctMarks(30, MarkKind.Issue, firstLine: 2);
+
+        var correction = Grade(Output(marks: [.. good, .. issues]));
+
+        Assert.Equal(Correction.MaxMarks, correction.Marks.Count);
+        Assert.Equal(30, correction.Marks.Count(mark => mark.Kind == MarkKind.Issue));
+        Assert.Equal(
+            [.. good.Take(50).Concat(issues).Select(mark => (mark.Line, mark.Start, mark.Criterion))],
+            correction.Marks.Select(mark => (mark.LineStart, mark.CharStart, mark.CriterionPosition)));
+    }
+
+    [Fact]
+    public void Mark_beyond_the_cap_with_a_made_up_position_still_rejects_the_response() =>
+        AssertRejected(3, Output(marks: [.. DistinctMarks(Correction.MaxMarks, MarkKind.Issue), new GradedMark(1, MarkKind.Good, 9, 0, 3, null, null)]));
+
+    /// <summary>Marcas em trechos diferentes: de um em um caractere, revezando os quatro critérios.</summary>
+    private static List<GradedMark> DistinctMarks(int count, MarkKind kind, int firstLine = 1) =>
+        [.. Enumerable.Range(0, count).Select(i => new GradedMark(1 + (i % 4), kind, firstLine, i / 4, (i / 4) + 1, "nota", null))];
     [Fact]
     public void Rule_outside_the_catalog_is_recorded_as_other()
     {

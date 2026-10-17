@@ -143,7 +143,7 @@ public class GradingTests(ApiFixture api)
     [Fact]
     public async Task Correction_with_more_than_twelve_marks_is_accepted()
     {
-        // Sem limite de marcas: a IA marca todos os trechos que afetam a nota (docs/08-ajustes-correcao.md, item 1).
+        // A IA marca todos os trechos que afetam a nota (docs/08-ajustes-correcao.md, item 1).
         var student = await QueuedEssayAsync();
         var response = FakeGrader.Good();
         var marks = response["marks"]!.AsArray();
@@ -151,7 +151,7 @@ public class GradingTests(ApiFixture api)
         {
             marks.Add(new JsonObject
             {
-                ["criterion"] = 3, ["kind"] = "issue", ["line"] = 1, ["start"] = 2, ["end"] = 6,
+                ["criterion"] = 3, ["kind"] = "issue", ["line"] = 1, ["start"] = i, ["end"] = i + 1,
                 ["note"] = $"Apontamento {i + 1}.", ["rule"] = null, ["fix"] = null,
             });
         }
@@ -163,9 +163,43 @@ public class GradingTests(ApiFixture api)
         Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
         var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
         Assert.Equal(20, correction.Marks.Count);
+        Assert.False(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.EntityId == student.EssayId && a.Action == "grading.marks_trimmed")));
         Assert.Contains("todos os trechos que afetam a nota", api.Grader.LastRequest!.System);
         Assert.DoesNotContain("até 12", api.Grader.LastRequest.System);
         Assert.DoesNotContain("60 palavras", api.Grader.LastRequest.System);
+    }
+
+    [Fact]
+    public async Task Repeated_marks_and_marks_above_the_cap_are_cut_without_failing_the_essay()
+    {
+        // Resposta absurda: 100 marcas diferentes e 50 repetidas. A correção sai com 80 e o crédito é consumido,
+        // para o aluno não poder reenviar o mesmo texto sem fim com a correção devolvida.
+        var student = await QueuedEssayAsync();
+        var response = FakeGrader.Good();
+        var marks = response["marks"]!.AsArray();
+        marks.Clear();
+        for (var i = 0; i < 150; i++)
+        {
+            var position = i % 100;
+            marks.Add(new JsonObject
+            {
+                ["criterion"] = 1 + (position % 3), ["kind"] = "issue", ["line"] = 1, ["start"] = position / 3, ["end"] = (position / 3) + 1,
+                ["note"] = "Apontamento.", ["rule"] = null, ["fix"] = null,
+            });
+        }
+
+        api.Grader.Script.Enqueue(() => response.ToJsonString());
+
+        await RunAsync(JobTypes.Grade);
+
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
+        Assert.Equal(Correction.MaxMarks, correction.Marks.Count);
+        Assert.Equal(0, await student.BalanceAsync());
+        var trimmed = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "grading.marks_trimmed"));
+        var data = JsonDocument.Parse(trimmed.Data!).RootElement;
+        Assert.Equal((150, 80), (data.GetProperty("received").GetInt32(), data.GetProperty("kept").GetInt32()));
+        Assert.Contains("até 80 trechos", api.Grader.LastRequest!.System);
     }
 
     [Fact]

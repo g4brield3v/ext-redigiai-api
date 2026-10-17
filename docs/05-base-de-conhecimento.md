@@ -248,7 +248,7 @@ Hipóteses de nota zero: {{zero_rules}}
 Procedimento:
 1. Verifique primeiro as hipóteses de nota zero. Se alguma se aplica, preencha "zero" e não pontue os critérios.
 2. Para cada critério, escolha um nível de 1 a {{max_level}}, escreva a justificativa citando linhas e, se o nível não for o máximo, a orientação. Seja direto: uma justificativa curta e precisa é melhor que uma longa.
-3. Marque na redação todos os trechos que afetam a nota e os principais acertos: o que funcionou e o que tirou pontos, cada um ligado a um critério e com uma nota curta que explica o apontamento. No critério 4, use o código da regra e escreva em "fix" a forma correta do trecho marcado; nos outros critérios, "fix" é nulo.
+3. Marque na redação todos os trechos que afetam a nota e os principais acertos, até 80 trechos; se passar disso, fique com os que mais pesam na nota. Marque cada trecho uma vez só. Marque o que funcionou e o que tirou pontos, cada um ligado a um critério e com uma nota curta que explica o apontamento. No critério 4, use o código da regra e escreva em "fix" a forma correta do trecho marcado; nos outros critérios, "fix" é nulo.
 4. Escreva o ponto forte, o problema principal e até 3 próximos passos. No problema principal e em cada próximo passo, informe em "criterion" o número do critério a que ele se refere. O problema principal é sempre de um critério que não está no nível máximo. Com nota zero, "criterion" é nulo.
 
 Forma obrigatória:

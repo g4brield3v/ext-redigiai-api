@@ -148,8 +148,9 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                 },
                 ["marks"] = new JsonObject
                 {
-                    // Sem limite: todos os trechos que afetam a nota e os principais acertos.
+                    // Todos os trechos que afetam a nota e os principais acertos; o teto só segura o caso absurdo.
                     ["type"] = "array",
+                    ["maxItems"] = Correction.MaxMarks,
                     ["items"] = new JsonObject
                     {
                         ["type"] = "object",
