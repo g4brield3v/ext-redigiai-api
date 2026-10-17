@@ -39,6 +39,26 @@ internal sealed class EssayRepository(AppDbContext db) : IEssayRepository
             .Select(e => e.Id)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Guid>> ListReviewsDueForReminderAsync(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        var remindBefore = now + EssayTransition.ReminderBeforeDeadline;
+        return await db.Essays
+            .AsNoTracking()
+            .Where(e => e.Status == EssayStatus.AwaitingReview
+                && e.ReviewRemindedAt == null
+                && e.ReviewDeadlineAt > now
+                && e.ReviewDeadlineAt <= remindBefore)
+            .OrderBy(e => e.ReviewDeadlineAt)
+            .Take(limit)
+            .Select(e => e.Id)
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> TryMarkRemindedAsync(Guid essayId, DateTimeOffset now, CancellationToken ct) =>
+        await db.Essays
+            .Where(e => e.Id == essayId && e.Status == EssayStatus.AwaitingReview && e.ReviewRemindedAt == null)
+            .ExecuteUpdateAsync(essay => essay.SetProperty(e => e.ReviewRemindedAt, now), ct) == 1;
+
     public async Task<IReadOnlyList<EssayHistoryEntry>> ListHistoryAsync(Guid essayId, CancellationToken ct) =>
         await db.AuditLog
             .AsNoTracking()

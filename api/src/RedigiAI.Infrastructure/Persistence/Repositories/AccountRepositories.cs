@@ -11,6 +11,9 @@ internal sealed class UserRepository(AppDbContext db) : IUserRepository
     public Task<User?> FindByClerkIdAsync(string clerkUserId, CancellationToken ct) =>
         db.Users.FirstOrDefaultAsync(u => u.ClerkUserId == clerkUserId && u.DeletedAt == null, ct);
 
+    public Task<User?> FindActiveByIdAsync(Guid userId, CancellationToken ct) =>
+        db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
+
     public void Add(User user) => db.Users.Add(user);
 
     public Task TouchAsync(Guid userId, DateTimeOffset now, CancellationToken ct)

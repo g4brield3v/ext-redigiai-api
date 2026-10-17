@@ -15,8 +15,10 @@ using RedigiAI.Domain.Common;
 using RedigiAI.Infrastructure;
 using RedigiAI.Application.Essays;
 using RedigiAI.Application.Grading;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Cloudinary;
+using RedigiAI.Infrastructure.Email;
 
 namespace RedigiAI.Api;
 
@@ -50,6 +52,11 @@ internal static class ApiHost
         });
         services.Configure<AiBudgetOptions>(builder.Configuration.GetSection(AiBudgetOptions.Section));
         services.Configure<CollectionCopyOptions>(builder.Configuration.GetSection(CollectionCopyOptions.Section));
+        services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.Section));
+        services.PostConfigure<SiteOptions>(site => site.RequireHttps = !builder.Environment.IsDevelopment());
+        services.Configure<CompanyOptions>(builder.Configuration.GetSection(CompanyOptions.Section));
+        services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.Section));
+        services.AddEmailSender(builder.Environment.IsDevelopment());
         services.Configure<RedigiAI.Infrastructure.Jobs.JobQueueOptions>(
             builder.Configuration.GetSection(RedigiAI.Infrastructure.Jobs.JobQueueOptions.Section));
         var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);

@@ -42,6 +42,9 @@ public sealed class Essay
     public int Version { get; private set; }
     public Guid? ParentEssayId { get; private set; }
     public DateTimeOffset? ReviewDeadlineAt { get; private set; }
+
+    /// <summary>Quando o lembrete das palavras ilegíveis foi agendado; um por redação.</summary>
+    public DateTimeOffset? ReviewRemindedAt { get; private set; }
     public string? FailureCode { get; private set; }
 
     /// <summary>Quando a redação falhou ou foi cancelada.</summary>
@@ -112,6 +115,9 @@ public sealed class Essay
 public sealed record EssayTransition
 {
     public static readonly TimeSpan ReviewWindow = TimeSpan.FromHours(24);
+
+    /// <summary>O lembrete sai 12 h depois do aviso das palavras ilegíveis, ou seja, 12 h antes do prazo.</summary>
+    public static readonly TimeSpan ReminderBeforeDeadline = TimeSpan.FromHours(12);
 
     private EssayTransition(EssayStatus from, EssayStatus to)
     {

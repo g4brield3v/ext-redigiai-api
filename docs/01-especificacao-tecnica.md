@@ -166,7 +166,8 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | Tabela | Campos principais | Regras |
 |---|---|---|
 | `jobs` | id, type, payload (jsonb), status (`ready`, `running`, `done`, `dead`), attempts, max_attempts, run_at, locked_until, last_error, created_at | Fila; ver seção 7. |
-| `email_log` | id, user_id, template, ref_id, sent_at, provider_message_id | Garante 1 envio por evento (único em template + ref_id). |
+| `feature_flags` | key, enabled, updated_at | Chaves liga/desliga lidas na hora. `email_sending` (envio dos e-mails da redação) nasce desligada. |
+| `email_log` | id, user_id, template, ref_id, claimed_at, sent_at, provider_message_id, created_at | Garante 1 envio por evento (único em template + ref_id). A linha é reservada (`claimed_at`) antes do envio e marcada (`sent_at`) depois; reserva sem envio há mais de 10 min pode ser retomada. |
 | `audit_log` | id, actor, action, entity, entity_id, data, created_at | Mudanças de status, créditos, exclusões. |
 
 ## 6. API
@@ -445,7 +446,7 @@ O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados 
 
 ## 10. E-mails transacionais
 
-Todos os e-mails saem pelo SendGrid, por job `send_email`, com no máximo um envio por evento (`email_log` único em template + referência). Nenhum traz nota ou conteúdo da correção: só o aviso e um botão para a plataforma.
+Todos os e-mails saem pelo SendGrid, por job `send_email`, com no máximo um envio por evento (`email_log` único em template + referência). Nenhum traz nota ou conteúdo da correção: só o aviso e um botão para a plataforma. O e-mail só sai se a redação ainda está no estado do aviso, a conta existe e, nos avisos que podem ser desligados, o aluno não os desligou. Os botões usam `App__BaseUrl` (fora de Development, só `https`). **O envio é ligado e desligado no banco** (`feature_flags`, chave `email_sending`) e nasce desligado: por enquanto só o Clerk manda e-mail (login). Desligado, o aviso é descartado e não fica para depois. Ligado, sem `SendGrid__ApiKey`: em Development os e-mails viram HTML na pasta `.outbox/`; fora dele, o envio falha com `EMAIL_NOT_CONFIGURED`.
 
 | Template | Quando | Botão leva a | Pode desligar |
 |---|---|---|---|

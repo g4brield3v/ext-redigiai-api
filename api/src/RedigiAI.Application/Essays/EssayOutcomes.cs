@@ -1,15 +1,22 @@
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Essays;
 
 namespace RedigiAI.Application.Essays;
 
 /// <summary>
-/// Encerra uma redação que falhou ou foi cancelada: muda o status e devolve a correção reservada, juntos.
+/// Encerra uma redação que falhou ou foi cancelada: muda o status, devolve a correção reservada e agenda o aviso
+/// por e-mail, juntos.
 /// Só age se a redação ainda está no status esperado, então rodar duas vezes não devolve o crédito duas vezes.
 /// </summary>
 internal sealed class EssayOutcomes(
-    IEssayRepository essays, ICreditRepository credits, IAuditLog audit, IUnitOfWork unitOfWork, TimeProvider time)
+    IEssayRepository essays,
+    ICreditRepository credits,
+    IJobQueue jobs,
+    IAuditLog audit,
+    IUnitOfWork unitOfWork,
+    TimeProvider time)
 {
     /// <returns><c>false</c> se outro processo já tinha avançado a redação.</returns>
     public Task<bool> EndWithRefundAsync(Guid essayId, EssayTransition transition, CancellationToken ct) =>
@@ -29,6 +36,11 @@ internal sealed class EssayOutcomes(
                     essayId,
                     new { from = transition.From.ToString(), to = transition.To.ToString(), failureCode = transition.FailureCode });
                 await RefundAsync(essayId, ct);
+                if (EmailTemplates.ForFailure(transition.FailureCode) is { } template)
+                {
+                    EmailJobs.Enqueue(jobs, template, essayId);
+                }
+
                 return true;
             },
             ct);

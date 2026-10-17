@@ -51,7 +51,7 @@ public class GradingTests(ApiFixture api)
         var audit = await api.QueryAsync(db => db.AuditLog.Where(a => a.EntityId == student.EssayId).Select(a => a.Action).ToListAsync());
         Assert.Contains("credit.consumed", audit);
 
-        // O aviso por e-mail fica na fila, sem nota nem conteúdo, até o handler de e-mail existir.
+        // O aviso por e-mail entra na fila na mesma transação, sem nota nem conteúdo (o envio é testado em EmailTests).
         var email = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.SendEmail).ToListAsync()))
             .Single(j => j.Payload.Contains(student.EssayId.ToString()));
         Assert.Equal(JobStatus.Ready, email.Status);
@@ -217,9 +217,10 @@ public class GradingTests(ApiFixture api)
         var job = await student.JobAsync(JobTypes.Grade);
         Assert.Equal((JobStatus.Dead, 1, "AI_INVALID_RESPONSE"), (job.Status, job.Attempts, job.LastError));
         Assert.Equal(1, await student.BalanceAsync());
-        Assert.DoesNotContain(
-            await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.SendEmail).ToListAsync()),
-            j => j.Payload.Contains(student.EssayId.ToString()));
+        // Sai o aviso de falha, nunca o de correção pronta.
+        var emails = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.SendEmail).ToListAsync()))
+            .Where(j => j.Payload.Contains(student.EssayId.ToString())).ToList();
+        Assert.Contains("essay_failed", Assert.Single(emails).Payload);
 
         // Rodar de novo o encerramento não devolve outra vez.
         await using var scope = api.Factory.Services.CreateAsyncScope();
@@ -227,6 +228,9 @@ public class GradingTests(ApiFixture api)
         Assert.Equal(1, await student.BalanceAsync());
         var ledger = await api.QueryAsync(db => db.CreditLedger.Where(e => e.EssayId == student.EssayId).OrderBy(e => e.Id).ToListAsync());
         Assert.Equal([(-1, CreditSource.Trial), (1, CreditSource.Refund)], ledger.Select(e => (e.Delta, e.Source)));
+        Assert.Single(
+            await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.SendEmail).ToListAsync()),
+            j => j.Payload.Contains(student.EssayId.ToString()));
     }
 
     /// <summary>Limite de gasto folgado, para testar o tamanho pedido sem a redução pelo limite.</summary>

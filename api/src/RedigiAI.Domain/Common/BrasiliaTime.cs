@@ -7,4 +7,7 @@ public static class BrasiliaTime
 
     public static DateOnly DateOf(DateTimeOffset instant) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Zone).DateTime);
+
+    /// <summary>O instante no relógio de Brasília.</summary>
+    public static DateTimeOffset At(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, Zone);
 }
