@@ -189,6 +189,23 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
         return new ProviderSubscriptionCharge(Id(charge), preapprovalId, payment);
     }
 
+    public async Task<string> RefundAsync(string paymentProviderId, long amountCents, Guid idempotencyKey, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Post, $"/v1/payments/{Uri.EscapeDataString(paymentProviderId)}/refunds");
+        // O mesmo pedido de arrependimento nunca vira dois reembolsos lá.
+        message.Headers.Add("X-Idempotency-Key", idempotencyKey.ToString());
+        message.Content = JsonContent.Create(new JsonObject { ["amount"] = amountCents / 100m });
+        var (status, refund) = await SendAsync(message, ct);
+        if (refund is null)
+        {
+            throw status is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity
+                ? Errors.PaymentFailed()
+                : Errors.PaymentUnavailable();
+        }
+
+        return Id(refund);
+    }
+
     public async Task CancelSubscriptionAsync(string providerId, CancellationToken ct)
     {
         using var message = Request(HttpMethod.Put, $"/preapproval/{Uri.EscapeDataString(providerId)}");

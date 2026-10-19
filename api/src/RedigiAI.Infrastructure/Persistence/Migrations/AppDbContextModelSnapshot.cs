@@ -448,6 +448,68 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RedigiAI.Domain.Billing.RefundRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_cents");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CreditsRemoved")
+                        .HasColumnType("integer")
+                        .HasColumnName("credits_removed");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("MpRefundId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("mp_refund_id");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refund_requests");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refund_requests_payment_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_refund_requests_user_id");
+
+                    b.ToTable("refund_requests", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refund_requests_amount", "amount_cents > 0 AND credits_removed >= 0");
+                        });
+                });
+
             modelBuilder.Entity("RedigiAI.Domain.Billing.Subscription", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2242,6 +2304,23 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_payments_users_user_id");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.RefundRequest", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Billing.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_requests_payments_payment_id");
+
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_requests_users_user_id");
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Billing.Subscription", b =>

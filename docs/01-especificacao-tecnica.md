@@ -587,15 +587,17 @@ Itens que decorrem das decisões jurídicas e de produto e que precisam existir 
 | `users.terms_version`, `users.terms_accepted_at` | versão aceita dos Termos e da Política, data do aceite | Gravados no `POST /v1/me`. Se a versão vigente mudar, o próximo acesso pede novo aceite antes de qualquer envio. |
 | `payments.guardian_authorized_at` | data da declaração | Obrigatório quando o comprador tem 16 ou 17 anos na data da compra: o checkout mostra a caixa "Meu responsável autorizou esta compra" e o backend recusa sem ela (`GUARDIAN_AUTHORIZATION_REQUIRED`, 422). |
 | `access_logs` | id, user_id (nulo após exclusão), ip, user_agent, occurred_at | Marco Civil, art. 15: registro de acesso por 6 meses, mantido mesmo após a exclusão da conta. Gravado em cada login e em cada envio. Job diário apaga os registros com mais de 6 meses. |
-| `refund_requests` | id, user_id, payment_id, status (`requested`, `approved`, `rejected`, `paid`), amount_cents, credits_removed, reason, created_at, decided_at | Direito de arrependimento (abaixo). |
+| `refund_requests` | id, user_id, payment_id (único: um pedido por compra), status (`requested`, `paid`), amount_cents, credits_removed, reason (até 500 caracteres), mp_refund_id, created_at, decided_at | Direito de arrependimento (abaixo). |
 
 **Direito de arrependimento (CDC, art. 49)**
 
 - Vale em até 7 dias corridos da data do pagamento aprovado.
-- Avulsa: devolve R$ 16 por crédito ainda não usado daquele pagamento. Plano: devolve o valor proporcional aos créditos do plano ainda não usados no período; a assinatura é cancelada.
+- Avulsa: devolve R$ 16 por crédito ainda não usado daquele pagamento. Plano: devolve R$ 39,90 menos R$ 3,33 por correção daquela cobrança já usada ou em andamento (nunca abaixo de zero); a assinatura é cancelada, lá e aqui.
 - Correções já entregues ou em andamento não são devolvidas.
 - No MVP, o pedido é feito em Perfil → Correções e compras → "Desistir da compra" (visível só dentro dos 7 dias), `POST /v1/payments/{id}/refund-request`. O backend calcula o valor, remove os créditos não usados no ledger (lançamento negativo, na mesma transação) e cria o reembolso pela API do Mercado Pago num job `process_refund`. Registro no `audit_log`.
+- O pedido revoga o bucket da compra (as correções não usadas saem, e uma correção reservada para uma redação em andamento não volta a ele) e grava o pedido como `requested`; o job `process_refund` faz o reembolso lá com o id do pedido como `X-Idempotency-Key` e o marca `paid`. Pedir de novo, ou cinco vezes ao mesmo tempo, devolve o mesmo pedido.
 - Erro `REFUND_WINDOW_EXPIRED` (409): "O prazo de 7 dias para desistir desta compra terminou."
+- Erro `NOTHING_TO_REFUND` (409): "Todas as correções desta compra já foram usadas. Não há valor a devolver." Compra que não está aprovada: `INVALID_STATE` (409). Compra de outro aluno: 404.
 
 **Folha pautada (`GET /v1/prompts/{id}/sheet.pdf`)**
 

@@ -209,3 +209,38 @@ internal sealed class WebhookEventRepository(AppDbContext db) : IWebhookEventRep
             .Where(e => e.Id == eventId && e.ProcessedAt == null)
             .ExecuteUpdateAsync(e => e.SetProperty(x => x.ProcessedAt, now), ct);
 }
+
+internal sealed class RefundRequestRepository(AppDbContext db) : IRefundRequestRepository
+{
+    public void Add(RefundRequest request) => db.RefundRequests.Add(request);
+
+    public Task<RefundRequest?> FindAsync(Guid refundRequestId, CancellationToken ct) =>
+        db.RefundRequests.AsNoTracking().FirstOrDefaultAsync(r => r.Id == refundRequestId, ct);
+
+    public Task<RefundRequest?> FindByPaymentAsync(Guid paymentId, CancellationToken ct) =>
+        db.RefundRequests.AsNoTracking().FirstOrDefaultAsync(r => r.PaymentId == paymentId, ct);
+
+    public async Task<IReadOnlySet<Guid>> PaymentsWithRequestAsync(IReadOnlyCollection<Guid> paymentIds, CancellationToken ct)
+    {
+        if (paymentIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        return (await db.RefundRequests
+            .AsNoTracking()
+            .Where(r => paymentIds.Contains(r.PaymentId))
+            .Select(r => r.PaymentId)
+            .ToListAsync(ct)).ToHashSet();
+    }
+
+    public async Task<bool> TryMarkPaidAsync(Guid refundRequestId, string mpRefundId, DateTimeOffset now, CancellationToken ct) =>
+        await db.RefundRequests
+            .Where(r => r.Id == refundRequestId && r.Status == RefundStatus.Requested)
+            .ExecuteUpdateAsync(
+                r => r
+                    .SetProperty(x => x.Status, RefundStatus.Paid)
+                    .SetProperty(x => x.MpRefundId, mpRefundId)
+                    .SetProperty(x => x.DecidedAt, now),
+                ct) == 1;
+}

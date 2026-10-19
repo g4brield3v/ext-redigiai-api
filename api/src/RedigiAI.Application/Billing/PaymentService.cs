@@ -31,6 +31,7 @@ internal sealed class PaymentService(
     IUserRepository users,
     IPaymentRepository payments,
     ISubscriptionRepository subscriptions,
+    IRefundRequestRepository refunds,
     IPaymentGateway gateway,
     IJobQueue jobs,
     IAuditLog audit,
@@ -113,13 +114,15 @@ internal sealed class PaymentService(
             throw Errors.NotFound();
         }
 
-        return ToDto(payment);
+        return ToDto(payment, hasRefundRequest: (await refunds.PaymentsWithRequestAsync([payment.Id], ct)).Count > 0);
     }
 
     public async Task<PaymentListDto> ListAsync(string clerkUserId, CancellationToken ct)
     {
         var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
-        return new PaymentListDto([.. (await payments.ListByUserAsync(user.Id, ListLimit, ct)).Select(ToDto)]);
+        var list = await payments.ListByUserAsync(user.Id, ListLimit, ct);
+        var requested = await refunds.PaymentsWithRequestAsync([.. list.Select(p => p.Id)], ct);
+        return new PaymentListDto([.. list.Select(p => ToDto(p, requested.Contains(p.Id)))]);
     }
 
     public async Task<int> RecheckPendingAsync(CancellationToken ct)
@@ -216,7 +219,8 @@ internal sealed class PaymentService(
             ? !required
             : value.Length is > 0 and <= MaxCardFieldLength && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
-    private PaymentDto ToDto(Payment payment) =>
+    /// <param name="hasRefundRequest">Com pedido de arrependimento feito, a compra não é mais "desistível".</param>
+    private PaymentDto ToDto(Payment payment, bool hasRefundRequest = false) =>
         new(
             payment.Id,
             payment.Kind,
@@ -226,7 +230,7 @@ internal sealed class PaymentService(
             payment.Status,
             payment.CreatedAt,
             payment.ApprovedAt,
-            payment.RefundableOn(time.GetUtcNow()),
+            !hasRefundRequest && payment.RefundableOn(time.GetUtcNow()),
             payment is { Status: PaymentStatus.Pending, PixQrCode: { } code, PixQrCodeBase64: { } image, PixExpiresAt: { } expires }
                 ? new PixDto(image, code, expires)
                 : null);

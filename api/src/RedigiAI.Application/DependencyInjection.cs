@@ -25,6 +25,8 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<PlanCredits>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<IRefundService, RefundService>();
+        services.AddScoped<Abstractions.IJobHandler, ProcessRefundHandler>();
         services.AddScoped<Abstractions.IJobHandler, ProcessSubscriptionHandler>();
         services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
         services.AddScoped<Abstractions.IJobHandler, ProcessPaymentHandler>();

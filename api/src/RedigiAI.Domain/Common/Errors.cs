@@ -60,6 +60,15 @@ public static class Errors
     public static AppError PaymentFailed() =>
         new("PAYMENT_FAILED", 402, "O pagamento não foi aprovado. Tente outro meio de pagamento.", retryable: true);
 
+    public static AppError RefundWindowExpired() =>
+        new("REFUND_WINDOW_EXPIRED", 409, "O prazo de 7 dias para desistir desta compra terminou.");
+
+    public static AppError NothingToRefund() =>
+        new("NOTHING_TO_REFUND", 409, "Todas as correções desta compra já foram usadas. Não há valor a devolver.");
+
+    public static AppError PaymentInvalidState() =>
+        new("INVALID_STATE", 409, "Essa ação não está disponível para esta compra agora.");
+
     public static AppError PlanAlreadyActive() =>
         new("PLAN_ALREADY_ACTIVE", 409, "Você já tem um plano mensal ativo.");
 

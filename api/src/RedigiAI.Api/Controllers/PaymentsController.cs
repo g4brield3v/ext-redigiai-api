@@ -14,7 +14,8 @@ namespace RedigiAI.Api.Controllers;
 [Tags("Payments")]
 [Produces("application/json")]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
-public sealed class PaymentsController(IPaymentService payments, ISubscriptionService subscriptions) : ControllerBase
+public sealed class PaymentsController(IPaymentService payments, ISubscriptionService subscriptions, IRefundService refunds)
+    : ControllerBase
 {
     /// <summary>
     /// Compra correções avulsas (R$ 16 cada, de 1 a 10) por Pix ou cartão. Exige <c>Idempotency-Key</c>; repetir a
@@ -72,6 +73,20 @@ public sealed class PaymentsController(IPaymentService payments, ISubscriptionSe
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> CancelSubscription(CancellationToken ct) =>
         Ok(await subscriptions.CancelAsync(User.GetClerkIdentity().UserId, ct));
+
+    /// <summary>
+    /// Desiste da compra (direito de arrependimento, até 7 dias da aprovação): as correções não usadas saem do saldo e o
+    /// valor delas é devolvido pelo Mercado Pago. No plano, a assinatura é cancelada. Pedir de novo devolve o mesmo
+    /// pedido. Fora do prazo, <c>REFUND_WINDOW_EXPIRED</c>.
+    /// </summary>
+    [HttpPost("payments/{id:guid}/refund-request", Name = "requestRefund")]
+    [ProducesResponseType<RefundRequestDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RequestRefund(Guid id, [FromBody] RefundRequestBody? request, CancellationToken ct) =>
+        Ok(await refunds.RequestAsync(User.GetClerkIdentity().UserId, id, request?.Reason, ct));
 
     /// <summary>As compras do aluno, da mais recente para a mais antiga.</summary>
     [HttpGet("payments", Name = "listPayments")]
