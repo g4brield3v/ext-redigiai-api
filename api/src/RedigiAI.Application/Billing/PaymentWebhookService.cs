@@ -61,7 +61,7 @@ internal sealed class PaymentWebhookService(
                         JobTypes.ProcessPayment, new ProcessPaymentPayload(resourceId!, webhookEvent.Id), ProcessPaymentHandler.Attempts);
                 }
 
-                // As notificações de assinatura ficam gravadas para a etapa do plano semanal.
+                // As notificações de assinatura ficam gravadas para a etapa do plano mensal.
                 return true;
             },
             ct);

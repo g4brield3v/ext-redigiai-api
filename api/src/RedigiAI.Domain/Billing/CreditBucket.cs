@@ -3,7 +3,7 @@ namespace RedigiAI.Domain.Billing;
 public enum CreditSource
 {
     Trial,
-    PlanWeek,
+    Plan,
     Single,
     Refund,
 }
@@ -39,7 +39,7 @@ public sealed class CreditBucket
         [.. buckets
             .OrderBy(b => b.Source switch
             {
-                CreditSource.PlanWeek => 0,
+                CreditSource.Plan => 0,
                 CreditSource.Trial => 1,
                 _ => 2,
             })
@@ -60,22 +60,6 @@ public sealed class CreditBucket
             CreatedAt = now,
         };
     }
-
-    /// <summary>
-    /// As correções da semana de uma assinatura, que vencem no dia 1º seguinte à segunda-feira da semana.
-    /// </summary>
-    public static CreditBucket GrantPlanWeek(Subscription subscription, DateTimeOffset weekStart, DateTimeOffset now) =>
-        new()
-        {
-            Id = Guid.CreateVersion7(),
-            UserId = subscription.UserId,
-            Source = CreditSource.PlanWeek,
-            Granted = PlanCalendar.WeeklyCredits,
-            Remaining = PlanCalendar.WeeklyCredits,
-            ExpiresAt = PlanCalendar.NextMonthStart(weekStart),
-            CreatedAt = now,
-            GrantKey = subscription.WeeklyGrantKey(weekStart),
-        };
 
     /// <summary>As correções avulsas de uma compra aprovada: sem vencimento, uma concessão por compra.</summary>
     public static CreditBucket GrantForPayment(Payment payment, DateTimeOffset now) =>

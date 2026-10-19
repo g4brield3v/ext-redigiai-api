@@ -6,7 +6,7 @@ namespace RedigiAI.Application.Billing;
 /// <param name="Actor">Quem concedeu, para a trilha de auditoria.</param>
 public sealed record GrantCreditsCommand(Guid UserId, CreditSource Source, int Amount, DateTimeOffset? ExpiresAt, string Actor);
 
-/// <summary>Resultado de uma passada do calendário.</summary>
+/// <summary>Resultado de uma passada do vencimento.</summary>
 /// <param name="Done">Quantos itens foram concluídos agora.</param>
 /// <param name="Failed">Os itens (assinatura ou bucket) que deram erro; a próxima passada tenta de novo.</param>
 public sealed record CreditSweepResult(int Done, IReadOnlyList<Guid> Failed);
@@ -17,26 +17,20 @@ public interface ICreditService
     Task GrantAsync(GrantCreditsCommand command, CancellationToken ct);
 
     /// <summary>
-    /// Segunda-feira 00h (Brasília): concede 3 correções a cada assinatura ativa, com vencimento no próximo dia 1º.
-    /// Roda quantas vezes for preciso na semana: cada assinatura recebe a semana uma vez só.
+    /// Vence as correções que sobraram nos buckets vencidos (as do plano, na data da cobrança seguinte), com lançamento
+    /// negativo no ledger. Roda quantas vezes for preciso: cada bucket vence uma vez só.
     /// </summary>
-    /// <returns>Quantas assinaturas receberam agora, e as que deram erro.</returns>
-    Task<CreditSweepResult> GrantWeeklyPlanCreditsAsync(CancellationToken ct);
-
-    /// <summary>Dia 1º 00h (Brasília): vence as correções do plano que sobraram, com lançamento negativo no ledger.</summary>
     /// <returns>Quantos buckets venceram agora, e os que deram erro.</returns>
     Task<CreditSweepResult> ExpirePlanCreditsAsync(CancellationToken ct);
 }
 
 internal sealed class CreditService(
     ICreditRepository credits,
-    ISubscriptionRepository subscriptions,
     IAuditLog audit,
     IUnitOfWork unitOfWork,
     TimeProvider time) : ICreditService
 {
     private const int ExpiredBucketsPerSweep = 200;
-    private const int SubscriptionsPerSweep = 500;
 
     public async Task GrantAsync(GrantCreditsCommand command, CancellationToken ct)
     {
@@ -51,50 +45,6 @@ internal sealed class CreditService(
             bucket.Id,
             new { source = command.Source.ToString().ToLowerInvariant(), delta = bucket.Granted });
         await unitOfWork.SaveChangesAsync(ct);
-    }
-
-    public async Task<CreditSweepResult> GrantWeeklyPlanCreditsAsync(CancellationToken ct)
-    {
-        var now = time.GetUtcNow();
-        var weekStart = PlanCalendar.WeekStart(now);
-        if (PlanCalendar.NextMonthStart(weekStart) <= now)
-        {
-            // A semana começou no mês anterior e o que ela daria já venceu (dia 1º no meio da semana).
-            return new CreditSweepResult(0, []);
-        }
-
-        var granted = 0;
-        var failed = new List<Guid>();
-        foreach (var subscription in await subscriptions.ListAwaitingWeeklyCreditsAsync(weekStart, SubscriptionsPerSweep, ct))
-        {
-            // Uma transação por assinatura; o banco confere de novo a assinatura e impede a repetição da semana.
-            var added = await IsolatedAsync(
-                subscription.Id,
-                failed,
-                () => unitOfWork.InTransactionAsync(
-                    async () =>
-                    {
-                        var bucket = CreditBucket.GrantPlanWeek(subscription, weekStart, now);
-                        var entry = CreditLedgerEntry.ForGrant(bucket, now);
-                        if (!await credits.TryAddWeeklyPlanGrantAsync(bucket, entry, subscription.Id, weekStart, ct))
-                        {
-                            return false;
-                        }
-
-                        audit.Record(
-                            "system",
-                            "credit.granted",
-                            "credit_bucket",
-                            bucket.Id,
-                            new { source = "plan_week", delta = bucket.Granted, subscriptionId = subscription.Id });
-                        return true;
-                    },
-                    ct),
-                ct);
-            granted += added ? 1 : 0;
-        }
-
-        return new CreditSweepResult(granted, failed);
     }
 
     public async Task<CreditSweepResult> ExpirePlanCreditsAsync(CancellationToken ct)

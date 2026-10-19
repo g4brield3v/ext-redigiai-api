@@ -70,7 +70,7 @@ internal static class ApiHost
             services.AddHostedService<DevEnvironmentSetup>();
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();
-            services.AddHostedService<CreditCalendarSweeper>();
+            services.AddHostedService<CreditExpirySweeper>();
             services.AddHostedService<PaymentReconciliationSweeper>();
         }
         AddControllers(services);

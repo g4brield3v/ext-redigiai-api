@@ -14,16 +14,6 @@ public interface ICreditRepository
 
     void AddEntry(CreditLedgerEntry entry);
 
-    /// <summary>
-    /// As correções da semana de uma assinatura: grava o bucket na hora, dentro da transação aberta, e acrescenta o
-    /// lançamento. O próprio banco confere, no mesmo comando, que a assinatura continua ativa, já existia antes da
-    /// segunda-feira e pertence a uma conta não excluída, e que a semana ainda não foi concedida
-    /// (<see cref="CreditBucket.GrantKey"/>). Se algo disso falha, não grava nada.
-    /// </summary>
-    /// <returns><c>false</c> se não concedeu.</returns>
-    Task<bool> TryAddWeeklyPlanGrantAsync(
-        CreditBucket bucket, CreditLedgerEntry entry, Guid subscriptionId, DateTimeOffset weekStart, CancellationToken ct);
-
     Task<CreditBucket?> FindByGrantKeyAsync(string grantKey, CancellationToken ct);
 
     /// <summary>

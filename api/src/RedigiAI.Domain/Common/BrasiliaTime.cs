@@ -10,11 +10,4 @@ public static class BrasiliaTime
 
     /// <summary>O instante no relógio de Brasília.</summary>
     public static DateTimeOffset At(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, Zone);
-
-    /// <summary>O instante em que o dia começa (00h) em Brasília.</summary>
-    public static DateTimeOffset StartOfDay(DateOnly date)
-    {
-        var local = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        return new DateTimeOffset(local, Zone.GetUtcOffset(local)).ToUniversalTime();
-    }
 }

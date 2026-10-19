@@ -2950,7 +2950,7 @@
       "CreditSource": {
         "enum": [
           "trial",
-          "plan_week",
+          "plan",
           "single",
           "refund"
         ]

@@ -20,6 +20,6 @@ public sealed record CreditBalanceDto(int Total, IReadOnlyList<CreditBucketDto> 
 
 public sealed record CreditBucketDto(CreditSource Source, int Remaining, DateTimeOffset? ExpiresAt);
 
-/// <summary>O plano semanal do aluno; nulo se ele nunca assinou.</summary>
+/// <summary>O plano mensal do aluno; nulo se ele nunca assinou.</summary>
 /// <param name="CardLast4">Os 4 últimos dígitos do cartão, quando o Mercado Pago informa.</param>
 public sealed record SubscriptionDto(SubscriptionStatus Status, DateTimeOffset? NextBillingAt, string? CardLast4);

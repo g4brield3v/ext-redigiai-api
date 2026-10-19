@@ -13,7 +13,7 @@ O MVP do RedigiAI corrige redações manuscritas da Fuvest com IA: o aluno escol
 - Vestibular: somente Fuvest, com a grade de 4 critérios (níveis de 1 a `max_level`, pesos 3, 2, 3 e 2; na grade publicada, 4 níveis e máximo de 40 pontos).
 - Entrada: somente foto JPG da folha, até 10 MB, uma face por redação. Envio em lote permitido.
 - Fluxo: seleção (vestibular → proposta → leitura da proposta e da coletânea, em página própria) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
-- Cobrança: 1 correção grátis por conta, plano semanal no cartão e correção avulsa por Pix ou cartão.
+- Cobrança: 1 correção grátis por conta, plano mensal no cartão e correção avulsa por Pix ou cartão.
 - Painel do aluno: lista de correções, evolução da nota e foco de melhoria.
 - Folha pautada da plataforma para download (PDF, 30 linhas).
 - Área de administração de propostas de redação (`/admin/propostas`): cadastro, versões e publicação, só para o administrador (`docs/07-propostas-de-redacao.md`).
@@ -36,7 +36,7 @@ O MVP roda em quatro serviços gerenciados e um backend .NET com dois processos 
 | Backend | ASP.NET Core em Docker no Railway, processos `api` e `worker` | Regras de negócio, fila, integrações |
 | Banco | PostgreSQL no Railway | Dados, fila de jobs, livro-razão de créditos |
 | Login | Clerk | Google e link por e-mail; o backend valida o JWT |
-| Pagamentos | Mercado Pago | Plano semanal no cartão; avulsa por Pix ou cartão |
+| Pagamentos | Mercado Pago | Plano mensal no cartão; avulsa por Pix ou cartão |
 | Arquivos | Cloudinary | Fotos em pasta privada, URLs assinadas |
 | E-mail | SendGrid | Avisos transacionais |
 | IA | API do Claude | Transcrição da foto e correção |
@@ -78,7 +78,7 @@ Cada regra abaixo é requisito de backend e frontend; o backend é a fonte da ve
 | Origem | Preço | Pagamento | Validade |
 |---|---|---|---|
 | Teste grátis | R$ 0 | — | Não vence; 1 por conta |
-| Plano semanal | R$ 39,90/mês | Cartão de crédito, renovação automática | 3 créditos toda segunda-feira, 00h (Brasília); acumulam e vencem no dia 1º de cada mês |
+| Plano mensal | R$ 39,90/mês | Cartão de crédito, renovação automática | 12 créditos a cada cobrança aprovada (a primeira e cada renovação), para usar ao longo do mês; vencem na cobrança seguinte e não acumulam |
 | Avulsa | R$ 16 por correção | Pix ou cartão | Não vence |
 
 15. Consumo: primeiro os créditos do plano (vencem antes), depois o teste grátis, depois os avulsos.
@@ -155,9 +155,9 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 
 | Tabela | Campos principais | Regras |
 |---|---|---|
-| `credit_ledger` | id, user_id, source (`trial`, `plan_week`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
-| `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key, revoked_at | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: a semana de uma assinatura (`plan_week:{assinatura}:{segunda-feira}`) ou uma compra (`payment:{compra}`). `revoked_at`: a compra foi estornada ou contestada; o saldo saiu e nenhuma correção volta para o bucket, nem a que estava reservada para uma redação em andamento. |
-| `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano semanal no Mercado Pago. Recebe as correções da semana a assinatura ativa criada antes daquela segunda-feira; a semana em que ela começa tem a concessão imediata. |
+| `credit_ledger` | id, user_id, source (`trial`, `plan`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
+| `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key, revoked_at | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: uma cobrança (`payment:{compra}`). `revoked_at`: a compra foi estornada ou contestada; o saldo saiu e nenhuma correção volta para o bucket, nem a que estava reservada para uma redação em andamento. |
+| `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano mensal no Mercado Pago. Cada cobrança aprovada concede 12 correções, que vencem em `next_billing_at`. |
 | `payments` | id, user_id, mp_payment_id (único quando preenchido), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, quantity, status (`pending`, `approved`, `rejected`, `cancelled`, `refunded`, `charged_back`), idempotency_key (única por aluno), guardian_authorized_at, pix_qr_code, pix_qr_code_base64, pix_expires_at, created_at, updated_at, approved_at | Idempotência pelo id do Mercado Pago e pela `Idempotency-Key` do aluno. A compra é gravada antes da chamada ao Mercado Pago e recebe o id de lá depois; o id da compra vai como `external_reference` e como `X-Idempotency-Key`. Status muda por `UPDATE` condicional: pendente → aprovado, recusado, cancelado (Pix vencido), estornado ou contestado; aprovado → estornado ou contestado. |
 | `webhook_events` | id, provider, external_id (único por provedor), topic, resource_id, payload, received_at, processed_at | Guarda todo webhook antes de processar. `external_id` é o `x-request-id`, que entra na assinatura, então a reentrega não duplica. O `payload` guarda só os campos conhecidos (id, tipo, ação, `data.id`). A assinatura vale até 10 minutos do `ts`. |
 
@@ -253,8 +253,7 @@ A fila é a tabela `jobs` no PostgreSQL: gravar a mudança de status e o job na 
 | Quando | Faz |
 |---|---|
 | A cada 15 min | Redações em `awaiting_review`: com 12 h sem preencher e sem lembrete → e-mail de lembrete; com `review_deadline_at` vencido → `cancelled`, devolve crédito, e-mail. |
-| Segunda-feira, 00h | Concede 3 créditos a cada assinatura ativa, com vencimento no próximo dia 1º às 00h. |
-| Dia 1º, 00h | Vence os créditos do plano não usados (lançamento negativo no ledger). |
+| A cada 5 min | Vence os créditos não usados dos buckets vencidos, como os do plano na data da cobrança seguinte (lançamento negativo no ledger). |
 | A cada 5 min | Compras pendentes há mais de 2 minutos (até 3 dias) sem consulta na fila → job `process_payment`: um aviso perdido não deixa um Pix pago sem as correções. |
 | Diariamente, 03h | Inatividade: contas sem assinatura ativa com `last_active_at` há 3 meses menos 7 dias → aviso; há 3 meses e já avisadas → job `delete_user`. |
 | Diariamente, 04h | Apaga do Cloudinary as fotos com `purge_after` vencido. |
@@ -421,11 +420,11 @@ Regras para manter qualidade dentro do teto:
 
 O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados de cartão (o cartão é tokenizado no navegador pelo SDK do Mercado Pago). Crédito só é concedido depois que o backend confirma o pagamento consultando a API do Mercado Pago, nunca pelo retorno do navegador.
 
-**Plano semanal (cartão, recorrente)**
+**Plano mensal (cartão, recorrente)**
 
 1. `POST /v1/checkout/plan` cria uma assinatura (preapproval) de R$ 39,90 mensais e devolve a URL de checkout.
-2. O webhook de assinatura autorizada cria `subscriptions` com `status = active`. A primeira concessão de 3 créditos é imediata; as seguintes vêm toda segunda-feira.
-3. Cada cobrança mensal aprovada mantém a assinatura ativa e atualiza `next_billing_at`. Cobrança recusada → `paused`: sem novas concessões até regularizar; os créditos já concedidos seguem até o dia 1º.
+2. O webhook de assinatura autorizada cria `subscriptions` com `status = active`. Cada cobrança aprovada (a primeira e cada renovação mensal) concede 12 créditos do plano, que vencem na data da cobrança seguinte (`next_billing_at`); os que sobram não acumulam.
+3. Cada cobrança mensal aprovada mantém a assinatura ativa e atualiza `next_billing_at`. Cobrança recusada → `paused`: sem novas concessões até regularizar; os créditos já concedidos seguem até o vencimento deles.
 4. Cancelamento pelo aluno → `cancelled` ao fim do período pago.
 
 **Correção avulsa (Pix ou cartão)**
@@ -561,7 +560,7 @@ A entrega segue o caminho do aluno, em cinco etapas; cada uma termina com algo t
 1. **Base:** repositório, CI, Railway e Vercel, banco com migrações, login com Clerk, `POST /v1/me` com data de nascimento, catálogo da Fuvest carregado via banco.
 2. **Envio e transcrição:** seleção vestibular → proposta, upload no Cloudinary, modal de confirmação, fila de jobs, transcrição, revisão de palavras ilegíveis com prazo.
 3. **Correção:** job `grade`, validação, cálculo da nota, tela da correção, painel, e-mails pelo SendGrid, conjunto de referência com redações reais.
-4. **Créditos e pagamentos:** ledger, teste grátis, avulsa por Pix e cartão, plano semanal no cartão, concessões de segunda-feira e vencimento no dia 1º, webhooks.
+4. **Créditos e pagamentos:** ledger, teste grátis, avulsa por Pix e cartão, plano mensal no cartão, 12 créditos por cobrança e vencimento na cobrança seguinte, webhooks.
 5. **Conta e lançamento:** perfil, exportação e exclusão, rotina de inatividade, avaliação da correção, envio em lote, página inicial, alertas e revisão de segurança.
 
 **Pontos em aberto**

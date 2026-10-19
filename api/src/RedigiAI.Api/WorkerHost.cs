@@ -18,7 +18,7 @@ internal static class WorkerHost
         var builder = CreateBuilder(args);
         builder.Services.AddHostedService<JobWorker>();
         builder.Services.AddHostedService<ReviewDeadlineSweeper>();
-        builder.Services.AddHostedService<CreditCalendarSweeper>();
+        builder.Services.AddHostedService<CreditExpirySweeper>();
         builder.Services.AddHostedService<PaymentReconciliationSweeper>();
 
         await builder.Build().RunAsync();

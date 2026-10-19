@@ -1,5 +1,3 @@
-using RedigiAI.Domain.Common;
-
 namespace RedigiAI.Domain.Billing;
 
 public enum SubscriptionStatus
@@ -9,7 +7,10 @@ public enum SubscriptionStatus
     Cancelled,
 }
 
-/// <summary>Plano semanal, cobrado no cartão pelo Mercado Pago (preapproval). Especificação, seção 9.</summary>
+/// <summary>
+/// Plano mensal, cobrado no cartão pelo Mercado Pago (preapproval). Especificação, seção 9: cada cobrança aprovada dá
+/// 12 correções, que vencem na cobrança seguinte.
+/// </summary>
 public sealed class Subscription
 {
     private const int MaxPreapprovalIdLength = 100;
@@ -52,14 +53,4 @@ public sealed class Subscription
         };
     }
 
-    /// <summary>
-    /// Recebe as correções da semana que começa em <paramref name="weekStart"/>: só ativa (pausada não recebe) e
-    /// só se já existia antes dessa segunda, porque a semana da assinatura já teve a concessão imediata.
-    /// </summary>
-    public bool EarnsWeeklyCredits(DateTimeOffset weekStart) =>
-        Status == SubscriptionStatus.Active && CreatedAt < weekStart;
-
-    /// <summary>Chave única da concessão da semana: a mesma segunda nunca concede duas vezes.</summary>
-    public string WeeklyGrantKey(DateTimeOffset weekStart) =>
-        $"plan_week:{Id}:{BrasiliaTime.DateOf(weekStart):yyyy-MM-dd}";
 }
