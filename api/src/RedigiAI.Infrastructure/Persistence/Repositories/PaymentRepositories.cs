@@ -58,6 +58,12 @@ internal sealed class PaymentRepository(AppDbContext db) : IPaymentRepository
                     .SetProperty(x => x.UpdatedAt, now),
                 ct) == 1;
 
+    public async Task<bool> TryRecordRefundAsync(
+        Guid paymentId, long fromCents, long toCents, DateTimeOffset now, CancellationToken ct) =>
+        await db.Payments
+            .Where(p => p.Id == paymentId && p.Status == PaymentStatus.Approved && p.RefundedCents == fromCents && toCents > fromCents)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.RefundedCents, toCents).SetProperty(x => x.UpdatedAt, now), ct) == 1;
+
     public async Task<bool> TryTransitionAsync(Guid paymentId, PaymentStatus to, DateTimeOffset now, CancellationToken ct)
     {
         var from = Payment.ReachableFrom(to);

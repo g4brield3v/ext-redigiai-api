@@ -83,6 +83,11 @@ internal sealed class ProcessPaymentHandler(
 
         if (remote.Status == payment.Status)
         {
+            if (payment.Status == PaymentStatus.Approved)
+            {
+                await ApplyPartialRefundAsync(payment, remote, now, ct);
+            }
+
             return;
         }
 
@@ -127,6 +132,44 @@ internal sealed class ProcessPaymentHandler(
                 audit.Record("system", $"payment.{Name(remote.Status)}", "payment", payment.Id, data);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Estorno parcial (a compra continua aprovada lá): saem as correções inteiras que o valor estornado cobre, sem
+    /// arredondar, contando o que já foi estornado antes. Sobra que não fecha uma correção fica no audit_log.
+    /// </summary>
+    private async Task ApplyPartialRefundAsync(Payment payment, ProviderPayment remote, DateTimeOffset now, CancellationToken ct)
+    {
+        if (remote.RefundedCents <= payment.RefundedCents
+            || !await payments.TryRecordRefundAsync(payment.Id, payment.RefundedCents, remote.RefundedCents, now, ct))
+        {
+            return;
+        }
+
+        var toRemove = payment.CreditsCoveredBy(remote.RefundedCents) - payment.CreditsCoveredBy(payment.RefundedCents);
+        var removed = 0;
+        if (toRemove > 0 && await credits.FindByGrantKeyAsync(CreditBucket.PaymentGrantKey(payment.Id), ct) is { } granted)
+        {
+            removed = await credits.RemoveAsync(granted.Id, toRemove, ct);
+            if (removed > 0)
+            {
+                credits.AddEntry(CreditLedgerEntry.ForPaymentReversal(granted, removed, payment.Id, now));
+            }
+        }
+
+        audit.Record(
+            "system",
+            "payment.partially_refunded",
+            "payment",
+            payment.Id,
+            new
+            {
+                mpPaymentId = remote.ProviderId,
+                refundedCents = remote.RefundedCents,
+                creditsRemoved = removed,
+                // Parte do valor estornado que não fecha uma correção inteira: para conferência manual.
+                uncoveredCents = remote.RefundedCents % payment.CreditCents,
+            });
     }
 
     private static string Name(PaymentStatus status) => JsonNamingPolicy.SnakeCaseLower.ConvertName(status.ToString());

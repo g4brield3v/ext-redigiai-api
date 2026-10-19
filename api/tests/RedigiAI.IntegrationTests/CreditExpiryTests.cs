@@ -61,6 +61,37 @@ public class CreditExpiryTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task The_renewal_resets_the_plan_to_12_whatever_was_left_and_whenever_it_arrives()
+    {
+        await using var app = TimedApi.Create(api);
+        app.Clock.Now = At(2032, 2, 15, 10);
+        var student = await app.StudentAsync();
+        var first = await app.RenewAsync(student, cycleEnd: At(2032, 3, 15, 10));
+        // Usou 7 das 12.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.Id == first)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, 5)));
+
+        // A renovação chega um dia antes do fim do ciclo: o saldo do plano volta a 12, não a 17.
+        app.Clock.Now = At(2032, 3, 14, 10);
+        var second = await app.RenewAsync(student, cycleEnd: At(2032, 4, 14, 10));
+
+        var profile = await student.Client.GetFromJsonAsync<JsonElement>("/v1/me");
+        var plan = profile.GetProperty("credits").GetProperty("buckets").EnumerateArray()
+            .Where(b => b.GetProperty("source").GetString() == "plan").ToList();
+        Assert.Equal(12, Assert.Single(plan).GetProperty("remaining").GetInt32());
+        var closed = await app.BucketAsync(first);
+        Assert.Equal(0, closed.Remaining);
+        Assert.Equal(At(2032, 3, 14, 10), closed.ExpiresAt);
+        var reset = Assert.Single(await api.QueryAsync(db => db.CreditLedger
+            .Where(e => e.BucketId == first && e.Delta < 0).ToListAsync()));
+        Assert.Equal(-5, reset.Delta);
+        Assert.Equal(12, (await app.BucketAsync(second)).Remaining);
+
+        // Uma correção reservada no ciclo anterior não volta para ele: o bucket encerrado não aceita devolução.
+        Assert.False(await app.TryCreditBackAsync(first, At(2032, 3, 14, 11)));
+    }
+
+    [Fact]
     public async Task A_student_has_at_most_one_open_subscription()
     {
         await using var app = TimedApi.Create(api);
@@ -163,6 +194,27 @@ public class CreditExpiryTests(ApiFixture api)
                 .Where(b => b.UserId == student.Id && b.Source == source)
                 .OrderByDescending(b => b.CreatedAt).ThenByDescending(b => b.Id)
                 .Select(b => b.Id).FirstAsync());
+        }
+
+        /// <summary>Uma cobrança do plano aprovada, como o job de pagamento fará na etapa 4c.</summary>
+        public async Task<Guid> RenewAsync(Student student, DateTimeOffset cycleEnd)
+        {
+            var payment = Payment.StartPlan(student.Id, Guid.NewGuid().ToString(), null, Clock.GetUtcNow());
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Payments.Add(payment);
+            await db.SaveChangesAsync();
+
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<RedigiAI.Application.Abstractions.IUnitOfWork>();
+            var planCredits = scope.ServiceProvider.GetRequiredService<PlanCredits>();
+            await unitOfWork.InTransactionAsync(
+                async () =>
+                {
+                    await planCredits.RenewAsync(payment, cycleEnd, Clock.GetUtcNow(), CancellationToken.None);
+                    return true;
+                },
+                CancellationToken.None);
+            return await api.QueryAsync(db => db.CreditBuckets.Where(b => b.GrantKey == CreditBucket.PaymentGrantKey(payment.Id)).Select(b => b.Id).SingleAsync());
         }
 
         public async Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now)

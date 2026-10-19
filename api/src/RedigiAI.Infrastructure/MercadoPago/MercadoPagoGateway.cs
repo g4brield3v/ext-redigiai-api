@@ -97,7 +97,8 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             StatusOf(payment),
             payment["external_reference"]?.GetValue<string>(),
             Cents(payment["transaction_amount"]),
-            payment["currency_id"]?.GetValue<string>() ?? "");
+            payment["currency_id"]?.GetValue<string>() ?? "",
+            Math.Max(0, Cents(payment["transaction_amount_refunded"])));
     }
 
     private static JsonObject Base(ChargeRequest request) =>

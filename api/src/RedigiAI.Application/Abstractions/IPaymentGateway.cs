@@ -20,7 +20,9 @@ public sealed record CreatedCharge(
 
 /// <summary>Um pagamento como o provedor o vê agora.</summary>
 /// <param name="ExternalReference">O id da compra aqui, que foi enviado na criação.</param>
-public sealed record ProviderPayment(string ProviderId, PaymentStatus Status, string? ExternalReference, long AmountCents, string Currency);
+/// <param name="RefundedCents">Quanto já foi estornado, somando os estornos parciais.</param>
+public sealed record ProviderPayment(
+    string ProviderId, PaymentStatus Status, string? ExternalReference, long AmountCents, string Currency, long RefundedCents = 0);
 
 /// <summary>O provedor de pagamentos (Mercado Pago). O cartão nunca passa por aqui: só o token do navegador.</summary>
 public interface IPaymentGateway

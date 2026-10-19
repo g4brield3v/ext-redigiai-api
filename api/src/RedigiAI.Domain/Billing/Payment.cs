@@ -29,6 +29,10 @@ public enum PaymentStatus
 public sealed class Payment
 {
     public const long SinglePriceCents = 1600;
+    public const long PlanPriceCents = 3990;
+
+    /// <summary>Quanto vale uma correção do plano, no estorno e no arrependimento: R$ 39,90 ÷ 12.</summary>
+    public const long PlanCreditCents = 333;
     public const int MaxQuantity = 10;
     public const int MaxKeyLength = 100;
 
@@ -63,6 +67,12 @@ public sealed class Payment
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
 
+    /// <summary>Quanto o Mercado Pago já estornou desta compra, em estornos parciais (o total vira <c>refunded</c>).</summary>
+    public long RefundedCents { get; private set; }
+
+    /// <summary>O valor de uma correção desta compra: R$ 16 na avulsa, R$ 3,33 no plano.</summary>
+    public long CreditCents => Kind == PaymentKind.Single ? SinglePriceCents : PlanCreditCents;
+
     /// <summary>Correção avulsa: R$ 16 por correção, de 1 a 10, por Pix ou cartão.</summary>
     public static Payment StartSingle(
         Guid userId, PaymentMethod method, int quantity, string idempotencyKey, DateTimeOffset? guardianAuthorizedAt, DateTimeOffset now)
@@ -89,6 +99,35 @@ public sealed class Payment
             UpdatedAt = now,
         };
     }
+
+    /// <summary>Uma cobrança do plano mensal: R$ 39,90 no cartão, que vale 12 correções.</summary>
+    public static Payment StartPlan(Guid userId, string idempotencyKey, DateTimeOffset? guardianAuthorizedAt, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > MaxKeyLength)
+        {
+            throw new ArgumentException("Invalid idempotency key.", nameof(idempotencyKey));
+        }
+
+        return new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            Kind = PaymentKind.Plan,
+            Method = PaymentMethod.Card,
+            AmountCents = PlanPriceCents,
+            Quantity = Subscription.CreditsPerCycle,
+            Status = PaymentStatus.Pending,
+            IdempotencyKey = idempotencyKey,
+            GuardianAuthorizedAt = guardianAuthorizedAt,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+    }
+
+    /// <summary>
+    /// Quantas correções inteiras um valor estornado cobre, sem arredondar: na avulsa, R$ 32 cobrem 2 e R$ 20 cobrem 1.
+    /// </summary>
+    public int CreditsCoveredBy(long refundedCents) => (int)(refundedCents / CreditCents);
 
     /// <summary>
     /// As situações de onde se pode chegar a <paramref name="to"/>. Pendente vira aprovado, recusado ou cancelado

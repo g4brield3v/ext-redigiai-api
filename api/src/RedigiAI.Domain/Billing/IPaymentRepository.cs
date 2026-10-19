@@ -32,6 +32,12 @@ public interface IPaymentRepository
     /// processo já avançou, ou a transição não é permitida.
     /// </summary>
     Task<bool> TryTransitionAsync(Guid paymentId, PaymentStatus to, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>
+    /// Registra um estorno parcial de uma compra aprovada: <c>UPDATE … WHERE refunded_cents = @antes</c>, na transação
+    /// aberta. Zero linhas: outro processo já registrou.
+    /// </summary>
+    Task<bool> TryRecordRefundAsync(Guid paymentId, long fromCents, long toCents, DateTimeOffset now, CancellationToken ct);
 }
 
 public interface IWebhookEventRepository

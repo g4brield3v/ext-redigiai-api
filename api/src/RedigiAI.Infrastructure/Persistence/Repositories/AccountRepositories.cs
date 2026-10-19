@@ -59,6 +59,50 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return revoked.Count == 1 ? revoked[0] : 0;
     }
 
+    public async Task<int> RemoveAsync(Guid bucketId, int max, CancellationToken ct)
+    {
+        var removed = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND remaining > 0
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = credit_buckets.remaining - LEAST({max}, current.remaining)
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING LEAST({max}, current.remaining) AS "Value"
+                """)
+            .ToListAsync(ct);
+        return removed.Count == 1 ? removed[0] : 0;
+    }
+
+    public async Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct) =>
+        await db.CreditBuckets
+            .AsNoTracking()
+            .Where(b => b.UserId == userId && b.Source == CreditSource.Plan && (b.ExpiresAt == null || b.ExpiresAt > now))
+            .ToListAsync(ct);
+
+    public async Task<int?> CloseAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct)
+    {
+        var closed = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND (expires_at IS NULL OR expires_at > {now})
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = 0, expires_at = {now}
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING current.remaining AS "Value"
+                """)
+            .ToListAsync(ct);
+        return closed.Count == 1 ? closed[0] : null;
+    }
+
     public async Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(
         DateTimeOffset now, int limit, CancellationToken ct) =>
         await db.CreditBuckets

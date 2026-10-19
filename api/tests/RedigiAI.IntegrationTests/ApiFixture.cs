@@ -383,7 +383,8 @@ public sealed class FakePaymentGateway : IPaymentGateway
     public string? ProviderIdOf(Guid paymentId) => _byPayment.TryGetValue(paymentId, out var id) ? id : null;
 
     /// <summary>Muda o pagamento "lá", como o aluno pagando, o banco estornando ou um chargeback.</summary>
-    public void Set(string providerId, PaymentStatus? status = null, long? amountCents = null, string? currency = null)
+    public void Set(
+        string providerId, PaymentStatus? status = null, long? amountCents = null, string? currency = null, long? refundedCents = null)
     {
         var current = _remote[providerId];
         _remote[providerId] = current with
@@ -391,6 +392,7 @@ public sealed class FakePaymentGateway : IPaymentGateway
             Status = status ?? current.Status,
             AmountCents = amountCents ?? current.AmountCents,
             Currency = currency ?? current.Currency,
+            RefundedCents = refundedCents ?? current.RefundedCents,
         };
     }
 

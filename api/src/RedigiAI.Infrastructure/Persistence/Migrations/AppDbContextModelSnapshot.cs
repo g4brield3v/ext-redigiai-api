@@ -400,6 +400,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<long>("RefundedCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refunded_cents");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)

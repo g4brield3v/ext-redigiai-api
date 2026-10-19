@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ITestAccountService, TestAccountService>();
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<PlanCredits>();
         services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
         services.AddScoped<Abstractions.IJobHandler, ProcessPaymentHandler>();
         services.AddScoped<ICatalogService, CatalogService>();

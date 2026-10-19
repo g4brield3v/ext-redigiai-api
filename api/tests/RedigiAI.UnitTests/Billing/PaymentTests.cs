@@ -55,6 +55,41 @@ public class PaymentTests
         Assert.Equal(payment.Id, entry.PaymentId);
     }
 
+    [Theory]
+    [InlineData(3200, 2)]
+    [InlineData(2000, 1)]
+    [InlineData(1599, 0)]
+    public void A_refunded_amount_covers_only_whole_single_corrections(long refundedCents, int credits)
+    {
+        var payment = Payment.StartSingle(Guid.NewGuid(), PaymentMethod.Pix, 4, "key", null, Now);
+
+        Assert.Equal(credits, payment.CreditsCoveredBy(refundedCents));
+    }
+
+    [Fact]
+    public void A_plan_charge_is_39_90_for_12_corrections_worth_3_33_each()
+    {
+        var payment = Payment.StartPlan(Guid.NewGuid(), "key", null, Now);
+
+        Assert.Equal(3990, payment.AmountCents);
+        Assert.Equal(12, payment.Quantity);
+        Assert.Equal(PaymentKind.Plan, payment.Kind);
+        Assert.Equal(3, payment.CreditsCoveredBy(1000));
+    }
+
+    [Fact]
+    public void The_plan_cycle_grants_12_corrections_until_the_next_charge()
+    {
+        var payment = Payment.StartPlan(Guid.NewGuid(), "key", null, Now);
+
+        var bucket = CreditBucket.GrantPlanCycle(payment, Now.AddMonths(1), Now);
+
+        Assert.Equal(CreditSource.Plan, bucket.Source);
+        Assert.Equal(12, bucket.Granted);
+        Assert.Equal(Now.AddMonths(1), bucket.ExpiresAt);
+        Assert.Equal($"payment:{payment.Id}", bucket.GrantKey);
+    }
+
     [Fact]
     public void A_pending_purchase_is_not_refundable()
     {

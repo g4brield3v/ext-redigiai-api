@@ -323,6 +323,42 @@ public class PaymentTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task A_partial_refund_removes_only_the_whole_corrections_it_covers()
+    {
+        var student = await Buyer.CreateAsync(api);
+        var paymentId = await student.BuyAndApproveAsync(quantity: 4);
+        var providerId = api.Payments.ProviderIdOf(paymentId)!;
+        Assert.Equal(5, await student.CreditsAsync());
+
+        // R$ 32 estornados: 2 correções.
+        api.Payments.Set(providerId, refundedCents: 3200);
+        await student.NotifyAsync(paymentId);
+        await RunPaymentJobsAsync();
+        Assert.Equal(3, await student.CreditsAsync());
+
+        // Mais R$ 8 (R$ 40 no total): não fecha uma terceira correção, nada sai e a sobra fica registrada.
+        api.Payments.Set(providerId, refundedCents: 4000);
+        await student.NotifyAsync(paymentId);
+        await RunPaymentJobsAsync();
+        Assert.Equal(3, await student.CreditsAsync());
+
+        // Mais R$ 8 (R$ 48 no total): fecha a terceira.
+        api.Payments.Set(providerId, refundedCents: 4800);
+        await student.NotifyAsync(paymentId);
+        await RunPaymentJobsAsync();
+        await RunPaymentJobsAsync();
+
+        Assert.Equal(2, await student.CreditsAsync());
+        var reversals = await api.QueryAsync(db => db.CreditLedger
+            .Where(e => e.PaymentId == paymentId && e.Delta < 0).OrderBy(e => e.CreatedAt).Select(e => e.Delta).ToListAsync());
+        Assert.Equal([-2, -1], reversals);
+        var payment = await api.QueryAsync(db => db.Payments.SingleAsync(p => p.Id == paymentId));
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(4800, payment.RefundedCents);
+        Assert.Equal(3, await api.QueryAsync(db => db.AuditLog.CountAsync(a => a.Action == "payment.partially_refunded" && a.EntityId == paymentId)));
+    }
+
+    [Fact]
     public async Task A_different_amount_there_grants_nothing_and_stops_for_manual_review()
     {
         var student = await Buyer.CreateAsync(api);

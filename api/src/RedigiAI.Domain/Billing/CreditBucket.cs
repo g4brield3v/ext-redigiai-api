@@ -75,6 +75,22 @@ public sealed class CreditBucket
             GrantKey = PaymentGrantKey(payment.Id),
         };
 
+    /// <summary>
+    /// As 12 correções de uma cobrança do plano, que valem até a cobrança seguinte (<paramref name="cycleEnd"/>).
+    /// </summary>
+    public static CreditBucket GrantPlanCycle(Payment payment, DateTimeOffset cycleEnd, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = payment.UserId,
+            Source = CreditSource.Plan,
+            Granted = Subscription.CreditsPerCycle,
+            Remaining = Subscription.CreditsPerCycle,
+            ExpiresAt = cycleEnd,
+            CreatedAt = now,
+            GrantKey = PaymentGrantKey(payment.Id),
+        };
+
     /// <summary>Chave da concessão de uma compra: acha o bucket dela no estorno.</summary>
     public static string PaymentGrantKey(Guid paymentId) => $"payment:{paymentId}";
 

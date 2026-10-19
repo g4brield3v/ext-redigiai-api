@@ -13,6 +13,9 @@ public enum SubscriptionStatus
 /// </summary>
 public sealed class Subscription
 {
+    /// <summary>Correções de cada cobrança aprovada. Não acumulam: a renovação zera as que sobraram.</summary>
+    public const int CreditsPerCycle = 12;
+
     private const int MaxPreapprovalIdLength = 100;
 
     private Subscription() { }

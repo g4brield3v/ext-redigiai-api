@@ -78,7 +78,7 @@ Cada regra abaixo é requisito de backend e frontend; o backend é a fonte da ve
 | Origem | Preço | Pagamento | Validade |
 |---|---|---|---|
 | Teste grátis | R$ 0 | — | Não vence; 1 por conta |
-| Plano mensal | R$ 39,90/mês | Cartão de crédito, renovação automática | 12 créditos a cada cobrança aprovada (a primeira e cada renovação), para usar ao longo do mês; vencem na cobrança seguinte e não acumulam |
+| Plano mensal | R$ 39,90/mês | Cartão de crédito, renovação automática | 12 créditos a cada cobrança aprovada (a primeira e cada renovação), para usar ao longo do mês; não acumulam: a renovação zera o que sobrou e o saldo do plano volta a 12 |
 | Avulsa | R$ 16 por correção | Pix ou cartão | Não vence |
 
 15. Consumo: primeiro os créditos do plano (vencem antes), depois o teste grátis, depois os avulsos.
@@ -158,7 +158,7 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | `credit_ledger` | id, user_id, source (`trial`, `plan`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
 | `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key, revoked_at | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: uma cobrança (`payment:{compra}`). `revoked_at`: a compra foi estornada ou contestada; o saldo saiu e nenhuma correção volta para o bucket, nem a que estava reservada para uma redação em andamento. |
 | `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano mensal no Mercado Pago. Cada cobrança aprovada concede 12 correções, que vencem em `next_billing_at`. |
-| `payments` | id, user_id, mp_payment_id (único quando preenchido), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, quantity, status (`pending`, `approved`, `rejected`, `cancelled`, `refunded`, `charged_back`), idempotency_key (única por aluno), guardian_authorized_at, pix_qr_code, pix_qr_code_base64, pix_expires_at, created_at, updated_at, approved_at | Idempotência pelo id do Mercado Pago e pela `Idempotency-Key` do aluno. A compra é gravada antes da chamada ao Mercado Pago e recebe o id de lá depois; o id da compra vai como `external_reference` e como `X-Idempotency-Key`. Status muda por `UPDATE` condicional: pendente → aprovado, recusado, cancelado (Pix vencido), estornado ou contestado; aprovado → estornado ou contestado. |
+| `payments` | id, user_id, mp_payment_id (único quando preenchido), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, quantity, status (`pending`, `approved`, `rejected`, `cancelled`, `refunded`, `charged_back`), idempotency_key (única por aluno), guardian_authorized_at, refunded_cents, pix_qr_code, pix_qr_code_base64, pix_expires_at, created_at, updated_at, approved_at | Idempotência pelo id do Mercado Pago e pela `Idempotency-Key` do aluno. A compra é gravada antes da chamada ao Mercado Pago e recebe o id de lá depois; o id da compra vai como `external_reference` e como `X-Idempotency-Key`. Status muda por `UPDATE` condicional: pendente → aprovado, recusado, cancelado (Pix vencido), estornado ou contestado; aprovado → estornado ou contestado. |
 | `webhook_events` | id, provider, external_id (único por provedor), topic, resource_id, payload, received_at, processed_at | Guarda todo webhook antes de processar. `external_id` é o `x-request-id`, que entra na assinatura, então a reentrega não duplica. O `payload` guarda só os campos conhecidos (id, tipo, ação, `data.id`). A assinatura vale até 10 minutos do `ts`. |
 
 **Infraestrutura**
@@ -423,7 +423,7 @@ O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados 
 **Plano mensal (cartão, recorrente)**
 
 1. `POST /v1/checkout/plan` cria uma assinatura (preapproval) de R$ 39,90 mensais e devolve a URL de checkout.
-2. O webhook de assinatura autorizada cria `subscriptions` com `status = active`. Cada cobrança aprovada (a primeira e cada renovação mensal) concede 12 créditos do plano, que vencem na data da cobrança seguinte (`next_billing_at`); os que sobram não acumulam.
+2. O webhook de assinatura autorizada cria `subscriptions` com `status = active`. Cada cobrança aprovada (a primeira e cada renovação mensal) concede 12 créditos do plano, válidos até a cobrança seguinte (`next_billing_at`). Não acumulam: na mesma transação, a renovação encerra o bucket do ciclo anterior (saldo zerado, com lançamento negativo, e vencido naquele instante), seja qual for o horário em que a cobrança chega. Uma correção reservada no ciclo anterior e devolvida depois volta como avulsa, como em todo bucket vencido.
 3. Cada cobrança mensal aprovada mantém a assinatura ativa e atualiza `next_billing_at`. Cobrança recusada → `paused`: sem novas concessões até regularizar; os créditos já concedidos seguem até o vencimento deles.
 4. Cancelamento pelo aluno → `cancelled` ao fim do período pago.
 
@@ -438,7 +438,7 @@ O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados 
 - Valida o cabeçalho `x-signature` com o segredo do Mercado Pago; inválido → 401 e nada é gravado.
 - Grava em `webhook_events` com `external_id` único (reentrega não duplica) e responde 200 em seguida; o processamento é o job `process_payment`.
 - O job busca o recurso na API do Mercado Pago e age pelo status de lá, não pelo corpo do webhook.
-- Estornos e chargebacks: removem do saldo os créditos ainda não usados daquele pagamento e registram no `audit_log`.
+- Estornos e chargebacks: removem do saldo os créditos ainda não usados daquele pagamento e registram no `audit_log`. Estorno parcial (o pagamento continua aprovado lá, com `transaction_amount_refunded`): saem as correções inteiras que o valor estornado cobre, sem arredondar (R$ 16 por correção avulsa, R$ 3,33 por correção do plano), contando os estornos anteriores (`payments.refunded_cents`); a sobra que não fecha uma correção fica no `audit_log` para conferência.
 
 **Saldo e consumo**
 

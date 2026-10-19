@@ -23,6 +23,23 @@ public interface ICreditRepository
     /// <returns>Quantas correções saíram; 0 se já não havia saldo ou o bucket já estava revogado.</returns>
     Task<int> RevokeAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
 
+    /// <summary>
+    /// Tira até <paramref name="max"/> correções ainda não usadas de um bucket (estorno parcial), na transação aberta,
+    /// com a linha travada contra um débito simultâneo. O bucket continua valendo para o que sobrar.
+    /// </summary>
+    /// <returns>Quantas saíram.</returns>
+    Task<int> RemoveAsync(Guid bucketId, int max, CancellationToken ct);
+
+    /// <summary>Os buckets do plano do aluno que ainda não venceram em <paramref name="now"/>, com ou sem saldo.</summary>
+    Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>
+    /// Encerra o bucket agora (renovação do plano): o saldo zera e ele passa a vencido em <paramref name="now"/>, na
+    /// transação aberta e com a linha travada. Uma devolução posterior a ele vira avulsa, como em todo bucket vencido.
+    /// </summary>
+    /// <returns>Quantas correções sobravam; <c>null</c> se o bucket já tinha vencido.</returns>
+    Task<int?> CloseAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
+
     /// <summary>Buckets vencidos até <paramref name="now"/> que ainda têm saldo.</summary>
     Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(DateTimeOffset now, int limit, CancellationToken ct);
 
