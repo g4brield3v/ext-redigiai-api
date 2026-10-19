@@ -158,8 +158,8 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | `credit_ledger` | id, user_id, source (`trial`, `plan_week`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
 | `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: a semana de uma assinatura (`plan_week:{assinatura}:{segunda-feira}`). |
 | `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano semanal no Mercado Pago. Recebe as correções da semana a assinatura ativa criada antes daquela segunda-feira; a semana em que ela começa tem a concessão imediata. |
-| `payments` | id, user_id, mp_payment_id (único), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, status, quantity, created_at | Idempotência pelo id do Mercado Pago. |
-| `webhook_events` | id, provider, external_id (único), payload, processed_at | Guarda todo webhook antes de processar. |
+| `payments` | id, user_id, mp_payment_id (único quando preenchido), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, quantity, status (`pending`, `approved`, `rejected`, `cancelled`, `refunded`, `charged_back`), idempotency_key (única por aluno), guardian_authorized_at, pix_qr_code, pix_qr_code_base64, pix_expires_at, created_at, updated_at, approved_at | Idempotência pelo id do Mercado Pago e pela `Idempotency-Key` do aluno. A compra é gravada antes da chamada ao Mercado Pago e recebe o id de lá depois; o id da compra vai como `external_reference` e como `X-Idempotency-Key`. Status muda por `UPDATE` condicional: pendente → aprovado, recusado, cancelado (Pix vencido), estornado ou contestado; aprovado → estornado ou contestado. |
+| `webhook_events` | id, provider, external_id (único por provedor), topic, resource_id, payload, received_at, processed_at | Guarda todo webhook antes de processar. `external_id` é o id da notificação (ou o `x-request-id`), então a reentrega não duplica. |
 
 **Infraestrutura**
 
@@ -212,7 +212,9 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 
 | Método e rota | Faz |
 |---|---|
-| `POST /v1/checkout/single` | Corpo: quantidade e método (`pix` ou `card`). Cria o pagamento no Mercado Pago; Pix devolve QR code e copia-e-cola. |
+| `POST /v1/checkout/single` | Corpo: `quantity` (1 a 10), `method` (`pix` ou `card`), `guardianAuthorized` e, no cartão, `card` (`token`, `paymentMethodId`, `issuerId`, `identificationType`, `identificationNumber`, vindos do Card Payment Brick). Exige `Idempotency-Key`. Cria o pagamento no Mercado Pago e responde 201 com a compra; Pix devolve QR code e copia-e-cola. Cartão em 1 parcela. |
+| `GET /v1/payments` | Compras do aluno, da mais recente para a mais antiga, com `refundable` (dentro dos 7 dias). |
+| `GET /v1/payments/{id}` | Uma compra do aluno, com a situação atual; a tela do Pix consulta a cada 3 s. De outro aluno, 404. |
 | `POST /v1/checkout/plan` | Cria a assinatura (preapproval) no cartão e devolve a URL de checkout. |
 | `POST /v1/subscription/cancel` | Cancela a renovação; os créditos já concedidos seguem até o dia 1º. |
 | `POST /v1/webhooks/mercadopago` | Recebe notificações; valida a assinatura `x-signature`, grava em `webhook_events` e enfileira job. Sem token do Clerk. |
@@ -517,6 +519,8 @@ Toda exceção conhecida é lançada como `AppError(code, httpStatus, userMessag
 | `TRANSCRIPTION_FAILED` | — | Sim | Não conseguimos ler a foto. Sua correção foi devolvida. |
 | `GRADING_FAILED` | — | Sim | A correção falhou. Sua correção foi devolvida; envie de novo. |
 | `PAYMENT_FAILED` | 402 | Sim | O pagamento não foi aprovado. Tente outro meio de pagamento. |
+| `PAYMENT_UNAVAILABLE` | 503 | Sim | Não conseguimos falar com o meio de pagamento. Tente de novo em instantes. |
+| `GUARDIAN_AUTHORIZATION_REQUIRED` | 422 | Não | Confirme que o seu responsável autorizou esta compra. |
 | `RATE_LIMITED` | 429 | Sim | Muitas tentativas seguidas. Aguarde um minuto. |
 | `AI_UNAVAILABLE` | — | Sim | Uso interno da fila; o aluno não vê. |
 | `INTERNAL_ERROR` | 500 | Não | Algo deu errado do nosso lado. Tente novamente em instantes. |
