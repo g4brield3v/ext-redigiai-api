@@ -99,6 +99,13 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
     public Task<Subscription?> FindByProviderIdAsync(string mpPreapprovalId, CancellationToken ct) =>
         db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.MpPreapprovalId == mpPreapprovalId, ct);
 
+    public Task<Subscription?> FindPendingAsync(Guid userId, CancellationToken ct) =>
+        db.Subscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Pending)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
     public Task<Subscription?> FindOpenAsync(Guid userId, CancellationToken ct) =>
         db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(
             s => s.UserId == userId && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Paused), ct);

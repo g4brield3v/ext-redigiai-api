@@ -10,6 +10,9 @@ public interface ISubscriptionRepository
 
     Task<Subscription?> FindByProviderIdAsync(string mpPreapprovalId, CancellationToken ct);
 
+    /// <summary>A assinatura pendente mais recente do aluno (checkout ainda não concluído), se houver.</summary>
+    Task<Subscription?> FindPendingAsync(Guid userId, CancellationToken ct);
+
     /// <summary>A assinatura ativa ou pausada do aluno, se houver (no máximo uma, garantido pelo banco).</summary>
     Task<Subscription?> FindOpenAsync(Guid userId, CancellationToken ct);
 

@@ -28,7 +28,7 @@ public class PaymentTests
     }
 
     [Theory]
-    [InlineData(PaymentStatus.Approved, new[] { PaymentStatus.Pending })]
+    [InlineData(PaymentStatus.Approved, new[] { PaymentStatus.Pending, PaymentStatus.Rejected })]
     [InlineData(PaymentStatus.Rejected, new[] { PaymentStatus.Pending })]
     [InlineData(PaymentStatus.Cancelled, new[] { PaymentStatus.Pending })]
     [InlineData(PaymentStatus.Refunded, new[] { PaymentStatus.Approved, PaymentStatus.Pending })]

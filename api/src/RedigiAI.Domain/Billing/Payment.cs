@@ -146,7 +146,9 @@ public sealed class Payment
     /// </summary>
     public static IReadOnlyList<PaymentStatus> ReachableFrom(PaymentStatus to) => to switch
     {
-        PaymentStatus.Approved or PaymentStatus.Rejected or PaymentStatus.Cancelled => [PaymentStatus.Pending],
+        // Recusado ainda pode virar aprovado: a nova tentativa de cobrança do plano pode reaproveitar o pagamento lá.
+        PaymentStatus.Approved => [PaymentStatus.Pending, PaymentStatus.Rejected],
+        PaymentStatus.Rejected or PaymentStatus.Cancelled => [PaymentStatus.Pending],
         PaymentStatus.Refunded or PaymentStatus.ChargedBack => [PaymentStatus.Approved, PaymentStatus.Pending],
         _ => [],
     };

@@ -77,6 +77,13 @@ internal sealed class ProcessSubscriptionHandler(
         }
 
         var now = time.GetUtcNow();
+        if (remote.Status == SubscriptionStatus.Active && subscription.Status == SubscriptionStatus.Pending
+            && await subscriptions.FindOpenAsync(subscription.UserId, ct) is { } open && open.Id != subscription.Id)
+        {
+            await CancelDuplicateAsync(subscription, providerId, ct);
+            return;
+        }
+
         try
         {
             await unitOfWork.InTransactionAsync(
@@ -116,11 +123,35 @@ internal sealed class ProcessSubscriptionHandler(
         }
         catch (UniqueConflictException)
         {
-            // Autorizada lá com outra assinatura do aluno já aberta aqui (dois checkouts concluídos): fica pendente
-            // aqui, sem correções, para conferência manual.
-            audit.Record("system", "subscription.duplicate", "subscription", subscription.Id, new { mpPreapprovalId = providerId });
-            await unitOfWork.SaveChangesAsync(ct);
+            // A outra assinatura do aluno foi ativada no mesmo instante.
+            await CancelDuplicateAsync(subscription, providerId, ct);
         }
+    }
+
+    /// <summary>
+    /// Autorizada lá com outra assinatura do aluno já aberta aqui (dois checkouts concluídos): cancelada lá, para não
+    /// ser cobrada todo mês, e aqui. Uma cobrança que já tenha passado fica no audit_log para estorno manual.
+    /// </summary>
+    private async Task CancelDuplicateAsync(Subscription subscription, string providerId, CancellationToken ct)
+    {
+        await gateway.CancelSubscriptionAsync(providerId, ct);
+        var now = time.GetUtcNow();
+        await unitOfWork.InTransactionAsync(
+            async () =>
+            {
+                if (subscription.MpPreapprovalId is null)
+                {
+                    await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, subscription.CheckoutUrl ?? "", now, ct);
+                }
+
+                if (await subscriptions.TryTransitionAsync(subscription.Id, SubscriptionStatus.Cancelled, now, ct))
+                {
+                    audit.Record("system", "subscription.duplicate", "subscription", subscription.Id, new { mpPreapprovalId = providerId });
+                }
+
+                return true;
+            },
+            ct);
     }
 
     private async Task RecordChargeAsync(string chargeId, CancellationToken ct)

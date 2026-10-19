@@ -42,6 +42,119 @@ public class SubscriptionTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task A_new_checkout_reuses_the_open_one_and_simultaneous_requests_create_one_subscription()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+
+        var parallel = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => student.CheckoutAsync(key: key)));
+        var otherTab = await student.CheckoutAsync();
+
+        Assert.All(parallel, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        var ids = await Task.WhenAll(parallel.Append(otherTab).Select(async r =>
+            (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid()));
+        Assert.Single(ids.Distinct());
+        Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
+    }
+
+    [Fact]
+    public async Task A_pending_checkout_can_be_cancelled_here_and_there()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var subscriptionId = (await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
+
+        var response = await student.Client.PostAsync("/v1/subscription/cancel", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(SubscriptionStatus.Cancelled, api.Payments.SubscriptionThere(api.Payments.PreapprovalIdOf(subscriptionId)!).Status);
+        Assert.Equal(SubscriptionStatus.Cancelled, await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.Status).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task A_second_subscription_authorized_there_is_cancelled_and_its_charge_gives_nothing()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var first = await student.SubscribeAsync();
+        await student.ChargeAsync(first, PaymentStatus.Approved);
+
+        // Um checkout antigo, de antes do plano, concluído depois.
+        var duplicate = Subscription.Request(student.Id, Guid.NewGuid().ToString(), null, DateTimeOffset.UtcNow);
+        await api.QueryAsync(async db =>
+        {
+            db.Subscriptions.Add(duplicate);
+            return await db.SaveChangesAsync();
+        });
+        var created = await api.Payments.CreateSubscriptionAsync(
+            new SubscriptionRequest(duplicate.Id, 3990, "plano", "aluna@exemplo.com", "https://redigiai.test/perfil"), CancellationToken.None);
+        await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == duplicate.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.MpPreapprovalId, created.ProviderId)));
+        api.Payments.SetSubscription(created.ProviderId, SubscriptionStatus.Active, DateTimeOffset.UtcNow.AddMonths(1));
+
+        await student.NotifyAsync("subscription_preapproval", created.ProviderId);
+        await RunAsync(JobTypes.ProcessSubscription);
+
+        Assert.Equal(SubscriptionStatus.Cancelled, api.Payments.SubscriptionThere(created.ProviderId).Status);
+        Assert.Equal(SubscriptionStatus.Cancelled, await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == duplicate.Id).Select(s => s.Status).SingleAsync()));
+
+        // Uma cobrança dela que passou antes do cancelamento não renova: fica para estorno manual.
+        var charged = await student.ChargeAsync(created.ProviderId, PaymentStatus.Approved);
+        Assert.Equal(13, await student.CreditsAsync());
+        var chargeId = await api.QueryAsync(db => db.Payments.Where(p => p.MpPaymentId == charged).Select(p => p.Id).SingleAsync());
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.Action == "payment.duplicate_subscription" && a.EntityId == chargeId)));
+    }
+
+    [Fact]
+    public async Task Two_charges_approved_at_the_same_time_still_leave_12_corrections()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync();
+        var one = api.Payments.Charge(preapprovalId, PaymentStatus.Approved);
+        var two = api.Payments.Charge(preapprovalId, PaymentStatus.Approved);
+        await student.NotifyAsync("subscription_authorized_payment", one.ChargeId);
+        await student.NotifyAsync("subscription_authorized_payment", two.ChargeId);
+        await RunAsync(JobTypes.ProcessSubscription);
+
+        var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+        await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => runner.RunNextAsync([JobTypes.ProcessPayment], CancellationToken.None)));
+        await RunAsync(JobTypes.ProcessPayment);
+
+        Assert.Equal(13, await student.CreditsAsync());
+    }
+
+    [Fact]
+    public async Task A_charge_whose_notice_was_lost_is_recorded_from_the_payment_notice()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync();
+        var (_, paymentId) = api.Payments.Charge(preapprovalId, PaymentStatus.Approved);
+
+        // Só o aviso do pagamento chega.
+        await student.NotifyAsync("payment", paymentId);
+        await RunAsync(JobTypes.ProcessPayment);
+
+        Assert.Equal(13, await student.CreditsAsync());
+        var payment = await api.QueryAsync(db => db.Payments.SingleAsync(p => p.MpPaymentId == paymentId));
+        Assert.Equal(PaymentKind.Plan, payment.Kind);
+    }
+
+    [Fact]
+    public async Task A_refused_charge_approved_on_a_later_attempt_renews_the_plan()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync();
+        var refused = await student.ChargeAsync(preapprovalId, PaymentStatus.Rejected);
+        Assert.Equal("paused", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+
+        // A nova tentativa lá aprova o mesmo pagamento.
+        api.Payments.Set(refused, PaymentStatus.Approved);
+        await student.NotifyAsync("payment", refused);
+        await RunAsync(JobTypes.ProcessPayment);
+
+        Assert.Equal(13, await student.CreditsAsync());
+        Assert.Equal("active", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task Buyers_aged_16_or_17_must_declare_the_guardian_authorization_for_the_plan()
     {
         var minor = await Subscriber.CreateAsync(api, birthDate: DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-16).AddDays(-10));

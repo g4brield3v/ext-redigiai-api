@@ -16,6 +16,8 @@ internal sealed class PlanCredits(ICreditRepository credits, IAuditLog audit)
     /// </summary>
     public async Task RenewAsync(Payment payment, DateTimeOffset cycleEnd, DateTimeOffset now, CancellationToken ct)
     {
+        // Duas cobranças do mesmo aluno aprovadas juntas: a segunda espera e vê o ciclo da primeira para zerá-lo.
+        await credits.LockUserAsync(payment.UserId, ct);
         foreach (var previous in await credits.ListOpenPlanBucketsAsync(payment.UserId, now, ct))
         {
             // Encerrado mesmo sem saldo: uma correção reservada no ciclo anterior não volta para ele, volta como avulsa.

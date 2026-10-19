@@ -78,6 +78,9 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return removed.Count == 1 ? removed[0] : 0;
     }
 
+    public Task LockUserAsync(Guid userId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM users WHERE id = {userId} FOR UPDATE", ct);
+
     public async Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
             .AsNoTracking()

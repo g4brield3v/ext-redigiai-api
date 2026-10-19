@@ -63,6 +63,12 @@ internal sealed class SubscriptionService(
             throw Errors.PlanAlreadyActive();
         }
 
+        // Um checkout em aberto é reaproveitado: duas abas ou dois cliques não viram duas assinaturas lá.
+        if (await subscriptions.FindPendingAsync(user.Id, ct) is { CheckoutUrl: { } pendingUrl } pending)
+        {
+            return new PlanCheckoutDto(pending.Id, pendingUrl);
+        }
+
         var now = time.GetUtcNow();
         // Compras de 16 e 17 anos exigem a declaração de autorização do responsável (regra 9).
         var minor = user.BirthDate.AgeOn(BrasiliaTime.DateOf(now)) < AdultAge;
@@ -91,14 +97,17 @@ internal sealed class SubscriptionService(
     public async Task<SubscriptionDto> CancelAsync(string clerkUserId, CancellationToken ct)
     {
         var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
-        var subscription = await subscriptions.FindOpenAsync(user.Id, ct);
-        if (subscription?.MpPreapprovalId is not { } providerId)
-        {
-            throw Errors.NotFound();
-        }
+        // O plano aberto ou, sem ele, o checkout pendente (que ainda poderia ser autorizado lá).
+        var subscription = await subscriptions.FindOpenAsync(user.Id, ct)
+            ?? await subscriptions.FindPendingAsync(user.Id, ct)
+            ?? throw Errors.NotFound();
 
         // Primeiro lá: se o Mercado Pago não cancelar, nada muda aqui e o aluno pode tentar de novo.
-        await gateway.CancelSubscriptionAsync(providerId, ct);
+        if (subscription.MpPreapprovalId is { } providerId)
+        {
+            await gateway.CancelSubscriptionAsync(providerId, ct);
+        }
+
         var now = time.GetUtcNow();
         await unitOfWork.InTransactionAsync(
             async () =>
@@ -135,19 +144,27 @@ internal sealed class SubscriptionService(
             new SubscriptionRequest(subscription.Id, Payment.PlanPriceCents, Reason, user.Email, BackUrl()), ct);
 
         var now = time.GetUtcNow();
-        await unitOfWork.InTransactionAsync(
+        var attached = await unitOfWork.InTransactionAsync(
             async () =>
             {
-                if (await subscriptions.TryAttachProviderAsync(subscription.Id, created.ProviderId, created.CheckoutUrl, now, ct))
+                if (!await subscriptions.TryAttachProviderAsync(subscription.Id, created.ProviderId, created.CheckoutUrl, now, ct))
                 {
-                    audit.Record("system", "subscription.created", "subscription", subscription.Id, new { mpPreapprovalId = created.ProviderId });
+                    return false;
                 }
 
+                audit.Record("system", "subscription.created", "subscription", subscription.Id, new { mpPreapprovalId = created.ProviderId });
                 return true;
             },
             ct);
+        if (attached)
+        {
+            return new PlanCheckoutDto(subscription.Id, created.CheckoutUrl);
+        }
 
-        return new PlanCheckoutDto(subscription.Id, created.CheckoutUrl);
+        // Outra requisição já ligou esta assinatura a outro preapproval lá: vale o dela, e este, sem dono, é cancelado.
+        var winner = await subscriptions.FindAsync(subscription.Id, ct);
+        await gateway.CancelSubscriptionAsync(created.ProviderId, ct);
+        return winner?.CheckoutUrl is { } url ? new PlanCheckoutDto(subscription.Id, url) : throw Errors.Internal();
     }
 
     /// <summary>O aluno volta do checkout do Mercado Pago para o perfil, onde vê a assinatura.</summary>

@@ -30,6 +30,11 @@ public interface ICreditRepository
     /// <returns>Quantas saíram.</returns>
     Task<int> RemoveAsync(Guid bucketId, int max, CancellationToken ct);
 
+    /// <summary>
+    /// Trava o aluno até o fim da transação aberta: duas renovações do plano do mesmo aluno não correm juntas.
+    /// </summary>
+    Task LockUserAsync(Guid userId, CancellationToken ct);
+
     /// <summary>Os buckets do plano do aluno que ainda não venceram em <paramref name="now"/>, com ou sem saldo.</summary>
     Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct);
 

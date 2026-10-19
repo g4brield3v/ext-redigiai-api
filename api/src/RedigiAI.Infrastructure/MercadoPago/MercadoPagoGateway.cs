@@ -132,7 +132,9 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
         }
 
         var checkoutUrl = created["init_point"]?.GetValue<string>();
-        if (checkoutUrl is null || !Uri.TryCreate(checkoutUrl, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps)
+        // O navegador vai para essa URL: só um endereço do Mercado Pago, em https.
+        if (checkoutUrl is null || !Uri.TryCreate(checkoutUrl, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps
+            || !IsMercadoPagoHost(url.Host))
         {
             logger.LogError("Mercado Pago created a subscription without a valid checkout URL");
             throw Errors.PaymentUnavailable();
@@ -197,6 +199,11 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             throw Errors.PaymentUnavailable();
         }
     }
+
+    private static bool IsMercadoPagoHost(string host) =>
+        host is "mercadopago.com.br" or "mercadopago.com"
+        || host.EndsWith(".mercadopago.com.br", StringComparison.OrdinalIgnoreCase)
+        || host.EndsWith(".mercadopago.com", StringComparison.OrdinalIgnoreCase);
 
     private static DateTimeOffset? Date(JsonNode? value) =>
         value is JsonValue node && node.TryGetValue<string>(out var text)
