@@ -27,6 +27,36 @@ public class EmailComposerTests
     }
 
     [Fact]
+    public void Approved_purchase_notice_has_the_amount_the_corrections_and_the_refund_deadline()
+    {
+        var paymentId = Guid.CreateVersion7();
+        // Aprovada em 19/10, 15h em Brasília: o arrependimento vai até 26/10.
+        var deadline = new DateTimeOffset(2026, 10, 26, 18, 0, 0, TimeSpan.Zero);
+
+        var email = Composer().ComposePayment(
+            EmailTemplates.PaymentApproved, new PaymentEmailFacts("aluna@exemplo.com", "Ana", paymentId, 3, 4800, deadline));
+
+        Assert.Equal("Pagamento aprovado: 3 correções avulsas", email.Subject);
+        Assert.Contains("Seu pagamento foi aprovado", email.Html);
+        Assert.Contains("Recebemos o pagamento de R$ 48,00 por 3 correções avulsas. Elas já estão no seu saldo e não vencem.", email.Text);
+        Assert.Contains("Se mudar de ideia, você pode desistir da compra até 26/10 e receber o valor das correções que não usou.", email.Text);
+        Assert.Contains("Ir para o painel: https://redigiai.com.br/painel", email.Text);
+        Assert.Equal(paymentId, email.RefId);
+    }
+
+    [Fact]
+    public void A_single_correction_purchase_reads_in_the_singular()
+    {
+        var email = Composer().ComposePayment(
+            EmailTemplates.PaymentApproved,
+            new PaymentEmailFacts("aluna@exemplo.com", null, Guid.CreateVersion7(), 1, 1600, DateTimeOffset.UtcNow.AddDays(7)));
+
+        Assert.Equal("Pagamento aprovado: 1 correção avulsa", email.Subject);
+        Assert.Contains("R$ 16,00 por 1 correção avulsa. Ela já está no seu saldo e não vence.", email.Text);
+        Assert.Contains("Olá,", email.Text);
+    }
+
+    [Fact]
     public void Deadline_is_shown_in_brasilia_time()
     {
         var email = Composer().Compose(EmailTemplates.IllegibleWords, Facts());

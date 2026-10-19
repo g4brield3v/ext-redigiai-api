@@ -22,6 +22,11 @@ public sealed record EssayEmailFacts(
     int? FailureIllegibleCount,
     string PromptSlug);
 
+/// <summary>O que o aviso de uma compra aprovada mostra (texto aprovado em 19/10/2026).</summary>
+/// <param name="RefundDeadline">Até quando vale o direito de arrependimento.</param>
+public sealed record PaymentEmailFacts(
+    string To, string? Name, Guid PaymentId, int Quantity, long AmountCents, DateTimeOffset RefundDeadline);
+
 /// <summary>
 /// Monta os e-mails da redação: assunto com o título "Vestibular – Tipo – Tema", um aviso curto e um botão para a
 /// plataforma. Os avisos de falha usam o título e o texto do catálogo de <c>docs/08-ajustes-correcao.md</c>.
@@ -101,7 +106,32 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
 
         // O título da proposta vem do cadastro: quebra de linha nunca entra no assunto.
         content = content with { Subject = content.Subject.ReplaceLineEndings(" ") };
-        return new EmailMessage(facts.To, content.Subject, Html(facts, content), Text(facts, content), template, facts.EssayId);
+        var recipient = new Recipient(facts.Name, facts.EssayTitle);
+        return new EmailMessage(facts.To, content.Subject, Html(recipient, content), Text(recipient, content), template, facts.EssayId);
+    }
+
+    /// <summary>O aviso de uma compra de correções avulsas aprovada.</summary>
+    public EmailMessage ComposePayment(string template, PaymentEmailFacts facts)
+    {
+        if (template != EmailTemplates.PaymentApproved)
+        {
+            throw new ArgumentOutOfRangeException(nameof(template), template, "Unknown e-mail template.");
+        }
+
+        var corrections = facts.Quantity == 1 ? "1 correção avulsa" : $"{facts.Quantity} correções avulsas";
+        var content = new Content(
+            $"Pagamento aprovado: {corrections}",
+            "Seu pagamento foi aprovado",
+            [
+                $"Recebemos o pagamento de R$ {(facts.AmountCents / 100m).ToString("N2", PtBr)} por {corrections}. "
+                    + (facts.Quantity == 1 ? "Ela já está no seu saldo e não vence." : "Elas já estão no seu saldo e não vencem."),
+                $"Se mudar de ideia, você pode desistir da compra até {BrasiliaTime.At(facts.RefundDeadline).ToString("dd/MM", PtBr)} e receber o valor das correções que não usou.",
+            ],
+            "Ir para o painel",
+            "/painel",
+            CanTurnOff: false);
+        var recipient = new Recipient(facts.Name, corrections);
+        return new EmailMessage(facts.To, content.Subject, Html(recipient, content), Text(recipient, content), template, facts.PaymentId);
     }
 
     private static Content Failure(EssayEmailFacts facts, string title, string text, string button, string path) =>
@@ -136,8 +166,8 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
             : throw new AppError("EMAIL_NOT_CONFIGURED", 500, "Algo deu errado do nosso lado. Tente novamente em instantes.");
     }
 
-    private static string Greeting(EssayEmailFacts facts) =>
-        string.IsNullOrWhiteSpace(facts.Name) ? "Olá," : $"Olá, {facts.Name.Trim()},";
+    private static string Greeting(Recipient recipient) =>
+        string.IsNullOrWhiteSpace(recipient.Name) ? "Olá," : $"Olá, {recipient.Name.Trim()},";
 
     private IEnumerable<string> FooterLines(Content content)
     {
@@ -160,10 +190,10 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
             : "RedigiAI";
     }
 
-    private string Text(EssayEmailFacts facts, Content content)
+    private string Text(Recipient recipient, Content content)
     {
         var text = new StringBuilder();
-        text.Append(Greeting(facts)).Append("\n\n");
+        text.Append(Greeting(recipient)).Append("\n\n");
         foreach (var paragraph in content.Paragraphs)
         {
             text.Append(paragraph).Append("\n\n");
@@ -178,7 +208,7 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
         return text.ToString();
     }
 
-    private string Html(EssayEmailFacts facts, Content content)
+    private string Html(Recipient recipient, Content content)
     {
         // Só os caracteres especiais do HTML: o documento é UTF-8, e os acentos ficam como são.
         static string E(string value) => value
@@ -193,13 +223,13 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
             .Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
             .Append("<title>").Append(E(content.Subject)).Append("</title></head>")
             .Append("<body style=\"margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b;\">")
-            // Pré-visualização na caixa de entrada: o título da redação.
-            .Append("<div style=\"display:none;max-height:0;overflow:hidden;\">").Append(E(facts.EssayTitle)).Append("</div>")
+            // Pré-visualização na caixa de entrada: o título da redação ou o que foi comprado.
+            .Append("<div style=\"display:none;max-height:0;overflow:hidden;\">").Append(E(recipient.Preview)).Append("</div>")
             .Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f4f5;padding:24px 12px;\"><tr><td align=\"center\">")
             .Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:12px;padding:32px 28px;\">")
             .Append("<tr><td style=\"font-size:14px;font-weight:bold;color:#4f46e5;padding-bottom:20px;\">RedigiAI</td></tr>")
             .Append("<tr><td style=\"font-size:22px;font-weight:bold;line-height:1.3;padding-bottom:16px;\">").Append(E(content.Heading)).Append("</td></tr>")
-            .Append("<tr><td style=\"font-size:16px;line-height:1.5;padding-bottom:12px;\">").Append(E(Greeting(facts))).Append("</td></tr>");
+            .Append("<tr><td style=\"font-size:16px;line-height:1.5;padding-bottom:12px;\">").Append(E(Greeting(recipient))).Append("</td></tr>");
 
         foreach (var paragraph in content.Paragraphs)
         {
@@ -220,6 +250,9 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
         html.Append("</table></td></tr></table></body></html>");
         return html.ToString();
     }
+
+    /// <param name="Preview">O texto que a caixa de entrada mostra depois do assunto.</param>
+    private sealed record Recipient(string? Name, string Preview);
 
     private sealed record Content(
         string Subject, string Heading, IReadOnlyList<string> Paragraphs, string Button, string Path, bool CanTurnOff);

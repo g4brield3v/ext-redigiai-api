@@ -1,5 +1,6 @@
 using System.Text.Json;
 using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Notifications;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Jobs;
@@ -20,6 +21,7 @@ internal sealed class ProcessPaymentHandler(
     IPaymentRepository payments,
     ICreditRepository credits,
     IWebhookEventRepository events,
+    IJobQueue jobs,
     IAuditLog audit,
     IUnitOfWork unitOfWork,
     TimeProvider time) : IJobHandler
@@ -112,6 +114,7 @@ internal sealed class ProcessPaymentHandler(
                 audit.Record("system", "payment.approved", "payment", payment.Id, data);
                 audit.Record(
                     "system", "credit.granted", "credit_bucket", bucket.Id, new { source = "single", delta = bucket.Granted, paymentId = payment.Id });
+                EmailJobs.Enqueue(jobs, EmailTemplates.PaymentApproved, payment.Id);
                 break;
 
             case PaymentStatus.Refunded or PaymentStatus.ChargedBack:

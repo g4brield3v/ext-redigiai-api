@@ -359,6 +359,30 @@ public class PaymentTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task The_approval_sends_one_notice_with_a_button_to_the_dashboard()
+    {
+        await SetEmailSendingAsync(true);
+        try
+        {
+            var student = await Buyer.CreateAsync(api);
+            var paymentId = await student.BuyAndApproveAsync(quantity: 2);
+            var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+            while (await runner.RunNextAsync([JobTypes.SendEmail], CancellationToken.None))
+            {
+            }
+
+            var email = Assert.Single(api.Emails.For(paymentId));
+            Assert.Equal("payment_approved", email.Template);
+            Assert.Equal("Pagamento aprovado: 2 correções avulsas", email.Subject);
+            Assert.Contains($"{ApiFixture.WebOrigin}/painel", email.Text);
+        }
+        finally
+        {
+            await SetEmailSendingAsync(false);
+        }
+    }
+
+    [Fact]
     public async Task A_different_amount_there_grants_nothing_and_stops_for_manual_review()
     {
         var student = await Buyer.CreateAsync(api);
@@ -393,6 +417,11 @@ public class PaymentTests(ApiFixture api)
 
     private static object Card() =>
         new { quantity = 1, method = "card", card = new { token = "tok_test_123", paymentMethodId = "visa", issuerId = "25", identificationType = "CPF", identificationNumber = "19119119100" } };
+
+    private Task<int> SetEmailSendingAsync(bool enabled) =>
+        api.QueryAsync(db => db.FeatureFlags
+            .Where(f => f.Key == FeatureFlag.EmailSending)
+            .ExecuteUpdateAsync(f => f.SetProperty(x => x.Enabled, enabled)));
 
     /// <summary>Roda a reconciliação e devolve os pagamentos que ela pôs na fila agora.</summary>
     private async Task<List<string>> RecheckAsync()

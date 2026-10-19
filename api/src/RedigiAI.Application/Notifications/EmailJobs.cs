@@ -3,7 +3,10 @@ using RedigiAI.Domain.Jobs;
 
 namespace RedigiAI.Application.Notifications;
 
-/// <summary>Os e-mails da redação (especificação, seção 10). Todos têm como referência o id da redação.</summary>
+/// <summary>
+/// Os e-mails da plataforma (especificação, seção 10). Os da redação têm como referência o id da redação; os de
+/// pagamento, o id da compra.
+/// </summary>
 public static class EmailTemplates
 {
     public const string CorrectionReady = "correction_ready";
@@ -12,6 +15,9 @@ public static class EmailTemplates
     public const string ReviewExpired = "review_expired";
     public const string PhotoUnreadable = "photo_unreadable";
     public const string EssayFailed = "essay_failed";
+    public const string PaymentApproved = "payment_approved";
+
+    public static bool IsPayment(string template) => template == PaymentApproved;
 
     /// <summary>O aviso de uma redação que falhou ou foi cancelada, pelo código gravado nela.</summary>
     public static string? ForFailure(string? failureCode) => failureCode switch
@@ -23,7 +29,7 @@ public static class EmailTemplates
     };
 }
 
-/// <param name="RefId">O id da redação.</param>
+/// <param name="RefId">O id da redação ou, nos avisos de pagamento, da compra.</param>
 public sealed record EmailJobPayload(string Template, Guid RefId);
 
 public static class EmailJobs
@@ -31,6 +37,6 @@ public static class EmailJobs
     public const int Attempts = 6;
 
     /// <summary>Enfileira o aviso na transação do caso de uso: só sai se a mudança que o disparou for gravada.</summary>
-    public static void Enqueue(IJobQueue jobs, string template, Guid essayId) =>
-        jobs.Enqueue(JobTypes.SendEmail, new EmailJobPayload(template, essayId), Attempts);
+    public static void Enqueue(IJobQueue jobs, string template, Guid refId) =>
+        jobs.Enqueue(JobTypes.SendEmail, new EmailJobPayload(template, refId), Attempts);
 }
