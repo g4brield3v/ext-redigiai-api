@@ -11,6 +11,12 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<DateTimeOffset>(
+                name: "revoked_at",
+                table: "credit_buckets",
+                type: "timestamp with time zone",
+                nullable: true);
+
             migrationBuilder.CreateTable(
                 name: "payments",
                 columns: table => new
@@ -117,6 +123,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
             migrationBuilder.DropIndex(
                 name: "ix_credit_ledger_payment_id",
                 table: "credit_ledger");
+
+            migrationBuilder.DropColumn(
+                name: "revoked_at",
+                table: "credit_buckets");
         }
     }
 }

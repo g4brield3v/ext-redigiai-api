@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Billing;
@@ -35,7 +34,9 @@ internal sealed class PaymentWebhookService(
         var body = Read(notification.Body);
         var resourceId = notification.QueryDataId ?? body.DataId;
         var topic = notification.QueryType ?? body.Type;
-        if (!IsId(resourceId) || !verifier.IsValid(notification.Signature, notification.RequestId, resourceId!))
+        // O x-request-id entra na assinatura e identifica a entrega: sem ele, a notificação não é aceita.
+        if (!IsId(resourceId) || !IsId(notification.RequestId)
+            || !verifier.IsValid(notification.Signature, notification.RequestId, resourceId!))
         {
             throw Errors.Unauthenticated();
         }
@@ -45,15 +46,12 @@ internal sealed class PaymentWebhookService(
             throw Errors.Validation("Notificação sem tipo.");
         }
 
-        // A reentrega da mesma notificação traz o mesmo id; sem ele, vale o x-request-id.
-        var externalId = IsId(body.Id) ? $"notification:{body.Id}" : $"request:{notification.RequestId}";
-        if (externalId.Length > WebhookEvent.MaxExternalIdLength)
-        {
-            throw Errors.Validation("Notificação inválida.");
-        }
-
-        var webhookEvent = WebhookEvent.Receive(
-            WebhookEvent.MercadoPago, externalId, topic!, resourceId!, Encoding.UTF8.GetString(notification.Body), time.GetUtcNow());
+        // A chave contra duplicação vem do que é assinado (o corpo não é). Uma reentrega com outro x-request-id vira
+        // outro evento, sem efeito: o job consulta o pagamento e só muda o que mudou lá.
+        var externalId = $"request:{notification.RequestId}";
+        // Guarda só os campos conhecidos, não o corpo inteiro.
+        var summary = JsonSerializer.Serialize(new { id = body.Id, type = topic, action = body.Action, dataId = resourceId });
+        var webhookEvent = WebhookEvent.Receive(WebhookEvent.MercadoPago, externalId, topic!, resourceId!, summary, time.GetUtcNow());
         await unitOfWork.InTransactionAsync(
             async () =>
             {
@@ -72,7 +70,7 @@ internal sealed class PaymentWebhookService(
     private static bool IsId(string? value) =>
         value is { Length: > 0 and <= MaxIdLength } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
-    private static (string? Id, string? Type, string? DataId) Read(byte[] body)
+    private static (string? Id, string? Type, string? Action, string? DataId) Read(byte[] body)
     {
         try
         {
@@ -83,7 +81,9 @@ internal sealed class PaymentWebhookService(
                 return default;
             }
 
-            return (Text(root, "id"), Text(root, "type"), root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object ? Text(data, "id") : null);
+            var dataId = root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object ? Text(data, "id") : null;
+            var action = Text(root, "action");
+            return (Text(root, "id"), Text(root, "type"), action is { Length: <= MaxIdLength } ? action : null, dataId);
         }
         catch (JsonException)
         {

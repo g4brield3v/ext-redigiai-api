@@ -212,10 +212,13 @@ public sealed class ApiFixture : IAsyncLifetime
 
     /// <summary>Uma notificação do Mercado Pago, assinada como ele assina (ou com outra chave).</summary>
     public static HttpRequestMessage CreateMercadoPagoWebhook(
-        string resourceId, string json, string type = "payment", string? secret = null, string requestId = "req-1")
+        string resourceId, string json, string type = "payment", string? secret = null, string? requestId = "req-1",
+        DateTimeOffset? signedAt = null)
     {
-        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var manifest = $"id:{resourceId.ToLowerInvariant()};request-id:{requestId};ts:{ts};";
+        var ts = (signedAt ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var manifest = requestId is null
+            ? $"id:{resourceId.ToLowerInvariant()};ts:{ts};"
+            : $"id:{resourceId.ToLowerInvariant()};request-id:{requestId};ts:{ts};";
         var v1 = Convert.ToHexStringLower(System.Security.Cryptography.HMACSHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(secret ?? MercadoPagoSecret), System.Text.Encoding.UTF8.GetBytes(manifest)));
         var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/webhooks/mercadopago?data.id={resourceId}&type={type}")
@@ -223,7 +226,10 @@ public sealed class ApiFixture : IAsyncLifetime
             Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json"),
         };
         request.Headers.Add("x-signature", $"ts={ts},v1={v1}");
-        request.Headers.Add("x-request-id", requestId);
+        if (requestId is not null)
+        {
+            request.Headers.Add("x-request-id", requestId);
+        }
         return request;
     }
 

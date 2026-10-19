@@ -191,8 +191,15 @@ public class PaymentTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.Unauthorized, unsigned.StatusCode);
         Assert.Equal(0, await api.QueryAsync(db => db.WebhookEvents.CountAsync(e => e.ResourceId == providerId)));
 
-        var first = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json));
-        var again = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: "req-2"));
+        // Uma assinatura antiga (capturada e reenviada) e uma notificação sem x-request-id também não valem.
+        var replayed = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, signedAt: DateTimeOffset.UtcNow.AddMinutes(-30)));
+        var withoutRequestId = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: null));
+        Assert.Equal(HttpStatusCode.Unauthorized, replayed.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, withoutRequestId.StatusCode);
+
+        var requestId = $"req-{Guid.NewGuid():N}";
+        var first = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: requestId));
+        var again = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: requestId));
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);
@@ -246,6 +253,76 @@ public class PaymentTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task A_correction_reserved_before_a_chargeback_does_not_come_back_when_the_essay_fails()
+    {
+        var student = await Buyer.CreateAsync(api);
+        var paymentId = await student.BuyAndApproveAsync(quantity: 1);
+        Assert.Equal(2, await student.CreditsAsync());
+
+        // As duas correções ficam reservadas: a do teste grátis e a da compra.
+        await student.SubmitAsync(count: 2);
+        Assert.Equal(0, await student.CreditsAsync());
+
+        // Chargeback: não há saldo para tirar, mas a compra fica revogada.
+        api.Payments.Set(api.Payments.ProviderIdOf(paymentId)!, PaymentStatus.ChargedBack);
+        await student.NotifyAsync(paymentId);
+        await RunPaymentJobsAsync();
+
+        // As duas redações falham depois (foto ilegível): só a correção do teste grátis volta.
+        api.Transcriber.Script.Enqueue(() => FakeTranscriber.Reading(readable: false));
+        api.Transcriber.Script.Enqueue(() => FakeTranscriber.Reading(readable: false));
+        var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+        while (await runner.RunNextAsync([JobTypes.Transcribe], CancellationToken.None))
+        {
+        }
+
+        Assert.Equal(1, await student.CreditsAsync());
+        var bucket = await api.QueryAsync(db => db.CreditBuckets.SingleAsync(b => b.GrantKey == CreditBucket.PaymentGrantKey(paymentId)));
+        Assert.Equal(0, bucket.Remaining);
+        Assert.NotNull(bucket.RevokedAt);
+        var essayIds = await api.QueryAsync(db => db.Essays.Where(e => e.UserId == student.Id).Select(e => e.Id).ToListAsync());
+        Assert.Equal(1, await api.QueryAsync(db => db.AuditLog.CountAsync(a => a.Action == "credit.refund_skipped" && essayIds.Contains(a.EntityId))));
+    }
+
+    [Fact]
+    public async Task Simultaneous_checks_of_the_same_approval_grant_once()
+    {
+        var student = await Buyer.CreateAsync(api);
+        var paymentId = await student.BuyPixAsync(quantity: 2);
+        api.Payments.Set(api.Payments.ProviderIdOf(paymentId)!, PaymentStatus.Approved);
+        await student.NotifyAsync(paymentId);
+        await student.NotifyAsync(paymentId);
+
+        var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+        await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => runner.RunNextAsync([JobTypes.ProcessPayment], CancellationToken.None)));
+        await RunPaymentJobsAsync();
+
+        Assert.Equal(3, await student.CreditsAsync());
+        Assert.Single(await api.QueryAsync(db => db.CreditLedger.Where(e => e.PaymentId == paymentId).ToListAsync()));
+    }
+
+    [Fact]
+    public async Task A_pix_paid_without_a_notification_is_found_by_the_reconciliation()
+    {
+        var student = await Buyer.CreateAsync(api);
+        var paymentId = await student.BuyPixAsync();
+        await RunPaymentJobsAsync();
+        api.Payments.Set(api.Payments.ProviderIdOf(paymentId)!, PaymentStatus.Approved);
+
+        // Recém-criada, a compra ainda não entra na reconciliação.
+        Assert.DoesNotContain(api.Payments.ProviderIdOf(paymentId), await RecheckAsync());
+
+        await api.QueryAsync(db => db.Payments.Where(p => p.Id == paymentId)
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.CreatedAt, x => x.CreatedAt.AddMinutes(-5))));
+        Assert.Contains(api.Payments.ProviderIdOf(paymentId), await RecheckAsync());
+        // Com a consulta já na fila, a próxima passada não enfileira outra.
+        Assert.DoesNotContain(api.Payments.ProviderIdOf(paymentId), await RecheckAsync());
+        await RunPaymentJobsAsync();
+
+        Assert.Equal(2, await student.CreditsAsync());
+    }
+
+    [Fact]
     public async Task A_different_amount_there_grants_nothing_and_stops_for_manual_review()
     {
         var student = await Buyer.CreateAsync(api);
@@ -280,6 +357,19 @@ public class PaymentTests(ApiFixture api)
 
     private static object Card() =>
         new { quantity = 1, method = "card", card = new { token = "tok_test_123", paymentMethodId = "visa", issuerId = "25", identificationType = "CPF", identificationNumber = "19119119100" } };
+
+    /// <summary>Roda a reconciliação e devolve os pagamentos que ela pôs na fila agora.</summary>
+    private async Task<List<string>> RecheckAsync()
+    {
+        var before = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.ProcessPayment).Select(j => j.Id).ToListAsync())).ToHashSet();
+        await using (var scope = api.Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<RedigiAI.Application.Billing.IPaymentService>().RecheckPendingAsync(CancellationToken.None);
+        }
+
+        var jobs = await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.ProcessPayment).ToListAsync());
+        return [.. jobs.Where(j => !before.Contains(j.Id)).Select(j => JsonDocument.Parse(j.Payload).RootElement.GetProperty("mpPaymentId").GetString()!)];
+    }
 
     /// <summary>Os jobs de pagamento de um pagamento do Mercado Pago (o payload é jsonb: filtra aqui).</summary>
     private async Task<List<Job>> PaymentJobsAsync(string providerId) =>
@@ -345,6 +435,28 @@ public class PaymentTests(ApiFixture api)
             var json = $$$"""{"id":{{{Random.Shared.NextInt64(1, long.MaxValue)}}},"type":"payment","action":"payment.updated","data":{"id":"{{{providerId}}}"}}""";
             var response = await api.CreateClient().SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: Guid.NewGuid().ToString()));
             response.EnsureSuccessStatusCode();
+        }
+
+        /// <summary>Envia redações da proposta de exemplo, como o aluno faria, reservando uma correção cada.</summary>
+        public async Task SubmitAsync(int count)
+        {
+            var prompt = await Client.GetFromJsonAsync<JsonElement>("/v1/prompts/algoritmos-e-o-debate-publico");
+            var items = new List<object>();
+            for (var i = 0; i < count; i++)
+            {
+                var assetId = (await (await Client.PostAsync("/v1/uploads/sign", null)).Content.ReadFromJsonAsync<JsonElement>())
+                    .GetProperty("assetId").GetGuid();
+                var publicId = await api.QueryAsync(db => db.Assets.Where(a => a.Id == assetId).Select(a => a.PublicId).SingleAsync());
+                api.Photos.Stored[publicId] = new StoredPhoto(2 * 1024 * 1024, "jpg");
+                items.Add(new { promptId = prompt.GetProperty("id").GetGuid(), assetId });
+            }
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/essays/batch")
+            {
+                Content = JsonContent.Create(new { essays = items, aiNoticeAccepted = true }),
+            };
+            request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            (await Client.SendAsync(request)).EnsureSuccessStatusCode();
         }
 
         public async Task<int> CreditsAsync() =>

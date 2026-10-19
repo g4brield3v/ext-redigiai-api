@@ -239,6 +239,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("remaining");
 
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(20)

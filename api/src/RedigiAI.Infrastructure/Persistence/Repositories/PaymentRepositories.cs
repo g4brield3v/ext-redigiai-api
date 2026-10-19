@@ -21,6 +21,29 @@ internal sealed class PaymentRepository(AppDbContext db) : IPaymentRepository
             .Take(limit)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<string>> ListPendingToRecheckAsync(
+        DateTimeOffset createdAfter, DateTimeOffset createdBefore, int limit, CancellationToken ct)
+    {
+        var pending = SnakeCaseEnum<PaymentStatus>.ToName(PaymentStatus.Pending);
+        var type = RedigiAI.Domain.Jobs.JobTypes.ProcessPayment;
+        var ready = SnakeCaseEnum<RedigiAI.Domain.Jobs.JobStatus>.ToName(RedigiAI.Domain.Jobs.JobStatus.Ready);
+        var running = SnakeCaseEnum<RedigiAI.Domain.Jobs.JobStatus>.ToName(RedigiAI.Domain.Jobs.JobStatus.Running);
+        return await db.Database
+            .SqlQuery<string>(
+                $"""
+                SELECT p.mp_payment_id AS "Value" FROM payments p
+                WHERE p.status = {pending} AND p.mp_payment_id IS NOT NULL
+                  AND p.created_at > {createdAfter} AND p.created_at <= {createdBefore}
+                  AND NOT EXISTS (
+                      SELECT 1 FROM jobs j
+                      WHERE j.type = {type} AND j.status IN ({ready}, {running})
+                        AND j.payload ->> 'mpPaymentId' = p.mp_payment_id)
+                ORDER BY p.created_at
+                LIMIT {limit}
+                """)
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> TryAttachProviderAsync(
         Guid paymentId, string mpPaymentId, string? pixQrCode, string? pixQrCodeBase64, DateTimeOffset? pixExpiresAt,
         DateTimeOffset now, CancellationToken ct) =>

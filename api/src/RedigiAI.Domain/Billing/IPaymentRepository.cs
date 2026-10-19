@@ -13,6 +13,13 @@ public interface IPaymentRepository
     Task<IReadOnlyList<Payment>> ListByUserAsync(Guid userId, int limit, CancellationToken ct);
 
     /// <summary>
+    /// Ids no Mercado Pago das compras pendentes criadas entre <paramref name="createdAfter"/> e
+    /// <paramref name="createdBefore"/> que não têm consulta (<c>process_payment</c>) na fila.
+    /// </summary>
+    Task<IReadOnlyList<string>> ListPendingToRecheckAsync(
+        DateTimeOffset createdAfter, DateTimeOffset createdBefore, int limit, CancellationToken ct);
+
+    /// <summary>
     /// Grava o que o Mercado Pago devolveu na criação (o id e, no Pix, o QR code). Só vale enquanto o pagamento não
     /// tem id ou tem este mesmo: duas requisições com a mesma chave chegam ao mesmo pagamento lá.
     /// </summary>

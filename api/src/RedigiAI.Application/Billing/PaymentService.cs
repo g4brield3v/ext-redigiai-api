@@ -18,6 +18,13 @@ public interface IPaymentService
     Task<PaymentDto> GetAsync(string clerkUserId, Guid paymentId, CancellationToken ct);
 
     Task<PaymentListDto> ListAsync(string clerkUserId, CancellationToken ct);
+
+    /// <summary>
+    /// Reconciliação: volta a consultar no Mercado Pago as compras pendentes há mais de 2 minutos (até 3 dias), para
+    /// que um aviso perdido ou um job morto não deixe um Pix pago sem as correções.
+    /// </summary>
+    /// <returns>Quantas consultas entraram na fila agora.</returns>
+    Task<int> RecheckPendingAsync(CancellationToken ct);
 }
 
 internal sealed class PaymentService(
@@ -32,6 +39,9 @@ internal sealed class PaymentService(
     private const int AdultAge = 18;
     private const int ListLimit = 50;
     private const int MaxCardFieldLength = 100;
+    private const int RechecksPerSweep = 200;
+    private static readonly TimeSpan RecheckAfter = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan RecheckFor = TimeSpan.FromDays(3);
 
     public async Task<PaymentDto> CheckoutSingleAsync(CheckoutSingleCommand command, CancellationToken ct)
     {
@@ -109,6 +119,19 @@ internal sealed class PaymentService(
     {
         var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
         return new PaymentListDto([.. (await payments.ListByUserAsync(user.Id, ListLimit, ct)).Select(ToDto)]);
+    }
+
+    public async Task<int> RecheckPendingAsync(CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var pending = await payments.ListPendingToRecheckAsync(now - RecheckFor, now - RecheckAfter, RechecksPerSweep, ct);
+        foreach (var mpPaymentId in pending)
+        {
+            jobs.Enqueue(JobTypes.ProcessPayment, new ProcessPaymentPayload(mpPaymentId, EventId: null), ProcessPaymentHandler.Attempts);
+        }
+
+        await unitOfWork.SaveChangesAsync(ct);
+        return pending.Count;
     }
 
     /// <summary>A mesma chave de novo: devolve a compra; se ela não chegou ao Mercado Pago, tenta de novo lá.</summary>

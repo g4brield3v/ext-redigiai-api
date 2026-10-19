@@ -156,10 +156,10 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | Tabela | Campos principais | Regras |
 |---|---|---|
 | `credit_ledger` | id, user_id, source (`trial`, `plan_week`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
-| `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: a semana de uma assinatura (`plan_week:{assinatura}:{segunda-feira}`). |
+| `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key, revoked_at | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: a semana de uma assinatura (`plan_week:{assinatura}:{segunda-feira}`) ou uma compra (`payment:{compra}`). `revoked_at`: a compra foi estornada ou contestada; o saldo saiu e nenhuma correção volta para o bucket, nem a que estava reservada para uma redação em andamento. |
 | `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano semanal no Mercado Pago. Recebe as correções da semana a assinatura ativa criada antes daquela segunda-feira; a semana em que ela começa tem a concessão imediata. |
 | `payments` | id, user_id, mp_payment_id (único quando preenchido), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, quantity, status (`pending`, `approved`, `rejected`, `cancelled`, `refunded`, `charged_back`), idempotency_key (única por aluno), guardian_authorized_at, pix_qr_code, pix_qr_code_base64, pix_expires_at, created_at, updated_at, approved_at | Idempotência pelo id do Mercado Pago e pela `Idempotency-Key` do aluno. A compra é gravada antes da chamada ao Mercado Pago e recebe o id de lá depois; o id da compra vai como `external_reference` e como `X-Idempotency-Key`. Status muda por `UPDATE` condicional: pendente → aprovado, recusado, cancelado (Pix vencido), estornado ou contestado; aprovado → estornado ou contestado. |
-| `webhook_events` | id, provider, external_id (único por provedor), topic, resource_id, payload, received_at, processed_at | Guarda todo webhook antes de processar. `external_id` é o id da notificação (ou o `x-request-id`), então a reentrega não duplica. |
+| `webhook_events` | id, provider, external_id (único por provedor), topic, resource_id, payload, received_at, processed_at | Guarda todo webhook antes de processar. `external_id` é o `x-request-id`, que entra na assinatura, então a reentrega não duplica. O `payload` guarda só os campos conhecidos (id, tipo, ação, `data.id`). A assinatura vale até 10 minutos do `ts`. |
 
 **Infraestrutura**
 
@@ -255,6 +255,7 @@ A fila é a tabela `jobs` no PostgreSQL: gravar a mudança de status e o job na 
 | A cada 15 min | Redações em `awaiting_review`: com 12 h sem preencher e sem lembrete → e-mail de lembrete; com `review_deadline_at` vencido → `cancelled`, devolve crédito, e-mail. |
 | Segunda-feira, 00h | Concede 3 créditos a cada assinatura ativa, com vencimento no próximo dia 1º às 00h. |
 | Dia 1º, 00h | Vence os créditos do plano não usados (lançamento negativo no ledger). |
+| A cada 5 min | Compras pendentes há mais de 2 minutos (até 3 dias) sem consulta na fila → job `process_payment`: um aviso perdido não deixa um Pix pago sem as correções. |
 | Diariamente, 03h | Inatividade: contas sem assinatura ativa com `last_active_at` há 3 meses menos 7 dias → aviso; há 3 meses e já avisadas → job `delete_user`. |
 | Diariamente, 04h | Apaga do Cloudinary as fotos com `purge_after` vencido. |
 

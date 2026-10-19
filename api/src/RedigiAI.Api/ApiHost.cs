@@ -71,6 +71,7 @@ internal static class ApiHost
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();
             services.AddHostedService<CreditCalendarSweeper>();
+            services.AddHostedService<PaymentReconciliationSweeper>();
         }
         AddControllers(services);
         AddOpenApiDocument(services);

@@ -68,18 +68,19 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
     public Task<CreditBucket?> FindByGrantKeyAsync(string grantKey, CancellationToken ct) =>
         db.CreditBuckets.AsNoTracking().FirstOrDefaultAsync(b => b.GrantKey == grantKey, ct);
 
-    public async Task<int> TryRevokeRemainingAsync(Guid bucketId, CancellationToken ct)
+    public async Task<int> RevokeAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct)
     {
-        // Mesma trava do vencimento: o saldo zerado e o lançamento negativo valem juntos, sem disputar com um débito.
+        // Mesma trava do vencimento: o saldo zerado, a marca e o lançamento negativo valem juntos, sem disputar com um
+        // débito ou uma devolução.
         var revoked = await db.Database
             .SqlQuery<int>(
                 $"""
                 WITH current AS (
                     SELECT id, remaining FROM credit_buckets
-                    WHERE id = {bucketId} AND remaining > 0
+                    WHERE id = {bucketId} AND revoked_at IS NULL
                     FOR UPDATE
                 )
-                UPDATE credit_buckets SET remaining = 0
+                UPDATE credit_buckets SET remaining = 0, revoked_at = {now}
                 FROM current
                 WHERE credit_buckets.id = current.id
                 RETURNING current.remaining AS "Value"
@@ -135,7 +136,8 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
     public async Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
-            .Where(b => b.Id == bucketId && b.Remaining < b.Granted && (b.ExpiresAt == null || b.ExpiresAt > now))
+            .Where(b => b.Id == bucketId && b.Remaining < b.Granted && b.RevokedAt == null
+                && (b.ExpiresAt == null || b.ExpiresAt > now))
             .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, x => x.Remaining + 1), ct) == 1;
 
     public async Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(

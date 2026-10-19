@@ -13,7 +13,7 @@ using RedigiAI.Infrastructure.Persistence;
 namespace RedigiAI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261019024540_Payments")]
+    [Migration("20261019030708_Payments")]
     partial class Payments
     {
         /// <inheritdoc />
@@ -241,6 +241,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.Property<int>("Remaining")
                         .HasColumnType("integer")
                         .HasColumnName("remaining");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
 
                     b.Property<string>("Source")
                         .IsRequired()

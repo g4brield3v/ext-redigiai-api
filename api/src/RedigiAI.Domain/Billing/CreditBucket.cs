@@ -27,6 +27,12 @@ public sealed class CreditBucket
     public string? GrantKey { get; private set; }
 
     /// <summary>
+    /// Quando a compra deste bucket foi estornada ou contestada: o saldo saiu e nenhuma correção volta para ele, nem a
+    /// que estava reservada para uma redação em andamento.
+    /// </summary>
+    public DateTimeOffset? RevokedAt { get; private set; }
+
+    /// <summary>
     /// Ordem de consumo (regra 15): primeiro o plano, que vence antes, depois o teste grátis e por fim os avulsos.
     /// </summary>
     public static IReadOnlyList<CreditBucket> InConsumptionOrder(IEnumerable<CreditBucket> buckets) =>

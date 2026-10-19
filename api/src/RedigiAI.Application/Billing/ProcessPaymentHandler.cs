@@ -71,18 +71,30 @@ internal sealed class ProcessPaymentHandler(
     private async Task ApplyAsync(Payment payment, ProviderPayment remote, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        if (payment.MpPaymentId is null)
+        // A criação aceita lá sem a resposta chegar aqui é vinculada agora. Se a compra já está ligada a outro
+        // pagamento lá, este não vale para ela.
+        if (payment.MpPaymentId != remote.ProviderId
+            && (payment.MpPaymentId is not null
+                || !await payments.TryAttachProviderAsync(payment.Id, remote.ProviderId, null, null, null, now, ct)))
         {
-            // A criação foi aceita lá, mas a resposta não chegou aqui.
-            await payments.TryAttachProviderAsync(payment.Id, remote.ProviderId, null, null, null, now, ct);
+            audit.Record("system", "payment.provider_mismatch", "payment", payment.Id, new { mpPaymentId = remote.ProviderId });
+            return;
         }
-        else if (payment.MpPaymentId != remote.ProviderId)
+
+        if (remote.Status == payment.Status)
         {
             return;
         }
 
-        if (remote.Status == payment.Status || !await payments.TryTransitionAsync(payment.Id, remote.Status, now, ct))
+        if (!await payments.TryTransitionAsync(payment.Id, remote.Status, now, ct))
         {
+            if (remote.Status == PaymentStatus.Approved && payment.Status is PaymentStatus.Cancelled or PaymentStatus.Rejected)
+            {
+                // Pago lá depois de cancelado ou recusado aqui: o dinheiro entrou sem correções. Para conferência manual.
+                audit.Record(
+                    "system", "payment.approved_after_end", "payment", payment.Id, new { mpPaymentId = remote.ProviderId, from = Name(payment.Status) });
+            }
+
             return;
         }
 
@@ -101,7 +113,7 @@ internal sealed class ProcessPaymentHandler(
                 var removed = 0;
                 if (await credits.FindByGrantKeyAsync(CreditBucket.PaymentGrantKey(payment.Id), ct) is { } granted)
                 {
-                    removed = await credits.TryRevokeRemainingAsync(granted.Id, ct);
+                    removed = await credits.RevokeAsync(granted.Id, now, ct);
                     if (removed > 0)
                     {
                         credits.AddEntry(CreditLedgerEntry.ForPaymentReversal(granted, removed, payment.Id, now));

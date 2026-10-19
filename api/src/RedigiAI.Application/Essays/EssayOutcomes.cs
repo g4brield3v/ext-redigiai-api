@@ -59,6 +59,13 @@ internal sealed class EssayOutcomes(
         {
             credits.AddEntry(CreditLedgerEntry.ForRefund(bucket, essayId, now));
         }
+        else if (bucket.ExpiresAt is null || bucket.ExpiresAt > now)
+        {
+            // Bucket que não venceu e não aceitou a devolução: a compra dele foi estornada ou contestada. A correção
+            // reservada já saiu com o dinheiro devolvido e não volta, nem como avulsa.
+            audit.Record("system", "credit.refund_skipped", "essay", essayId, new { bucketId = bucket.Id, reason = "revoked" });
+            return;
+        }
         else
         {
             // O bucket já venceu (plano depois do dia 1º): a correção volta como avulsa, sem vencimento.
