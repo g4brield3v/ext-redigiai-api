@@ -78,6 +78,9 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return removed.Count == 1 ? removed[0] : 0;
     }
 
+    public Task LockUserAsync(Guid userId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM users WHERE id = {userId} FOR UPDATE", ct);
+
     public async Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
             .AsNoTracking()
@@ -178,16 +181,4 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
         return refunded.ToHashSet();
     }
-}
-
-internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRepository
-{
-    public void Add(Subscription subscription) => db.Subscriptions.Add(subscription);
-
-    public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
-        db.Subscriptions
-            .AsNoTracking()
-            .Where(s => s.UserId == userId)
-            .OrderByDescending(s => s.CreatedAt)
-            .FirstOrDefaultAsync(ct);
 }

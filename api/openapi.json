@@ -2199,6 +2199,167 @@
         ]
       }
     },
+    "/v1/checkout/plan": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Assina o plano mensal (R$ 39,90 no cartão, 12 correções por cobrança): devolve o checkout do Mercado Pago, onde o\r\naluno autoriza o cartão. Exige `Idempotency-Key`; repetir a chave devolve o mesmo checkout. A assinatura\r\naparece em `GET /v1/me` quando o Mercado Pago confirma.",
+        "operationId": "checkoutPlan",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutPlanRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutPlanRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCheckoutDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/subscription/cancel": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Cancela a renovação do plano mensal. As correções já concedidas valem até o fim do ciclo pago. Sem plano ativo\r\nou pausado, 404.",
+        "operationId": "cancelSubscription",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/v1/payments": {
       "get": {
         "tags": [
@@ -2431,6 +2592,20 @@
             "type": [
               "null",
               "string"
+            ]
+          }
+        }
+      },
+      "CheckoutPlanRequest": {
+        "required": [
+          "guardianAuthorized"
+        ],
+        "type": "object",
+        "properties": {
+          "guardianAuthorized": {
+            "type": [
+              "null",
+              "boolean"
             ]
           }
         }
@@ -3655,6 +3830,22 @@
           }
         }
       },
+      "PlanCheckoutDto": {
+        "required": [
+          "subscriptionId",
+          "checkoutUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkoutUrl": {
+            "type": "string"
+          }
+        }
+      },
       "ProfileDto": {
         "required": [
           "id",
@@ -4717,6 +4908,7 @@
       },
       "SubscriptionStatus": {
         "enum": [
+          "pending",
           "active",
           "paused",
           "cancelled"

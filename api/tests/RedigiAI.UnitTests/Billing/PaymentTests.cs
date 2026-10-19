@@ -28,7 +28,7 @@ public class PaymentTests
     }
 
     [Theory]
-    [InlineData(PaymentStatus.Approved, new[] { PaymentStatus.Pending })]
+    [InlineData(PaymentStatus.Approved, new[] { PaymentStatus.Pending, PaymentStatus.Rejected })]
     [InlineData(PaymentStatus.Rejected, new[] { PaymentStatus.Pending })]
     [InlineData(PaymentStatus.Cancelled, new[] { PaymentStatus.Pending })]
     [InlineData(PaymentStatus.Refunded, new[] { PaymentStatus.Approved, PaymentStatus.Pending })]
@@ -69,7 +69,7 @@ public class PaymentTests
     [Fact]
     public void A_plan_charge_is_39_90_for_12_corrections_worth_3_33_each()
     {
-        var payment = Payment.StartPlan(Guid.NewGuid(), "key", null, Now);
+        var payment = Payment.StartPlanCharge(Subscription.Request(Guid.NewGuid(), "key", null, Now), "123", Now);
 
         Assert.Equal(3990, payment.AmountCents);
         Assert.Equal(12, payment.Quantity);
@@ -80,7 +80,7 @@ public class PaymentTests
     [Fact]
     public void The_plan_cycle_grants_12_corrections_until_the_next_charge()
     {
-        var payment = Payment.StartPlan(Guid.NewGuid(), "key", null, Now);
+        var payment = Payment.StartPlanCharge(Subscription.Request(Guid.NewGuid(), "key", null, Now), "123", Now);
 
         var bucket = CreditBucket.GrantPlanCycle(payment, Now.AddMonths(1), Now);
 

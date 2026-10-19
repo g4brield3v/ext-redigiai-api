@@ -20,8 +20,8 @@ public interface IPaymentService
     Task<PaymentListDto> ListAsync(string clerkUserId, CancellationToken ct);
 
     /// <summary>
-    /// Reconciliação: volta a consultar no Mercado Pago as compras pendentes há mais de 2 minutos (até 3 dias), para
-    /// que um aviso perdido ou um job morto não deixe um Pix pago sem as correções.
+    /// Reconciliação: volta a consultar no Mercado Pago as compras e as assinaturas pendentes há mais de 2 minutos (até
+    /// 3 dias), para que um aviso perdido ou um job morto não deixe um Pix pago sem as correções.
     /// </summary>
     /// <returns>Quantas consultas entraram na fila agora.</returns>
     Task<int> RecheckPendingAsync(CancellationToken ct);
@@ -30,6 +30,7 @@ public interface IPaymentService
 internal sealed class PaymentService(
     IUserRepository users,
     IPaymentRepository payments,
+    ISubscriptionRepository subscriptions,
     IPaymentGateway gateway,
     IJobQueue jobs,
     IAuditLog audit,
@@ -130,8 +131,18 @@ internal sealed class PaymentService(
             jobs.Enqueue(JobTypes.ProcessPayment, new ProcessPaymentPayload(mpPaymentId, EventId: null), ProcessPaymentHandler.Attempts);
         }
 
+        // Assinaturas criadas lá e ainda pendentes aqui: o aviso de autorização pode ter se perdido.
+        var pendingSubscriptions = await subscriptions.ListPendingToRecheckAsync(now - RecheckFor, now - RecheckAfter, RechecksPerSweep, ct);
+        foreach (var mpPreapprovalId in pendingSubscriptions)
+        {
+            jobs.Enqueue(
+                JobTypes.ProcessSubscription,
+                new ProcessSubscriptionPayload(SubscriptionNotice.Subscription, mpPreapprovalId, EventId: null),
+                ProcessSubscriptionHandler.Attempts);
+        }
+
         await unitOfWork.SaveChangesAsync(ct);
-        return pending.Count;
+        return pending.Count + pendingSubscriptions.Count;
     }
 
     /// <summary>A mesma chave de novo: devolve a compra; se ela não chegou ao Mercado Pago, tenta de novo lá.</summary>

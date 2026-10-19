@@ -16,8 +16,9 @@ public static class EmailTemplates
     public const string PhotoUnreadable = "photo_unreadable";
     public const string EssayFailed = "essay_failed";
     public const string PaymentApproved = "payment_approved";
+    public const string SubscriptionPaymentFailed = "subscription_payment_failed";
 
-    public static bool IsPayment(string template) => template == PaymentApproved;
+    public static bool IsPayment(string template) => template is PaymentApproved or SubscriptionPaymentFailed;
 
     /// <summary>O aviso de uma redação que falhou ou foi cancelada, pelo código gravado nela.</summary>
     public static string? ForFailure(string? failureCode) => failureCode switch

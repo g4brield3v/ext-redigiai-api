@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RedigiAI.Api.Auth;
 using RedigiAI.Api.Http;
+using RedigiAI.Application.Accounts;
 using RedigiAI.Application.Billing;
 
 namespace RedigiAI.Api.Controllers;
@@ -13,7 +14,7 @@ namespace RedigiAI.Api.Controllers;
 [Tags("Payments")]
 [Produces("application/json")]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
-public sealed class PaymentsController(IPaymentService payments) : ControllerBase
+public sealed class PaymentsController(IPaymentService payments, ISubscriptionService subscriptions) : ControllerBase
 {
     /// <summary>
     /// Compra correções avulsas (R$ 16 cada, de 1 a 10) por Pix ou cartão. Exige <c>Idempotency-Key</c>; repetir a
@@ -42,6 +43,35 @@ public sealed class PaymentsController(IPaymentService payments) : ControllerBas
             ct);
         return CreatedAtRoute("getPayment", new { id = payment.Id }, payment);
     }
+
+    /// <summary>
+    /// Assina o plano mensal (R$ 39,90 no cartão, 12 correções por cobrança): devolve o checkout do Mercado Pago, onde o
+    /// aluno autoriza o cartão. Exige <c>Idempotency-Key</c>; repetir a chave devolve o mesmo checkout. A assinatura
+    /// aparece em <c>GET /v1/me</c> quando o Mercado Pago confirma.
+    /// </summary>
+    [HttpPost("checkout/plan", Name = "checkoutPlan")]
+    [ProducesResponseType<PlanCheckoutDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> CheckoutPlan(
+        [FromBody] CheckoutPlanRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct) =>
+        Ok(await subscriptions.CheckoutPlanAsync(
+            new CheckoutPlanCommand(User.GetClerkIdentity().UserId, idempotencyKey, request.GuardianAuthorized == true), ct));
+
+    /// <summary>
+    /// Cancela a renovação do plano mensal. As correções já concedidas valem até o fim do ciclo pago. Sem plano ativo
+    /// ou pausado, 404.
+    /// </summary>
+    [HttpPost("subscription/cancel", Name = "cancelSubscription")]
+    [ProducesResponseType<SubscriptionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> CancelSubscription(CancellationToken ct) =>
+        Ok(await subscriptions.CancelAsync(User.GetClerkIdentity().UserId, ct));
 
     /// <summary>As compras do aluno, da mais recente para a mais antiga.</summary>
     [HttpGet("payments", Name = "listPayments")]

@@ -367,6 +367,70 @@ public sealed class FakePaymentGateway : IPaymentGateway
 {
     private readonly ConcurrentDictionary<Guid, string> _byPayment = new();
     private readonly ConcurrentDictionary<string, ProviderPayment> _remote = new();
+    private readonly ConcurrentDictionary<Guid, string> _bySubscription = new();
+    private readonly ConcurrentDictionary<string, ProviderSubscription> _subscriptions = new();
+    private readonly ConcurrentDictionary<string, ProviderSubscriptionCharge> _charges = new();
+    private int _subscriptionCreates;
+
+    /// <summary>Quantas vezes a criação de assinatura chegou "lá".</summary>
+    public int SubscriptionCreates => _subscriptionCreates;
+
+    public string? PreapprovalIdOf(Guid subscriptionId) => _bySubscription.TryGetValue(subscriptionId, out var id) ? id : null;
+
+    public ProviderSubscription SubscriptionThere(string preapprovalId) => _subscriptions[preapprovalId];
+
+    /// <summary>Muda a assinatura "lá", como o aluno autorizando o cartão ou o Mercado Pago pausando.</summary>
+    public void SetSubscription(string preapprovalId, SubscriptionStatus status, DateTimeOffset? nextChargeAt = null, string? cardLast4 = null)
+    {
+        var current = _subscriptions[preapprovalId];
+        _subscriptions[preapprovalId] = current with
+        {
+            Status = status,
+            NextChargeAt = nextChargeAt ?? current.NextChargeAt,
+            CardLast4 = cardLast4 ?? current.CardLast4,
+        };
+    }
+
+    /// <summary>Uma cobrança mensal da assinatura "lá", com o pagamento dela na situação dada.</summary>
+    /// <returns>O id da cobrança (para o aviso) e o do pagamento.</returns>
+    public (string ChargeId, string PaymentId) Charge(string preapprovalId, PaymentStatus status, long amountCents = 3990)
+    {
+        var paymentId = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var chargeId = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _remote[paymentId] = new ProviderPayment(paymentId, status, _subscriptions[preapprovalId].ExternalReference, amountCents, "BRL");
+        _charges[chargeId] = new ProviderSubscriptionCharge(chargeId, preapprovalId, paymentId);
+        return (chargeId, paymentId);
+    }
+
+    public Task<CreatedSubscription> CreateSubscriptionAsync(SubscriptionRequest request, CancellationToken ct)
+    {
+        if (Failures.TryDequeue(out var failure))
+        {
+            throw failure;
+        }
+
+        var id = _bySubscription.GetOrAdd(request.SubscriptionId, _ =>
+        {
+            Interlocked.Increment(ref _subscriptionCreates);
+            var preapprovalId = $"pre{Guid.NewGuid():N}";
+            _subscriptions[preapprovalId] = new ProviderSubscription(
+                preapprovalId, SubscriptionStatus.Pending, request.SubscriptionId.ToString(), null, null);
+            return preapprovalId;
+        });
+        return Task.FromResult(new CreatedSubscription(id, $"https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id={id}"));
+    }
+
+    public Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct) =>
+        Task.FromResult(_subscriptions.TryGetValue(providerId, out var subscription) ? subscription : null);
+
+    public Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct) =>
+        Task.FromResult(_charges.TryGetValue(providerId, out var charge) ? charge : null);
+
+    public Task CancelSubscriptionAsync(string providerId, CancellationToken ct)
+    {
+        SetSubscription(providerId, SubscriptionStatus.Cancelled);
+        return Task.CompletedTask;
+    }
     private int _creates;
 
     /// <summary>Quantas vezes a criação chegou "lá".</summary>

@@ -2,6 +2,8 @@ namespace RedigiAI.Domain.Billing;
 
 public enum SubscriptionStatus
 {
+    /// <summary>Criada aqui e no Mercado Pago, esperando o aluno autorizar o cartão lá.</summary>
+    Pending,
     Active,
     Paused,
     Cancelled,
@@ -9,51 +11,72 @@ public enum SubscriptionStatus
 
 /// <summary>
 /// Plano mensal, cobrado no cartão pelo Mercado Pago (preapproval). Especificação, seção 9: cada cobrança aprovada dá
-/// 12 correções, que vencem na cobrança seguinte.
+/// 12 correções, que valem até a cobrança seguinte. A situação só muda pelo que o Mercado Pago informa (ou pelo
+/// cancelamento pedido pelo aluno), com <c>UPDATE</c> condicional no repositório (regra 10).
 /// </summary>
 public sealed class Subscription
 {
     /// <summary>Correções de cada cobrança aprovada. Não acumulam: a renovação zera as que sobraram.</summary>
     public const int CreditsPerCycle = 12;
 
-    private const int MaxPreapprovalIdLength = 100;
+    public const int MaxKeyLength = 100;
 
     private Subscription() { }
 
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
-    public string MpPreapprovalId { get; private set; } = null!;
+
+    /// <summary>O id da assinatura no Mercado Pago; nulo até a criação lá responder.</summary>
+    public string? MpPreapprovalId { get; private set; }
     public SubscriptionStatus Status { get; private set; }
+
+    /// <summary>A <c>Idempotency-Key</c> do pedido: repetir a chave devolve esta assinatura.</summary>
+    public string IdempotencyKey { get; private set; } = null!;
+
+    /// <summary>O endereço do checkout do Mercado Pago, onde o aluno autoriza o cartão.</summary>
+    public string? CheckoutUrl { get; private set; }
+
+    /// <summary>Quando o assinante de 16 ou 17 anos declarou a autorização do responsável.</summary>
+    public DateTimeOffset? GuardianAuthorizedAt { get; private set; }
     public DateTimeOffset? NextBillingAt { get; private set; }
     public string? CardLast4 { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public DateTimeOffset? CancelledAt { get; private set; }
 
-    /// <summary>Assinatura autorizada no Mercado Pago: começa ativa.</summary>
-    public static Subscription Start(
-        Guid userId, string mpPreapprovalId, DateTimeOffset? nextBillingAt, string? cardLast4, DateTimeOffset now)
+    /// <summary>O pedido de assinatura: começa pendente, antes de chamar o Mercado Pago.</summary>
+    public static Subscription Request(Guid userId, string idempotencyKey, DateTimeOffset? guardianAuthorizedAt, DateTimeOffset now)
     {
-        if (string.IsNullOrWhiteSpace(mpPreapprovalId) || mpPreapprovalId.Length > MaxPreapprovalIdLength)
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > MaxKeyLength)
         {
-            throw new ArgumentException("Invalid preapproval id.", nameof(mpPreapprovalId));
-        }
-
-        if (cardLast4 is not null && (cardLast4.Length != 4 || !cardLast4.All(char.IsAsciiDigit)))
-        {
-            throw new ArgumentException("Card last digits must be 4 digits.", nameof(cardLast4));
+            throw new ArgumentException("Invalid idempotency key.", nameof(idempotencyKey));
         }
 
         return new Subscription
         {
             Id = Guid.CreateVersion7(),
             UserId = userId,
-            MpPreapprovalId = mpPreapprovalId,
-            Status = SubscriptionStatus.Active,
-            NextBillingAt = nextBillingAt,
-            CardLast4 = cardLast4,
+            Status = SubscriptionStatus.Pending,
+            IdempotencyKey = idempotencyKey,
+            GuardianAuthorizedAt = guardianAuthorizedAt,
             CreatedAt = now,
             UpdatedAt = now,
         };
     }
 
+    /// <summary>
+    /// As situações de onde se pode chegar a <paramref name="to"/>. Pendente vira ativa (cartão autorizado); ativa e
+    /// pausada se alternam (cobrança recusada, cobrança regularizada); qualquer uma, menos cancelada, vira cancelada.
+    /// </summary>
+    public static IReadOnlyList<SubscriptionStatus> ReachableFrom(SubscriptionStatus to) => to switch
+    {
+        SubscriptionStatus.Active => [SubscriptionStatus.Pending, SubscriptionStatus.Paused],
+        SubscriptionStatus.Paused => [SubscriptionStatus.Active],
+        SubscriptionStatus.Cancelled => [SubscriptionStatus.Pending, SubscriptionStatus.Active, SubscriptionStatus.Paused],
+        _ => [],
+    };
+
+    /// <summary>Os 4 últimos dígitos do cartão, se o Mercado Pago informou algo nesse formato.</summary>
+    public static string? CardLast4From(string? digits) =>
+        digits is { Length: 4 } && digits.All(char.IsAsciiDigit) ? digits : null;
 }

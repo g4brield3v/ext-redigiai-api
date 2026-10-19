@@ -55,13 +55,32 @@ internal sealed class PaymentWebhookService(
         await unitOfWork.InTransactionAsync(
             async () =>
             {
-                if (await events.TryAddAsync(webhookEvent, ct) && topic == PaymentTopic)
+                if (!await events.TryAddAsync(webhookEvent, ct))
                 {
-                    jobs.Enqueue(
-                        JobTypes.ProcessPayment, new ProcessPaymentPayload(resourceId!, webhookEvent.Id), ProcessPaymentHandler.Attempts);
+                    return true;
                 }
 
-                // As notificações de assinatura ficam gravadas para a etapa do plano mensal.
+                switch (topic)
+                {
+                    case PaymentTopic:
+                        jobs.Enqueue(
+                            JobTypes.ProcessPayment, new ProcessPaymentPayload(resourceId!, webhookEvent.Id), ProcessPaymentHandler.Attempts);
+                        break;
+                    case "subscription_preapproval" or "preapproval":
+                        jobs.Enqueue(
+                            JobTypes.ProcessSubscription,
+                            new ProcessSubscriptionPayload(SubscriptionNotice.Subscription, resourceId!, webhookEvent.Id),
+                            ProcessSubscriptionHandler.Attempts);
+                        break;
+                    case "subscription_authorized_payment" or "authorized_payment":
+                        jobs.Enqueue(
+                            JobTypes.ProcessSubscription,
+                            new ProcessSubscriptionPayload(SubscriptionNotice.Charge, resourceId!, webhookEvent.Id),
+                            ProcessSubscriptionHandler.Attempts);
+                        break;
+                }
+
+                // Outros tópicos ficam só gravados.
                 return true;
             },
             ct);

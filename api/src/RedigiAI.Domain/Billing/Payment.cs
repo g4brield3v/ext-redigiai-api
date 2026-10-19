@@ -49,6 +49,9 @@ public sealed class Payment
 
     /// <summary>O id do pagamento no Mercado Pago; nulo até a criação lá responder.</summary>
     public string? MpPaymentId { get; private set; }
+
+    /// <summary>Na cobrança do plano, a assinatura que ela renova.</summary>
+    public Guid? SubscriptionId { get; private set; }
     public PaymentKind Kind { get; private set; }
     public PaymentMethod Method { get; private set; }
     public long AmountCents { get; private set; }
@@ -100,25 +103,31 @@ public sealed class Payment
         };
     }
 
-    /// <summary>Uma cobrança do plano mensal: R$ 39,90 no cartão, que vale 12 correções.</summary>
-    public static Payment StartPlan(Guid userId, string idempotencyKey, DateTimeOffset? guardianAuthorizedAt, DateTimeOffset now)
+    /// <summary>
+    /// Uma cobrança do plano mensal, feita pelo Mercado Pago na assinatura: R$ 39,90 no cartão, que vale 12 correções.
+    /// Nasce pendente, já com o id do pagamento de lá; a aprovação vem da consulta, como em toda compra.
+    /// </summary>
+    public static Payment StartPlanCharge(Subscription subscription, string mpPaymentId, DateTimeOffset now)
     {
-        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > MaxKeyLength)
+        if (string.IsNullOrWhiteSpace(mpPaymentId) || mpPaymentId.Length > 64)
         {
-            throw new ArgumentException("Invalid idempotency key.", nameof(idempotencyKey));
+            throw new ArgumentException("Invalid payment id.", nameof(mpPaymentId));
         }
 
         return new Payment
         {
             Id = Guid.CreateVersion7(),
-            UserId = userId,
+            UserId = subscription.UserId,
+            MpPaymentId = mpPaymentId,
+            SubscriptionId = subscription.Id,
             Kind = PaymentKind.Plan,
             Method = PaymentMethod.Card,
             AmountCents = PlanPriceCents,
             Quantity = Subscription.CreditsPerCycle,
             Status = PaymentStatus.Pending,
-            IdempotencyKey = idempotencyKey,
-            GuardianAuthorizedAt = guardianAuthorizedAt,
+            // Uma compra por cobrança de lá, mesmo com o aviso chegando duas vezes.
+            IdempotencyKey = $"charge:{mpPaymentId}",
+            GuardianAuthorizedAt = subscription.GuardianAuthorizedAt,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -137,7 +146,9 @@ public sealed class Payment
     /// </summary>
     public static IReadOnlyList<PaymentStatus> ReachableFrom(PaymentStatus to) => to switch
     {
-        PaymentStatus.Approved or PaymentStatus.Rejected or PaymentStatus.Cancelled => [PaymentStatus.Pending],
+        // Recusado ainda pode virar aprovado: a nova tentativa de cobrança do plano pode reaproveitar o pagamento lá.
+        PaymentStatus.Approved => [PaymentStatus.Pending, PaymentStatus.Rejected],
+        PaymentStatus.Rejected or PaymentStatus.Cancelled => [PaymentStatus.Pending],
         PaymentStatus.Refunded or PaymentStatus.ChargedBack => [PaymentStatus.Approved, PaymentStatus.Pending],
         _ => [],
     };

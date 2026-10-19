@@ -65,10 +65,13 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
             table.HasCheckConstraint("ck_subscriptions_card_last4", "card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'");
         });
         builder.Property(s => s.MpPreapprovalId).HasMaxLength(100);
+        builder.Property(s => s.IdempotencyKey).HasMaxLength(Subscription.MaxKeyLength);
+        builder.Property(s => s.CheckoutUrl).HasMaxLength(1000);
         builder.Property(s => s.Status).HasMaxLength(20);
         builder.Property(s => s.CardLast4).HasMaxLength(4);
         builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(s => s.MpPreapprovalId).IsUnique();
+        builder.HasIndex(s => s.MpPreapprovalId).IsUnique().HasFilter("mp_preapproval_id IS NOT NULL");
+        builder.HasIndex(s => new { s.UserId, s.IdempotencyKey }).IsUnique();
         builder.HasIndex(s => s.UserId);
         builder.HasIndex(s => s.Status);
 
@@ -143,6 +146,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(p => p.PixQrCode).HasMaxLength(1000);
         builder.Property(p => p.PixQrCodeBase64).HasMaxLength(20000);
         builder.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Subscription>().WithMany().HasForeignKey(p => p.SubscriptionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(p => p.MpPaymentId).IsUnique().HasFilter("mp_payment_id IS NOT NULL");
         builder.HasIndex(p => new { p.UserId, p.IdempotencyKey }).IsUnique();
         builder.HasIndex(p => new { p.UserId, p.CreatedAt });

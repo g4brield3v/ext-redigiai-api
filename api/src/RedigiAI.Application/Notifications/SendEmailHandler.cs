@@ -22,6 +22,8 @@ internal sealed class SendEmailHandler(
     ITranscriptionRepository transcriptions,
     IPromptRepository prompts,
     IPaymentRepository payments,
+    ISubscriptionRepository subscriptions,
+    ICreditRepository credits,
     IEmailLogRepository emailLog,
     IEmailSender sender,
     EmailComposer composer,
@@ -65,17 +67,43 @@ internal sealed class SendEmailHandler(
         await SendOnceAsync(user.Id, job.Template, essay.Id, composer.Compose(job.Template, await FactsAsync(essay, user, ct)), ct);
     }
 
-    /// <summary>O aviso de pagamento só sai se a compra continua aprovada e a conta existe.</summary>
+    /// <summary>
+    /// O aviso de pagamento só sai se a compra continua na situação do aviso (aprovada, ou recusada na cobrança do
+    /// plano) e a conta existe.
+    /// </summary>
     private async Task HandlePaymentAsync(EmailJobPayload job, CancellationToken ct)
     {
-        if (await payments.FindAsync(job.RefId, ct) is not { Status: PaymentStatus.Approved, ApprovedAt: { } approvedAt } payment
+        var expected = job.Template == EmailTemplates.PaymentApproved ? PaymentStatus.Approved : PaymentStatus.Rejected;
+        if (await payments.FindAsync(job.RefId, ct) is not { } payment
+            || payment.Status != expected
             || await users.FindActiveByIdAsync(payment.UserId, ct) is not { } user)
         {
             return;
         }
 
+        var now = time.GetUtcNow();
+        DateTimeOffset? creditsUntil = null;
+        string? cardLast4 = null;
+        if (payment.Kind == PaymentKind.Plan)
+        {
+            // Até quando valem as correções do plano que o aluno tem agora.
+            creditsUntil = (await credits.ListOpenPlanBucketsAsync(user.Id, now, ct)).Max(b => b.ExpiresAt);
+            if (payment.SubscriptionId is { } subscriptionId)
+            {
+                cardLast4 = (await subscriptions.FindAsync(subscriptionId, ct))?.CardLast4;
+            }
+        }
+
         var facts = new PaymentEmailFacts(
-            user.Email, user.Name, payment.Id, payment.Quantity, payment.AmountCents, approvedAt + Payment.RefundWindow);
+            user.Email,
+            user.Name,
+            payment.Id,
+            payment.Kind,
+            payment.Quantity,
+            payment.AmountCents,
+            (payment.ApprovedAt ?? now) + Payment.RefundWindow,
+            creditsUntil,
+            cardLast4);
         await SendOnceAsync(user.Id, job.Template, payment.Id, composer.ComposePayment(job.Template, facts), ct);
     }
 
