@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Billing;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Infrastructure.Persistence;
@@ -157,6 +158,68 @@ public class CreditCalendarTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task A_subscription_paused_after_the_list_was_read_does_not_get_the_week()
+    {
+        await using var calendar = Calendar.Create(api);
+        calendar.Clock.Now = Brasilia(2031, 11, 5, 10);
+        var student = await calendar.StudentAsync();
+        var subscription = await calendar.SubscribeAsync(student);
+        var monday = Brasilia(2031, 11, 10);
+        calendar.Clock.Now = monday.AddMinutes(1);
+
+        // A varredura leu a assinatura ainda ativa; a cobrança recusada chega antes da gravação.
+        await calendar.SetStatusAsync(subscription, SubscriptionStatus.Paused);
+        var granted = await calendar.TryGrantWeekAsync(subscription, monday);
+
+        Assert.False(granted);
+        Assert.Empty(await calendar.PlanBucketsAsync(student));
+    }
+
+    [Fact]
+    public async Task A_deleted_account_gets_no_weekly_credits()
+    {
+        await using var calendar = Calendar.Create(api);
+        calendar.Clock.Now = Brasilia(2031, 11, 12, 10);
+        var student = await calendar.StudentAsync();
+        await calendar.SubscribeAsync(student);
+        var deletedAt = Brasilia(2031, 11, 13);
+        await api.QueryAsync(db => db.Users.Where(u => u.Id == student.Id)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.DeletedAt, deletedAt)));
+
+        calendar.Clock.Now = Brasilia(2031, 11, 17, 0, 1);
+        await calendar.GrantWeeklyAsync();
+
+        Assert.Empty(await calendar.PlanBucketsAsync(student));
+    }
+
+    [Fact]
+    public async Task A_student_has_at_most_one_open_subscription()
+    {
+        await using var calendar = Calendar.Create(api);
+        calendar.Clock.Now = Brasilia(2031, 12, 1, 10);
+        var student = await calendar.StudentAsync();
+        await calendar.SubscribeAsync(student);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => calendar.SubscribeAsync(student));
+    }
+
+    [Fact]
+    public async Task A_refund_never_lands_in_a_bucket_that_already_expired()
+    {
+        await using var calendar = Calendar.Create(api);
+        calendar.Clock.Now = Brasilia(2031, 12, 20, 10);
+        var student = await calendar.StudentAsync();
+        var plan = await calendar.GrantAsync(student, CreditSource.PlanWeek, 3, Brasilia(2032, 1, 1));
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.Id == plan)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, 2)));
+
+        // Um processo decide devolver depois do dia 1º 00h: o bucket vencido não recebe nada.
+        Assert.False(await calendar.TryCreditBackAsync(plan, Brasilia(2032, 1, 1, 0, 1)));
+        Assert.True(await calendar.TryCreditBackAsync(plan, Brasilia(2031, 12, 31, 23, 59)));
+        Assert.Equal(3, (await calendar.BucketAsync(plan)).Remaining);
+    }
+
+    [Fact]
     public async Task The_profile_shows_the_subscription_and_the_plan_credits_with_their_expiry()
     {
         await using var calendar = Calendar.Create(api);
@@ -249,6 +312,30 @@ public class CreditCalendarTests(ApiFixture api)
         {
             await using var scope = factory.Services.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<ICreditService>().GrantWeeklyPlanCreditsAsync(CancellationToken.None);
+        }
+
+        public Task<int> SetStatusAsync(Subscription subscription, SubscriptionStatus status) =>
+            api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscription.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, status)));
+
+        /// <summary>A gravação da concessão de uma assinatura, como a varredura faz depois de ler a lista.</summary>
+        public async Task<bool> TryGrantWeekAsync(Subscription subscription, DateTimeOffset weekStart)
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            var credits = scope.ServiceProvider.GetRequiredService<ICreditRepository>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var bucket = CreditBucket.GrantPlanWeek(subscription, weekStart, Clock.GetUtcNow());
+            var entry = CreditLedgerEntry.ForGrant(bucket, Clock.GetUtcNow());
+            return await unitOfWork.InTransactionAsync(
+                () => credits.TryAddWeeklyPlanGrantAsync(bucket, entry, subscription.Id, weekStart, CancellationToken.None),
+                CancellationToken.None);
+        }
+
+        public async Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now)
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            return await scope.ServiceProvider.GetRequiredService<ICreditRepository>()
+                .TryCreditBackAsync(bucketId, now, CancellationToken.None);
         }
 
         public async Task ExpireAsync()

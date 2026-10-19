@@ -382,6 +382,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_subscriptions_user_id");
 
+                    b.HasIndex(new[] { "UserId" }, "ux_subscriptions_open_per_user")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscriptions_open_per_user")
+                        .HasFilter("status IN ('active', 'paused')");
+
                     b.ToTable("subscriptions", null, t =>
                         {
                             t.HasCheckConstraint("ck_subscriptions_card_last4", "card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'");

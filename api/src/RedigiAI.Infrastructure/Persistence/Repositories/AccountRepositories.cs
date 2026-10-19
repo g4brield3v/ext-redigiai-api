@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
+using RedigiAI.Domain.Common;
 
 namespace RedigiAI.Infrastructure.Persistence.Repositories;
 
@@ -35,15 +36,23 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
     public void AddEntry(CreditLedgerEntry entry) => db.CreditLedger.Add(entry);
 
-    public async Task<bool> TryAddKeyedGrantAsync(CreditBucket bucket, CreditLedgerEntry entry, CancellationToken ct)
+    public async Task<bool> TryAddWeeklyPlanGrantAsync(
+        CreditBucket bucket, CreditLedgerEntry entry, Guid subscriptionId, DateTimeOffset weekStart, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(bucket.GrantKey);
         var source = SnakeCaseEnum<CreditSource>.ToName(bucket.Source);
+        var active = SnakeCaseEnum<SubscriptionStatus>.ToName(SubscriptionStatus.Active);
+        // A situação da assinatura é conferida no mesmo comando que grava: uma pausa ou um cancelamento que chegue
+        // depois da leitura da lista não leva as correções.
         var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO credit_buckets (id, user_id, source, granted, remaining, expires_at, created_at, grant_key)
-            VALUES ({bucket.Id}, {bucket.UserId}, {source}, {bucket.Granted}, {bucket.Remaining}, {bucket.ExpiresAt},
-                    {bucket.CreatedAt}, {bucket.GrantKey})
+            SELECT {bucket.Id}, s.user_id, {source}, {bucket.Granted}, {bucket.Remaining}, {bucket.ExpiresAt},
+                   {bucket.CreatedAt}, {bucket.GrantKey}
+            FROM subscriptions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.id = {subscriptionId} AND s.user_id = {bucket.UserId} AND s.status = {active}
+              AND s.created_at < {weekStart} AND u.deleted_at IS NULL
             ON CONFLICT (grant_key) WHERE grant_key IS NOT NULL DO NOTHING
             """,
             ct);
@@ -101,9 +110,9 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return bucketId is null ? null : await db.CreditBuckets.AsNoTracking().FirstOrDefaultAsync(b => b.Id == bucketId, ct);
     }
 
-    public async Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct) =>
+    public async Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
-            .Where(b => b.Id == bucketId && b.Remaining < b.Granted)
+            .Where(b => b.Id == bucketId && b.Remaining < b.Granted && (b.ExpiresAt == null || b.ExpiresAt > now))
             .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, x => x.Remaining + 1), ct) == 1;
 
     public async Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(
@@ -136,13 +145,20 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
 {
     public void Add(Subscription subscription) => db.Subscriptions.Add(subscription);
 
-    public async Task<IReadOnlyList<Subscription>> ListEarningWeeklyCreditsAsync(
-        DateTimeOffset weekStart, CancellationToken ct) =>
-        await db.Subscriptions
+    public async Task<IReadOnlyList<Subscription>> ListAwaitingWeeklyCreditsAsync(
+        DateTimeOffset weekStart, int limit, CancellationToken ct)
+    {
+        // O mesmo formato de Subscription.WeeklyGrantKey: quem já recebeu a semana sai da lista.
+        var week = $":{BrasiliaTime.DateOf(weekStart):yyyy-MM-dd}";
+        return await db.Subscriptions
             .AsNoTracking()
             .Where(s => s.Status == SubscriptionStatus.Active && s.CreatedAt < weekStart)
+            .Where(s => db.Users.Any(u => u.Id == s.UserId && u.DeletedAt == null))
+            .Where(s => !db.CreditBuckets.Any(b => b.GrantKey == "plan_week:" + s.Id.ToString() + week))
             .OrderBy(s => s.CreatedAt)
+            .Take(limit)
             .ToListAsync(ct);
+    }
 
     public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
         db.Subscriptions

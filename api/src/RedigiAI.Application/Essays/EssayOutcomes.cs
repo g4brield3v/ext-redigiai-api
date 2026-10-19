@@ -54,8 +54,8 @@ internal sealed class EssayOutcomes(
         }
 
         var now = time.GetUtcNow();
-        var stillValid = bucket.ExpiresAt is null || bucket.ExpiresAt > now;
-        if (stillValid && await credits.TryCreditBackAsync(bucket.Id, ct))
+        // O banco decide se o bucket ainda vale: a devolução não pode cair num bucket que o dia 1º já zerou.
+        if (await credits.TryCreditBackAsync(bucket.Id, now, ct))
         {
             credits.AddEntry(CreditLedgerEntry.ForRefund(bucket, essayId, now));
         }

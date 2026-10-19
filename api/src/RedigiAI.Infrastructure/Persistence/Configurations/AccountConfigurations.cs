@@ -71,6 +71,12 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
         builder.HasIndex(s => s.MpPreapprovalId).IsUnique();
         builder.HasIndex(s => s.UserId);
         builder.HasIndex(s => s.Status);
+
+        // No máximo uma assinatura aberta por aluno: dois checkouts concluídos não viram duas cobranças.
+        builder.HasIndex(s => s.UserId, "ux_subscriptions_open_per_user")
+            .HasDatabaseName("ux_subscriptions_open_per_user")
+            .IsUnique()
+            .HasFilter("status IN ('active', 'paused')");
     }
 }
 

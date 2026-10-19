@@ -71,6 +71,13 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                 name: "ix_subscriptions_user_id",
                 table: "subscriptions",
                 column: "user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ux_subscriptions_open_per_user",
+                table: "subscriptions",
+                column: "user_id",
+                unique: true,
+                filter: "status IN ('active', 'paused')");
         }
 
         /// <inheritdoc />

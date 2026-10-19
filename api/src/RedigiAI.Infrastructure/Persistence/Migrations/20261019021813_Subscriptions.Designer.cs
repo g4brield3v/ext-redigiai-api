@@ -13,7 +13,7 @@ using RedigiAI.Infrastructure.Persistence;
 namespace RedigiAI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261019013852_Subscriptions")]
+    [Migration("20261019021813_Subscriptions")]
     partial class Subscriptions
     {
         /// <inheritdoc />
@@ -384,6 +384,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_subscriptions_user_id");
+
+                    b.HasIndex(new[] { "UserId" }, "ux_subscriptions_open_per_user")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscriptions_open_per_user")
+                        .HasFilter("status IN ('active', 'paused')");
 
                     b.ToTable("subscriptions", null, t =>
                         {

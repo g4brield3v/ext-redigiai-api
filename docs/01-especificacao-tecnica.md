@@ -155,9 +155,9 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 
 | Tabela | Campos principais | Regras |
 |---|---|---|
-| `credit_ledger` | id, user_id, source (`trial`, `plan_week`, `single`, `refund`), delta (+1/−1), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
+| `credit_ledger` | id, user_id, source (`trial`, `plan_week`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
 | `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: a semana de uma assinatura (`plan_week:{assinatura}:{segunda-feira}`). |
-| `subscriptions` | id, user_id, mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano semanal no Mercado Pago. Recebe as correções da semana a assinatura ativa criada antes daquela segunda-feira; a semana em que ela começa tem a concessão imediata. |
+| `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano semanal no Mercado Pago. Recebe as correções da semana a assinatura ativa criada antes daquela segunda-feira; a semana em que ela começa tem a concessão imediata. |
 | `payments` | id, user_id, mp_payment_id (único), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, status, quantity, created_at | Idempotência pelo id do Mercado Pago. |
 | `webhook_events` | id, provider, external_id (único), payload, processed_at | Guarda todo webhook antes de processar. |
 

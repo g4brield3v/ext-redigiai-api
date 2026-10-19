@@ -15,11 +15,14 @@ public interface ICreditRepository
     void AddEntry(CreditLedgerEntry entry);
 
     /// <summary>
-    /// Concessão com chave única (<see cref="CreditBucket.GrantKey"/>): grava o bucket na hora, dentro da transação
-    /// aberta, e acrescenta o lançamento. Se a chave já existe, não grava nada.
+    /// As correções da semana de uma assinatura: grava o bucket na hora, dentro da transação aberta, e acrescenta o
+    /// lançamento. O próprio banco confere, no mesmo comando, que a assinatura continua ativa, já existia antes da
+    /// segunda-feira e pertence a uma conta não excluída, e que a semana ainda não foi concedida
+    /// (<see cref="CreditBucket.GrantKey"/>). Se algo disso falha, não grava nada.
     /// </summary>
-    /// <returns><c>false</c> se a concessão já tinha sido feita.</returns>
-    Task<bool> TryAddKeyedGrantAsync(CreditBucket bucket, CreditLedgerEntry entry, CancellationToken ct);
+    /// <returns><c>false</c> se não concedeu.</returns>
+    Task<bool> TryAddWeeklyPlanGrantAsync(
+        CreditBucket bucket, CreditLedgerEntry entry, Guid subscriptionId, DateTimeOffset weekStart, CancellationToken ct);
 
     /// <summary>Buckets vencidos até <paramref name="now"/> que ainda têm saldo.</summary>
     Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(DateTimeOffset now, int limit, CancellationToken ct);
@@ -33,8 +36,12 @@ public interface ICreditRepository
     /// <summary>O bucket de onde saiu a correção reservada para a redação; <c>null</c> se não houve reserva.</summary>
     Task<CreditBucket?> FindReservedBucketAsync(Guid essayId, CancellationToken ct);
 
-    /// <summary>Devolve 1 correção ao bucket com <c>UPDATE … WHERE remaining &lt; granted</c>, na transação aberta.</summary>
-    Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct);
+    /// <summary>
+    /// Devolve 1 correção ao bucket com <c>UPDATE … WHERE remaining &lt; granted</c>, na transação aberta, só se ele
+    /// ainda não venceu em <paramref name="now"/>.
+    /// </summary>
+    /// <returns><c>false</c> se o bucket venceu (a correção volta como avulsa) ou já está cheio.</returns>
+    Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
 
     /// <summary>Entre as redações informadas, as que tiveram a correção devolvida ao saldo.</summary>
     Task<IReadOnlySet<Guid>> RefundedAsync(IReadOnlyCollection<Guid> essayIds, CancellationToken ct);

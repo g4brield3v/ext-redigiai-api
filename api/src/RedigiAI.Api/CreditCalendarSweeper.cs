@@ -15,33 +15,38 @@ internal sealed class CreditCalendarSweeper(IServiceScopeFactory scopes, ILogger
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                await using var scope = scopes.CreateAsyncScope();
-                var credits = scope.ServiceProvider.GetRequiredService<ICreditService>();
-                var expired = await credits.ExpirePlanCreditsAsync(stoppingToken);
-                if (expired > 0)
-                {
-                    logger.LogInformation("Expired {Count} plan credit buckets", expired);
-                }
-
-                var granted = await credits.GrantWeeklyPlanCreditsAsync(stoppingToken);
-                if (granted > 0)
-                {
-                    logger.LogInformation("Granted the weekly plan credits to {Count} subscriptions", granted);
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                // Banco fora do ar, por exemplo: a próxima passada tenta de novo.
-                logger.LogError(ex, "Credit calendar sweep failed");
-            }
+            // Vencimento e concessão são independentes: um erro em um não impede o outro.
+            await RunAsync("expiry", credits => credits.ExpirePlanCreditsAsync(stoppingToken), stoppingToken);
+            await RunAsync("weekly grant", credits => credits.GrantWeeklyPlanCreditsAsync(stoppingToken), stoppingToken);
 
             await Task.Delay(Interval, stoppingToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+    }
+
+    private async Task RunAsync(string step, Func<ICreditService, Task<CreditSweepResult>> sweep, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var result = await sweep(scope.ServiceProvider.GetRequiredService<ICreditService>());
+            if (result.Done > 0)
+            {
+                logger.LogInformation("Credit calendar {Step}: {Count} done", step, result.Done);
+            }
+
+            if (result.Failed.Count > 0)
+            {
+                // Só os ids (assinatura ou bucket): nada de dado pessoal no log.
+                logger.LogError("Credit calendar {Step} failed for {Ids}", step, string.Join(", ", result.Failed));
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            // Banco fora do ar, por exemplo: a próxima passada tenta de novo.
+            logger.LogError(ex, "Credit calendar {Step} failed", step);
         }
     }
 }
