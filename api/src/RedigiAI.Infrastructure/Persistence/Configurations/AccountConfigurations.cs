@@ -89,6 +89,7 @@ internal sealed class CreditLedgerEntryConfiguration : IEntityTypeConfiguration<
         builder.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CreditBucket>().WithMany().HasForeignKey(e => e.BucketId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Essay>().WithMany().HasForeignKey(e => e.EssayId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Payment>().WithMany().HasForeignKey(e => e.PaymentId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => e.UserId);
     }
 }
@@ -119,5 +120,45 @@ internal sealed class AccessLogEntryConfiguration : IEntityTypeConfiguration<Acc
         builder.HasIndex(e => new { e.UserId, e.SessionId })
             .IsUnique()
             .HasFilter("session_id IS NOT NULL");
+    }
+}
+
+internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
+{
+    public void Configure(EntityTypeBuilder<Payment> builder)
+    {
+        builder.ToTable("payments", table =>
+        {
+            table.HasCheckConstraint("ck_payments_amount", "amount_cents > 0 AND quantity >= 1");
+            // Pagamento aprovado sempre tem a data da aprovação.
+            table.HasCheckConstraint(
+                "ck_payments_approved_at",
+                "status <> 'approved' OR approved_at IS NOT NULL");
+        });
+        builder.Property(p => p.MpPaymentId).HasMaxLength(64);
+        builder.Property(p => p.Kind).HasMaxLength(20);
+        builder.Property(p => p.Method).HasMaxLength(20);
+        builder.Property(p => p.Status).HasMaxLength(20);
+        builder.Property(p => p.IdempotencyKey).HasMaxLength(Payment.MaxKeyLength);
+        builder.Property(p => p.PixQrCode).HasMaxLength(1000);
+        builder.Property(p => p.PixQrCodeBase64).HasMaxLength(20000);
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(p => p.MpPaymentId).IsUnique().HasFilter("mp_payment_id IS NOT NULL");
+        builder.HasIndex(p => new { p.UserId, p.IdempotencyKey }).IsUnique();
+        builder.HasIndex(p => new { p.UserId, p.CreatedAt });
+    }
+}
+
+internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<WebhookEvent>
+{
+    public void Configure(EntityTypeBuilder<WebhookEvent> builder)
+    {
+        builder.ToTable("webhook_events");
+        builder.Property(e => e.Provider).HasMaxLength(20);
+        builder.Property(e => e.ExternalId).HasMaxLength(WebhookEvent.MaxExternalIdLength);
+        builder.Property(e => e.Topic).HasMaxLength(64);
+        builder.Property(e => e.ResourceId).HasMaxLength(64);
+        builder.Property(e => e.Payload).HasColumnType("text");
+        builder.HasIndex(e => new { e.Provider, e.ExternalId }).IsUnique();
     }
 }

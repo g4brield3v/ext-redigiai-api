@@ -42,6 +42,8 @@ internal static class ApiHost
             seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
+        services.Configure<RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions>(
+            builder.Configuration.GetSection(RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.
         services.PostConfigure<AnthropicOptions>(anthropic =>
         {

@@ -65,6 +65,29 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return true;
     }
 
+    public Task<CreditBucket?> FindByGrantKeyAsync(string grantKey, CancellationToken ct) =>
+        db.CreditBuckets.AsNoTracking().FirstOrDefaultAsync(b => b.GrantKey == grantKey, ct);
+
+    public async Task<int> TryRevokeRemainingAsync(Guid bucketId, CancellationToken ct)
+    {
+        // Mesma trava do vencimento: o saldo zerado e o lançamento negativo valem juntos, sem disputar com um débito.
+        var revoked = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND remaining > 0
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = 0
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING current.remaining AS "Value"
+                """)
+            .ToListAsync(ct);
+        return revoked.Count == 1 ? revoked[0] : 0;
+    }
+
     public async Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(
         DateTimeOffset now, int limit, CancellationToken ct) =>
         await db.CreditBuckets

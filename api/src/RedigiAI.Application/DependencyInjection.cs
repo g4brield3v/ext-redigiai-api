@@ -22,6 +22,9 @@ public static class DependencyInjection
         services.AddScoped<IClerkWebhookService, ClerkWebhookService>();
         services.AddScoped<ITestAccountService, TestAccountService>();
         services.AddScoped<ICreditService, CreditService>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
+        services.AddScoped<Abstractions.IJobHandler, ProcessPaymentHandler>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IPromptAdminService, PromptAdminService>();
         services.AddOptions<SeedOptions>();

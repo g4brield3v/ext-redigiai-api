@@ -59,6 +59,37 @@ public sealed class CreditLedgerEntry
         };
     }
 
+    /// <summary>A concessão das correções de uma compra, ligada a ela.</summary>
+    public static CreditLedgerEntry ForPaymentGrant(CreditBucket bucket, Guid paymentId, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = bucket.Granted,
+            BucketId = bucket.Id,
+            PaymentId = paymentId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+
+    /// <summary>Estorno ou chargeback: saem do saldo as correções ainda não usadas daquela compra.</summary>
+    public static CreditLedgerEntry ForPaymentReversal(CreditBucket bucket, int amount, Guid paymentId, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(amount, 1);
+        return new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = -amount,
+            BucketId = bucket.Id,
+            PaymentId = paymentId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+    }
+
     public static CreditLedgerEntry ForGrant(CreditBucket bucket, DateTimeOffset now) =>
         new()
         {

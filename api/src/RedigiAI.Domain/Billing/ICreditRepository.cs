@@ -24,6 +24,15 @@ public interface ICreditRepository
     Task<bool> TryAddWeeklyPlanGrantAsync(
         CreditBucket bucket, CreditLedgerEntry entry, Guid subscriptionId, DateTimeOffset weekStart, CancellationToken ct);
 
+    Task<CreditBucket?> FindByGrantKeyAsync(string grantKey, CancellationToken ct);
+
+    /// <summary>
+    /// Zera o que sobrou num bucket (estorno da compra), na transação aberta, com a linha travada contra um débito
+    /// simultâneo.
+    /// </summary>
+    /// <returns>Quantas correções saíram; 0 se já não havia saldo.</returns>
+    Task<int> TryRevokeRemainingAsync(Guid bucketId, CancellationToken ct);
+
     /// <summary>Buckets vencidos até <paramref name="now"/> que ainda têm saldo.</summary>
     Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(DateTimeOffset now, int limit, CancellationToken ct);
 

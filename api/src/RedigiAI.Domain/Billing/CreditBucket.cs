@@ -71,6 +71,23 @@ public sealed class CreditBucket
             GrantKey = subscription.WeeklyGrantKey(weekStart),
         };
 
+    /// <summary>As correções avulsas de uma compra aprovada: sem vencimento, uma concessão por compra.</summary>
+    public static CreditBucket GrantForPayment(Payment payment, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = payment.UserId,
+            Source = CreditSource.Single,
+            Granted = payment.Quantity,
+            Remaining = payment.Quantity,
+            ExpiresAt = null,
+            CreatedAt = now,
+            GrantKey = PaymentGrantKey(payment.Id),
+        };
+
+    /// <summary>Chave da concessão de uma compra: acha o bucket dela no estorno.</summary>
+    public static string PaymentGrantKey(Guid paymentId) => $"payment:{paymentId}";
+
     /// <summary>Teste grátis: 1 correção por conta, sem vencimento.</summary>
     public static CreditBucket GrantTrial(Guid userId, DateTimeOffset now) =>
         new()
