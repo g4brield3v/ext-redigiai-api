@@ -226,6 +226,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
+                    b.Property<string>("GrantKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("grant_key");
+
                     b.Property<int>("Granted")
                         .HasColumnType("integer")
                         .HasColumnName("granted");
@@ -246,6 +251,15 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_credit_buckets");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_credit_buckets_expires_at")
+                        .HasFilter("remaining > 0 AND expires_at IS NOT NULL");
+
+                    b.HasIndex("GrantKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_credit_buckets_grant_key")
+                        .HasFilter("grant_key IS NOT NULL");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_credit_buckets_user_id");
@@ -314,6 +328,64 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_credit_ledger_user_id");
 
                     b.ToTable("credit_ledger", (string)null);
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.Subscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CardLast4")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("card_last4");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("MpPreapprovalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("mp_preapproval_id");
+
+                    b.Property<DateTimeOffset?>("NextBillingAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_billing_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscriptions");
+
+                    b.HasIndex("MpPreapprovalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subscriptions_mp_preapproval_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_subscriptions_status");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_subscriptions_user_id");
+
+                    b.ToTable("subscriptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_subscriptions_card_last4", "card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'");
+                        });
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Catalog.EssayType", b =>
@@ -1949,6 +2021,16 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_credit_ledger_users_user_id");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.Subscription", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscriptions_users_user_id");
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Catalog.EssayType", b =>

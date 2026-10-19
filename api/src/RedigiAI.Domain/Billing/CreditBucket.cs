@@ -23,6 +23,9 @@ public sealed class CreditBucket
     public DateTimeOffset? ExpiresAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>Identifica uma concessão que não pode se repetir (a semana de uma assinatura); único no banco.</summary>
+    public string? GrantKey { get; private set; }
+
     /// <summary>
     /// Ordem de consumo (regra 15): primeiro o plano, que vence antes, depois o teste grátis e por fim os avulsos.
     /// </summary>
@@ -51,6 +54,22 @@ public sealed class CreditBucket
             CreatedAt = now,
         };
     }
+
+    /// <summary>
+    /// As correções da semana de uma assinatura, que vencem no dia 1º seguinte à segunda-feira da semana.
+    /// </summary>
+    public static CreditBucket GrantPlanWeek(Subscription subscription, DateTimeOffset weekStart, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = subscription.UserId,
+            Source = CreditSource.PlanWeek,
+            Granted = PlanCalendar.WeeklyCredits,
+            Remaining = PlanCalendar.WeeklyCredits,
+            ExpiresAt = PlanCalendar.NextMonthStart(weekStart),
+            CreatedAt = now,
+            GrantKey = subscription.WeeklyGrantKey(weekStart),
+        };
 
     /// <summary>Teste grátis: 1 correção por conta, sem vencimento.</summary>
     public static CreditBucket GrantTrial(Guid userId, DateTimeOffset now) =>

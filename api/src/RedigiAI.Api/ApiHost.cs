@@ -68,6 +68,7 @@ internal static class ApiHost
             services.AddHostedService<DevEnvironmentSetup>();
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();
+            services.AddHostedService<CreditCalendarSweeper>();
         }
         AddControllers(services);
         AddOpenApiDocument(services);

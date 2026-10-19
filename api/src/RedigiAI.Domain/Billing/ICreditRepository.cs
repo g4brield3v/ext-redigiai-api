@@ -14,6 +14,22 @@ public interface ICreditRepository
 
     void AddEntry(CreditLedgerEntry entry);
 
+    /// <summary>
+    /// Concessão com chave única (<see cref="CreditBucket.GrantKey"/>): grava o bucket na hora, dentro da transação
+    /// aberta, e acrescenta o lançamento. Se a chave já existe, não grava nada.
+    /// </summary>
+    /// <returns><c>false</c> se a concessão já tinha sido feita.</returns>
+    Task<bool> TryAddKeyedGrantAsync(CreditBucket bucket, CreditLedgerEntry entry, CancellationToken ct);
+
+    /// <summary>Buckets vencidos até <paramref name="now"/> que ainda têm saldo.</summary>
+    Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(DateTimeOffset now, int limit, CancellationToken ct);
+
+    /// <summary>
+    /// Zera o saldo de um bucket vencido, na transação aberta, travando a linha contra um débito simultâneo.
+    /// </summary>
+    /// <returns>Quantas correções venceram; 0 se o bucket não estava vencido ou já não tinha saldo.</returns>
+    Task<int> TryExpireAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
+
     /// <summary>O bucket de onde saiu a correção reservada para a redação; <c>null</c> se não houve reserva.</summary>
     Task<CreditBucket?> FindReservedBucketAsync(Guid essayId, CancellationToken ct);
 

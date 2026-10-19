@@ -3218,7 +3218,8 @@
           "termsAcceptanceRequired",
           "aiNoticeAccepted",
           "emailPreferences",
-          "credits"
+          "credits",
+          "subscription"
         ],
         "type": "object",
         "properties": {
@@ -3249,6 +3250,16 @@
           },
           "credits": {
             "$ref": "#/components/schemas/CreditBalanceDto"
+          },
+          "subscription": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SubscriptionDto"
+              }
+            ]
           }
         }
       },
@@ -4231,6 +4242,39 @@
             "format": "int32"
           }
         }
+      },
+      "SubscriptionDto": {
+        "required": [
+          "status",
+          "nextBillingAt",
+          "cardLast4"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "nextBillingAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "cardLast4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SubscriptionStatus": {
+        "enum": [
+          "active",
+          "paused",
+          "cancelled"
+        ]
       },
       "TranscriptionLineDto": {
         "required": [

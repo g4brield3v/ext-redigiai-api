@@ -43,6 +43,22 @@ public sealed class CreditLedgerEntry
             CreatedAt = now,
         };
 
+    /// <summary>Vencimento das correções que sobraram num bucket do plano (dia 1º): lançamento negativo.</summary>
+    public static CreditLedgerEntry ForExpiry(CreditBucket bucket, int amount, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(amount, 1);
+        return new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = -amount,
+            BucketId = bucket.Id,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+    }
+
     public static CreditLedgerEntry ForGrant(CreditBucket bucket, DateTimeOffset now) =>
         new()
         {

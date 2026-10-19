@@ -46,6 +46,31 @@ internal sealed class CreditBucketConfiguration : IEntityTypeConfiguration<Credi
             .HasDatabaseName("ux_credit_buckets_trial_per_user")
             .IsUnique()
             .HasFilter("source = 'trial'");
+
+        // A semana de uma assinatura é concedida uma vez só, mesmo com dois workers ao mesmo tempo.
+        builder.Property(b => b.GrantKey).HasMaxLength(120);
+        builder.HasIndex(b => b.GrantKey).IsUnique().HasFilter("grant_key IS NOT NULL");
+
+        // O vencimento do dia 1º procura os buckets vencidos que ainda têm saldo.
+        builder.HasIndex(b => b.ExpiresAt).HasFilter("remaining > 0 AND expires_at IS NOT NULL");
+    }
+}
+
+internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
+{
+    public void Configure(EntityTypeBuilder<Subscription> builder)
+    {
+        builder.ToTable("subscriptions", table =>
+        {
+            table.HasCheckConstraint("ck_subscriptions_card_last4", "card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'");
+        });
+        builder.Property(s => s.MpPreapprovalId).HasMaxLength(100);
+        builder.Property(s => s.Status).HasMaxLength(20);
+        builder.Property(s => s.CardLast4).HasMaxLength(4);
+        builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(s => s.MpPreapprovalId).IsUnique();
+        builder.HasIndex(s => s.UserId);
+        builder.HasIndex(s => s.Status);
     }
 }
 

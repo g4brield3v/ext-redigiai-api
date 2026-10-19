@@ -35,6 +35,56 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
     public void AddEntry(CreditLedgerEntry entry) => db.CreditLedger.Add(entry);
 
+    public async Task<bool> TryAddKeyedGrantAsync(CreditBucket bucket, CreditLedgerEntry entry, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(bucket.GrantKey);
+        var source = SnakeCaseEnum<CreditSource>.ToName(bucket.Source);
+        var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO credit_buckets (id, user_id, source, granted, remaining, expires_at, created_at, grant_key)
+            VALUES ({bucket.Id}, {bucket.UserId}, {source}, {bucket.Granted}, {bucket.Remaining}, {bucket.ExpiresAt},
+                    {bucket.CreatedAt}, {bucket.GrantKey})
+            ON CONFLICT (grant_key) WHERE grant_key IS NOT NULL DO NOTHING
+            """,
+            ct);
+        if (inserted == 0)
+        {
+            return false;
+        }
+
+        db.CreditLedger.Add(entry);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(
+        DateTimeOffset now, int limit, CancellationToken ct) =>
+        await db.CreditBuckets
+            .AsNoTracking()
+            .Where(b => b.Remaining > 0 && b.ExpiresAt != null && b.ExpiresAt <= now)
+            .OrderBy(b => b.ExpiresAt)
+            .Take(limit)
+            .ToListAsync(ct);
+
+    public async Task<int> TryExpireAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct)
+    {
+        // A linha fica travada até o fim da transação: o saldo zerado e o lançamento negativo valem juntos.
+        var expired = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND remaining > 0 AND expires_at IS NOT NULL AND expires_at <= {now}
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = 0
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING current.remaining AS "Value"
+                """)
+            .ToListAsync(ct);
+        return expired.Count == 1 ? expired[0] : 0;
+    }
+
     public async Task<bool> TryDebitAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
             .Where(b => b.Id == bucketId && b.Remaining >= 1 && (b.ExpiresAt == null || b.ExpiresAt > now))
@@ -80,4 +130,24 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
         return refunded.ToHashSet();
     }
+}
+
+internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRepository
+{
+    public void Add(Subscription subscription) => db.Subscriptions.Add(subscription);
+
+    public async Task<IReadOnlyList<Subscription>> ListEarningWeeklyCreditsAsync(
+        DateTimeOffset weekStart, CancellationToken ct) =>
+        await db.Subscriptions
+            .AsNoTracking()
+            .Where(s => s.Status == SubscriptionStatus.Active && s.CreatedAt < weekStart)
+            .OrderBy(s => s.CreatedAt)
+            .ToListAsync(ct);
+
+    public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
+        db.Subscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct);
 }
