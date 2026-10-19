@@ -54,10 +54,17 @@ internal sealed class EssayOutcomes(
         }
 
         var now = time.GetUtcNow();
-        var stillValid = bucket.ExpiresAt is null || bucket.ExpiresAt > now;
-        if (stillValid && await credits.TryCreditBackAsync(bucket.Id, ct))
+        // O banco decide se o bucket ainda vale: a devolução não pode cair num bucket que o dia 1º já zerou.
+        if (await credits.TryCreditBackAsync(bucket.Id, now, ct))
         {
             credits.AddEntry(CreditLedgerEntry.ForRefund(bucket, essayId, now));
+        }
+        else if (bucket.ExpiresAt is null || bucket.ExpiresAt > now)
+        {
+            // Bucket que não venceu e não aceitou a devolução: a compra dele foi estornada ou contestada. A correção
+            // reservada já saiu com o dinheiro devolvido e não volta, nem como avulsa.
+            audit.Record("system", "credit.refund_skipped", "essay", essayId, new { bucketId = bucket.Id, reason = "revoked" });
+            return;
         }
         else
         {

@@ -116,7 +116,7 @@ public class EssayTests(ApiFixture api)
     public async Task Batch_spends_the_plan_first_then_the_trial_then_the_single_credits()
     {
         var student = await Student.CreateAsync(api, extraCredits: 1);
-        await student.GrantAsync(CreditSource.PlanWeek, 1, DateTimeOffset.UtcNow.AddDays(10));
+        await student.GrantAsync(CreditSource.Plan, 1, DateTimeOffset.UtcNow.AddDays(10));
         var assets = new[] { await student.UploadAsync(), await student.UploadAsync(), await student.UploadAsync() };
 
         var response = await student.SubmitAsync([.. assets.Select(student.Item)]);
@@ -126,7 +126,7 @@ public class EssayTests(ApiFixture api)
             .GetProperty("essayIds").EnumerateArray().Select(id => id.GetGuid()).ToList();
         var spent = await api.QueryAsync(db => db.CreditLedger.Where(e => e.EssayId != null && ids.Contains(e.EssayId.Value)).ToListAsync());
         Assert.Equal(
-            [CreditSource.PlanWeek, CreditSource.Trial, CreditSource.Single],
+            [CreditSource.Plan, CreditSource.Trial, CreditSource.Single],
             ids.Select(id => spent.Single(e => e.EssayId == id).Source));
     }
 

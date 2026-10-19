@@ -46,6 +46,37 @@ internal sealed class CreditBucketConfiguration : IEntityTypeConfiguration<Credi
             .HasDatabaseName("ux_credit_buckets_trial_per_user")
             .IsUnique()
             .HasFilter("source = 'trial'");
+
+        // A semana de uma assinatura é concedida uma vez só, mesmo com dois workers ao mesmo tempo.
+        builder.Property(b => b.GrantKey).HasMaxLength(120);
+        builder.HasIndex(b => b.GrantKey).IsUnique().HasFilter("grant_key IS NOT NULL");
+
+        // O vencimento do dia 1º procura os buckets vencidos que ainda têm saldo.
+        builder.HasIndex(b => b.ExpiresAt).HasFilter("remaining > 0 AND expires_at IS NOT NULL");
+    }
+}
+
+internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
+{
+    public void Configure(EntityTypeBuilder<Subscription> builder)
+    {
+        builder.ToTable("subscriptions", table =>
+        {
+            table.HasCheckConstraint("ck_subscriptions_card_last4", "card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'");
+        });
+        builder.Property(s => s.MpPreapprovalId).HasMaxLength(100);
+        builder.Property(s => s.Status).HasMaxLength(20);
+        builder.Property(s => s.CardLast4).HasMaxLength(4);
+        builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(s => s.MpPreapprovalId).IsUnique();
+        builder.HasIndex(s => s.UserId);
+        builder.HasIndex(s => s.Status);
+
+        // No máximo uma assinatura aberta por aluno: dois checkouts concluídos não viram duas cobranças.
+        builder.HasIndex(s => s.UserId, "ux_subscriptions_open_per_user")
+            .HasDatabaseName("ux_subscriptions_open_per_user")
+            .IsUnique()
+            .HasFilter("status IN ('active', 'paused')");
     }
 }
 
@@ -58,6 +89,7 @@ internal sealed class CreditLedgerEntryConfiguration : IEntityTypeConfiguration<
         builder.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CreditBucket>().WithMany().HasForeignKey(e => e.BucketId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Essay>().WithMany().HasForeignKey(e => e.EssayId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Payment>().WithMany().HasForeignKey(e => e.PaymentId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => e.UserId);
     }
 }
@@ -88,5 +120,45 @@ internal sealed class AccessLogEntryConfiguration : IEntityTypeConfiguration<Acc
         builder.HasIndex(e => new { e.UserId, e.SessionId })
             .IsUnique()
             .HasFilter("session_id IS NOT NULL");
+    }
+}
+
+internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
+{
+    public void Configure(EntityTypeBuilder<Payment> builder)
+    {
+        builder.ToTable("payments", table =>
+        {
+            table.HasCheckConstraint("ck_payments_amount", "amount_cents > 0 AND quantity >= 1");
+            // Pagamento aprovado sempre tem a data da aprovação.
+            table.HasCheckConstraint(
+                "ck_payments_approved_at",
+                "status <> 'approved' OR approved_at IS NOT NULL");
+        });
+        builder.Property(p => p.MpPaymentId).HasMaxLength(64);
+        builder.Property(p => p.Kind).HasMaxLength(20);
+        builder.Property(p => p.Method).HasMaxLength(20);
+        builder.Property(p => p.Status).HasMaxLength(20);
+        builder.Property(p => p.IdempotencyKey).HasMaxLength(Payment.MaxKeyLength);
+        builder.Property(p => p.PixQrCode).HasMaxLength(1000);
+        builder.Property(p => p.PixQrCodeBase64).HasMaxLength(20000);
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(p => p.MpPaymentId).IsUnique().HasFilter("mp_payment_id IS NOT NULL");
+        builder.HasIndex(p => new { p.UserId, p.IdempotencyKey }).IsUnique();
+        builder.HasIndex(p => new { p.UserId, p.CreatedAt });
+    }
+}
+
+internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<WebhookEvent>
+{
+    public void Configure(EntityTypeBuilder<WebhookEvent> builder)
+    {
+        builder.ToTable("webhook_events");
+        builder.Property(e => e.Provider).HasMaxLength(20);
+        builder.Property(e => e.ExternalId).HasMaxLength(WebhookEvent.MaxExternalIdLength);
+        builder.Property(e => e.Topic).HasMaxLength(64);
+        builder.Property(e => e.ResourceId).HasMaxLength(64);
+        builder.Property(e => e.Payload).HasColumnType("text");
+        builder.HasIndex(e => new { e.Provider, e.ExternalId }).IsUnique();
     }
 }

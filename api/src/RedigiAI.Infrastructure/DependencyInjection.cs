@@ -13,6 +13,7 @@ using RedigiAI.Infrastructure.Anthropic;
 using RedigiAI.Infrastructure.Clerk;
 using RedigiAI.Infrastructure.Cloudinary;
 using RedigiAI.Infrastructure.Jobs;
+using RedigiAI.Infrastructure.MercadoPago;
 using RedigiAI.Infrastructure.Persistence;
 using RedigiAI.Infrastructure.Persistence.Repositories;
 
@@ -33,6 +34,9 @@ public static class DependencyInjection
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ICreditRepository, CreditRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
         services.AddScoped<IExamRepository, ExamRepository>();
         services.AddScoped<IEssayTypeRepository, EssayTypeRepository>();
         services.AddScoped<IRubricRepository, RubricRepository>();
@@ -63,6 +67,8 @@ public static class DependencyInjection
         services.AddSingleton<ClaudeMessagesApi>();
         services.AddSingleton<IEssayTranscriber, ClaudeEssayTranscriber>();
         services.AddSingleton<IEssayGrader, ClaudeEssayGrader>();
+        services.AddSingleton<IPaymentGateway, MercadoPagoGateway>();
+        services.AddSingleton<IPaymentWebhookVerifier, MercadoPagoWebhookVerifier>();
 
         return services;
     }

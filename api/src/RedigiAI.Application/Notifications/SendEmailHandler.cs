@@ -1,6 +1,7 @@
 using System.Text.Json;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Domain.Accounts;
+using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
@@ -20,6 +21,7 @@ internal sealed class SendEmailHandler(
     IUserRepository users,
     ITranscriptionRepository transcriptions,
     IPromptRepository prompts,
+    IPaymentRepository payments,
     IEmailLogRepository emailLog,
     IEmailSender sender,
     EmailComposer composer,
@@ -44,6 +46,12 @@ internal sealed class SendEmailHandler(
         }
 
         var job = JsonSerializer.Deserialize<EmailJobPayload>(payload, Json)!;
+        if (EmailTemplates.IsPayment(job.Template))
+        {
+            await HandlePaymentAsync(job, ct);
+            return;
+        }
+
         if (await essays.FindByIdAsync(job.RefId, ct) is not { } essay || !StillApplies(job.Template, essay))
         {
             return;
@@ -54,9 +62,28 @@ internal sealed class SendEmailHandler(
             return;
         }
 
-        var message = composer.Compose(job.Template, await FactsAsync(essay, user, ct));
+        await SendOnceAsync(user.Id, job.Template, essay.Id, composer.Compose(job.Template, await FactsAsync(essay, user, ct)), ct);
+    }
+
+    /// <summary>O aviso de pagamento só sai se a compra continua aprovada e a conta existe.</summary>
+    private async Task HandlePaymentAsync(EmailJobPayload job, CancellationToken ct)
+    {
+        if (await payments.FindAsync(job.RefId, ct) is not { Status: PaymentStatus.Approved, ApprovedAt: { } approvedAt } payment
+            || await users.FindActiveByIdAsync(payment.UserId, ct) is not { } user)
+        {
+            return;
+        }
+
+        var facts = new PaymentEmailFacts(
+            user.Email, user.Name, payment.Id, payment.Quantity, payment.AmountCents, approvedAt + Payment.RefundWindow);
+        await SendOnceAsync(user.Id, job.Template, payment.Id, composer.ComposePayment(job.Template, facts), ct);
+    }
+
+    /// <summary>Reserva, envia e marca: no máximo um envio por template e referência (<c>email_log</c>).</summary>
+    private async Task SendOnceAsync(Guid userId, string template, Guid refId, EmailMessage message, CancellationToken ct)
+    {
         var now = time.GetUtcNow();
-        var claim = await emailLog.TryClaimAsync(EmailLogEntry.Claim(user.Id, job.Template, essay.Id, now), now - ClaimTimeout, ct);
+        var claim = await emailLog.TryClaimAsync(EmailLogEntry.Claim(userId, template, refId, now), now - ClaimTimeout, ct);
         if (claim.AlreadySent)
         {
             return;
@@ -86,7 +113,7 @@ internal sealed class SendEmailHandler(
     public async Task OnDeadAsync(string payload, CancellationToken ct)
     {
         var job = JsonSerializer.Deserialize<EmailJobPayload>(payload, Json)!;
-        audit.Record("system", "email.failed", "essay", job.RefId, new { template = job.Template });
+        audit.Record("system", "email.failed", EmailTemplates.IsPayment(job.Template) ? "payment" : "essay", job.RefId, new { template = job.Template });
         await unitOfWork.SaveChangesAsync(ct);
     }
 

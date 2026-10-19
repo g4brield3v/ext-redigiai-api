@@ -35,6 +35,103 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
     public void AddEntry(CreditLedgerEntry entry) => db.CreditLedger.Add(entry);
 
+    public Task<CreditBucket?> FindByGrantKeyAsync(string grantKey, CancellationToken ct) =>
+        db.CreditBuckets.AsNoTracking().FirstOrDefaultAsync(b => b.GrantKey == grantKey, ct);
+
+    public async Task<int> RevokeAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct)
+    {
+        // Mesma trava do vencimento: o saldo zerado, a marca e o lançamento negativo valem juntos, sem disputar com um
+        // débito ou uma devolução.
+        var revoked = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND revoked_at IS NULL
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = 0, revoked_at = {now}
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING current.remaining AS "Value"
+                """)
+            .ToListAsync(ct);
+        return revoked.Count == 1 ? revoked[0] : 0;
+    }
+
+    public async Task<int> RemoveAsync(Guid bucketId, int max, CancellationToken ct)
+    {
+        var removed = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND remaining > 0
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = credit_buckets.remaining - LEAST({max}, current.remaining)
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING LEAST({max}, current.remaining) AS "Value"
+                """)
+            .ToListAsync(ct);
+        return removed.Count == 1 ? removed[0] : 0;
+    }
+
+    public async Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct) =>
+        await db.CreditBuckets
+            .AsNoTracking()
+            .Where(b => b.UserId == userId && b.Source == CreditSource.Plan && (b.ExpiresAt == null || b.ExpiresAt > now))
+            .ToListAsync(ct);
+
+    public async Task<int?> CloseAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct)
+    {
+        var closed = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND (expires_at IS NULL OR expires_at > {now})
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = 0, expires_at = {now}
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING current.remaining AS "Value"
+                """)
+            .ToListAsync(ct);
+        return closed.Count == 1 ? closed[0] : null;
+    }
+
+    public async Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(
+        DateTimeOffset now, int limit, CancellationToken ct) =>
+        await db.CreditBuckets
+            .AsNoTracking()
+            .Where(b => b.Remaining > 0 && b.ExpiresAt != null && b.ExpiresAt <= now)
+            .OrderBy(b => b.ExpiresAt)
+            .Take(limit)
+            .ToListAsync(ct);
+
+    public async Task<int> TryExpireAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct)
+    {
+        // A linha fica travada até o fim da transação: o saldo zerado e o lançamento negativo valem juntos.
+        var expired = await db.Database
+            .SqlQuery<int>(
+                $"""
+                WITH current AS (
+                    SELECT id, remaining FROM credit_buckets
+                    WHERE id = {bucketId} AND remaining > 0 AND expires_at IS NOT NULL AND expires_at <= {now}
+                    FOR UPDATE
+                )
+                UPDATE credit_buckets SET remaining = 0
+                FROM current
+                WHERE credit_buckets.id = current.id
+                RETURNING current.remaining AS "Value"
+                """)
+            .ToListAsync(ct);
+        return expired.Count == 1 ? expired[0] : 0;
+    }
+
     public async Task<bool> TryDebitAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
             .Where(b => b.Id == bucketId && b.Remaining >= 1 && (b.ExpiresAt == null || b.ExpiresAt > now))
@@ -51,9 +148,10 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return bucketId is null ? null : await db.CreditBuckets.AsNoTracking().FirstOrDefaultAsync(b => b.Id == bucketId, ct);
     }
 
-    public async Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct) =>
+    public async Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct) =>
         await db.CreditBuckets
-            .Where(b => b.Id == bucketId && b.Remaining < b.Granted)
+            .Where(b => b.Id == bucketId && b.Remaining < b.Granted && b.RevokedAt == null
+                && (b.ExpiresAt == null || b.ExpiresAt > now))
             .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, x => x.Remaining + 1), ct) == 1;
 
     public async Task<IReadOnlyList<CreditBucket>> ListAvailableAsync(
@@ -80,4 +178,16 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
 
         return refunded.ToHashSet();
     }
+}
+
+internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRepository
+{
+    public void Add(Subscription subscription) => db.Subscriptions.Add(subscription);
+
+    public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
+        db.Subscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct);
 }

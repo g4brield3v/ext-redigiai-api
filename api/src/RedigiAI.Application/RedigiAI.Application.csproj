@@ -9,6 +9,11 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- A renovação do plano é testada antes de a cobrança mensal (etapa 4c) chamá-la. -->
+    <InternalsVisibleTo Include="RedigiAI.IntegrationTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

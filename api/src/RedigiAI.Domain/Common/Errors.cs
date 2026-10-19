@@ -57,6 +57,12 @@ public static class Errors
     public static AppError AdminSecondFactorRequired() =>
         new("ADMIN_2FA_REQUIRED", 403, "Ative a verificação em duas etapas para acessar a administração.");
 
+    public static AppError PaymentFailed() =>
+        new("PAYMENT_FAILED", 402, "O pagamento não foi aprovado. Tente outro meio de pagamento.", retryable: true);
+
+    public static AppError GuardianAuthorizationRequired() =>
+        new("GUARDIAN_AUTHORIZATION_REQUIRED", 422, "Confirme que o seu responsável autorizou esta compra.");
+
     public static AppError RateLimited() =>
         new("RATE_LIMITED", 429, "Muitas tentativas seguidas. Aguarde um minuto.", retryable: true);
 
@@ -69,6 +75,10 @@ public static class Errors
 
     public static AppError ProfileNotFound() =>
         new("PROFILE_NOT_FOUND", 404, "Conclua o seu cadastro para continuar.");
+
+    /// <summary>O Mercado Pago não respondeu ou não está configurado: nada foi cobrado.</summary>
+    public static AppError PaymentUnavailable() =>
+        new("PAYMENT_UNAVAILABLE", 503, "Não conseguimos falar com o meio de pagamento. Tente de novo em instantes.", retryable: true);
 
     public static AppError NotFound() =>
         new("NOT_FOUND", 404, "Não encontramos o que você procura.");

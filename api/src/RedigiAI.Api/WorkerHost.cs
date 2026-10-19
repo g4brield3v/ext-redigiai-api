@@ -18,6 +18,8 @@ internal static class WorkerHost
         var builder = CreateBuilder(args);
         builder.Services.AddHostedService<JobWorker>();
         builder.Services.AddHostedService<ReviewDeadlineSweeper>();
+        builder.Services.AddHostedService<CreditExpirySweeper>();
+        builder.Services.AddHostedService<PaymentReconciliationSweeper>();
 
         await builder.Build().RunAsync();
         return 0;
@@ -36,6 +38,8 @@ internal static class WorkerHost
             seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
+        builder.Services.Configure<RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions>(
+            builder.Configuration.GetSection(RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions.Section));
         // Aceita também o nome padrão da Anthropic para a chave.
         builder.Services.PostConfigure<AnthropicOptions>(anthropic =>
         {

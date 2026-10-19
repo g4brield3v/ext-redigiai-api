@@ -14,11 +14,50 @@ public interface ICreditRepository
 
     void AddEntry(CreditLedgerEntry entry);
 
+    Task<CreditBucket?> FindByGrantKeyAsync(string grantKey, CancellationToken ct);
+
+    /// <summary>
+    /// Revoga o bucket (estorno da compra): zera o que sobrou e marca <see cref="CreditBucket.RevokedAt"/>, na
+    /// transação aberta, com a linha travada contra um débito ou uma devolução simultâneos.
+    /// </summary>
+    /// <returns>Quantas correções saíram; 0 se já não havia saldo ou o bucket já estava revogado.</returns>
+    Task<int> RevokeAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>
+    /// Tira até <paramref name="max"/> correções ainda não usadas de um bucket (estorno parcial), na transação aberta,
+    /// com a linha travada contra um débito simultâneo. O bucket continua valendo para o que sobrar.
+    /// </summary>
+    /// <returns>Quantas saíram.</returns>
+    Task<int> RemoveAsync(Guid bucketId, int max, CancellationToken ct);
+
+    /// <summary>Os buckets do plano do aluno que ainda não venceram em <paramref name="now"/>, com ou sem saldo.</summary>
+    Task<IReadOnlyList<CreditBucket>> ListOpenPlanBucketsAsync(Guid userId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>
+    /// Encerra o bucket agora (renovação do plano): o saldo zera e ele passa a vencido em <paramref name="now"/>, na
+    /// transação aberta e com a linha travada. Uma devolução posterior a ele vira avulsa, como em todo bucket vencido.
+    /// </summary>
+    /// <returns>Quantas correções sobravam; <c>null</c> se o bucket já tinha vencido.</returns>
+    Task<int?> CloseAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Buckets vencidos até <paramref name="now"/> que ainda têm saldo.</summary>
+    Task<IReadOnlyList<CreditBucket>> ListExpiredWithBalanceAsync(DateTimeOffset now, int limit, CancellationToken ct);
+
+    /// <summary>
+    /// Zera o saldo de um bucket vencido, na transação aberta, travando a linha contra um débito simultâneo.
+    /// </summary>
+    /// <returns>Quantas correções venceram; 0 se o bucket não estava vencido ou já não tinha saldo.</returns>
+    Task<int> TryExpireAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
+
     /// <summary>O bucket de onde saiu a correção reservada para a redação; <c>null</c> se não houve reserva.</summary>
     Task<CreditBucket?> FindReservedBucketAsync(Guid essayId, CancellationToken ct);
 
-    /// <summary>Devolve 1 correção ao bucket com <c>UPDATE … WHERE remaining &lt; granted</c>, na transação aberta.</summary>
-    Task<bool> TryCreditBackAsync(Guid bucketId, CancellationToken ct);
+    /// <summary>
+    /// Devolve 1 correção ao bucket com <c>UPDATE … WHERE remaining &lt; granted</c>, na transação aberta, só se ele
+    /// ainda não venceu em <paramref name="now"/> nem foi revogado.
+    /// </summary>
+    /// <returns><c>false</c> se o bucket venceu (a correção volta como avulsa), foi revogado ou já está cheio.</returns>
+    Task<bool> TryCreditBackAsync(Guid bucketId, DateTimeOffset now, CancellationToken ct);
 
     /// <summary>Entre as redações informadas, as que tiveram a correção devolvida ao saldo.</summary>
     Task<IReadOnlySet<Guid>> RefundedAsync(IReadOnlyCollection<Guid> essayIds, CancellationToken ct);

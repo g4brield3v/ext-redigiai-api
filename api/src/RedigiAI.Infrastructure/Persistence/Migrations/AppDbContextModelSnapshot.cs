@@ -226,6 +226,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
+                    b.Property<string>("GrantKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("grant_key");
+
                     b.Property<int>("Granted")
                         .HasColumnType("integer")
                         .HasColumnName("granted");
@@ -233,6 +238,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.Property<int>("Remaining")
                         .HasColumnType("integer")
                         .HasColumnName("remaining");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
 
                     b.Property<string>("Source")
                         .IsRequired()
@@ -246,6 +255,15 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_credit_buckets");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_credit_buckets_expires_at")
+                        .HasFilter("remaining > 0 AND expires_at IS NOT NULL");
+
+                    b.HasIndex("GrantKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_credit_buckets_grant_key")
+                        .HasFilter("grant_key IS NOT NULL");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_credit_buckets_user_id");
@@ -310,10 +328,233 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("EssayId")
                         .HasDatabaseName("ix_credit_ledger_essay_id");
 
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("ix_credit_ledger_payment_id");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_credit_ledger_user_id");
 
                     b.ToTable("credit_ledger", (string)null);
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_cents");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("GuardianAuthorizedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("guardian_authorized_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("MpPaymentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("mp_payment_id");
+
+                    b.Property<DateTimeOffset?>("PixExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pix_expires_at");
+
+                    b.Property<string>("PixQrCode")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("pix_qr_code");
+
+                    b.Property<string>("PixQrCodeBase64")
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("pix_qr_code_base64");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("RefundedCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refunded_cents");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payments");
+
+                    b.HasIndex("MpPaymentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payments_mp_payment_id")
+                        .HasFilter("mp_payment_id IS NOT NULL");
+
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("ix_payments_user_id_created_at");
+
+                    b.HasIndex("UserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payments_user_id_idempotency_key");
+
+                    b.ToTable("payments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payments_amount", "amount_cents > 0 AND quantity >= 1");
+
+                            t.HasCheckConstraint("ck_payments_approved_at", "status <> 'approved' OR approved_at IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.Subscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CardLast4")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("card_last4");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("MpPreapprovalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("mp_preapproval_id");
+
+                    b.Property<DateTimeOffset?>("NextBillingAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_billing_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscriptions");
+
+                    b.HasIndex("MpPreapprovalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subscriptions_mp_preapproval_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_subscriptions_status");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_subscriptions_user_id");
+
+                    b.HasIndex(new[] { "UserId" }, "ux_subscriptions_open_per_user")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscriptions_open_per_user")
+                        .HasFilter("status IN ('active', 'paused')");
+
+                    b.ToTable("subscriptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_subscriptions_card_last4", "card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$'");
+                        });
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.WebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("topic");
+
+                    b.HasKey("Id")
+                        .HasName("pk_webhook_events");
+
+                    b.HasIndex("Provider", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_webhook_events_provider_external_id");
+
+                    b.ToTable("webhook_events", (string)null);
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Catalog.EssayType", b =>
@@ -1943,12 +2184,38 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_credit_ledger_essays_essay_id");
 
+                    b.HasOne("RedigiAI.Domain.Billing.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_credit_ledger_payments_payment_id");
+
                     b.HasOne("RedigiAI.Domain.Accounts.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_credit_ledger_users_user_id");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.Payment", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payments_users_user_id");
+                });
+
+            modelBuilder.Entity("RedigiAI.Domain.Billing.Subscription", b =>
+                {
+                    b.HasOne("RedigiAI.Domain.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscriptions_users_user_id");
                 });
 
             modelBuilder.Entity("RedigiAI.Domain.Catalog.EssayType", b =>

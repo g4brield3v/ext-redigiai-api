@@ -159,8 +159,8 @@ public class EssayTests
     {
         var single = CreditBucket.Grant(UserId, CreditSource.Single, 2, expiresAt: null, Now);
         var trial = CreditBucket.GrantTrial(UserId, Now.AddMinutes(1));
-        var planLater = CreditBucket.Grant(UserId, CreditSource.PlanWeek, 3, Now.AddDays(20), Now.AddMinutes(2));
-        var planSooner = CreditBucket.Grant(UserId, CreditSource.PlanWeek, 3, Now.AddDays(5), Now.AddMinutes(3));
+        var planLater = CreditBucket.Grant(UserId, CreditSource.Plan, 3, Now.AddDays(20), Now.AddMinutes(2));
+        var planSooner = CreditBucket.Grant(UserId, CreditSource.Plan, 3, Now.AddDays(5), Now.AddMinutes(3));
 
         var ordered = CreditBucket.InConsumptionOrder([single, trial, planLater, planSooner]);
 

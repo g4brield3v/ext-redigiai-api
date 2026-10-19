@@ -309,7 +309,7 @@ public class TranscriptionTests(ApiFixture api)
     public async Task Credit_from_an_expired_plan_comes_back_as_a_single_credit()
     {
         var student = await Student.CreateAsync(api);
-        await student.GrantAsync(CreditSource.PlanWeek, 1, DateTimeOffset.UtcNow.AddDays(3));
+        await student.GrantAsync(CreditSource.Plan, 1, DateTimeOffset.UtcNow.AddDays(3));
         var essayId = await student.SubmitAsync();
         var planBucket = await api.QueryAsync(db => db.CreditLedger.Where(e => e.EssayId == essayId).Select(e => e.BucketId).SingleAsync());
         await api.QueryAsync(db => db.CreditBuckets.Where(b => b.Id == planBucket)

@@ -9,6 +9,7 @@ namespace RedigiAI.Application.Accounts;
 internal sealed class AccountService(
     IUserRepository users,
     ICreditRepository credits,
+    ISubscriptionRepository subscriptions,
     IAuditLog audit,
     IAccessLog accessLog,
     IUnitOfWork unitOfWork,
@@ -126,6 +127,7 @@ internal sealed class AccountService(
             .GroupBy(b => (b.Source, b.ExpiresAt))
             .Select(g => new CreditBucketDto(g.Key.Source, g.Sum(b => b.Remaining), g.Key.ExpiresAt))
             .ToList();
+        var subscription = await subscriptions.FindLatestAsync(user.Id, ct);
 
         return new ProfileDto(
             user.Id,
@@ -138,6 +140,9 @@ internal sealed class AccountService(
                 user.EmailPreferences.CorrectionReady,
                 user.EmailPreferences.IllegibleReminder,
                 user.EmailPreferences.NewThemes),
-            new CreditBalanceDto(bySource.Sum(b => b.Remaining), bySource));
+            new CreditBalanceDto(bySource.Sum(b => b.Remaining), bySource),
+            subscription is null
+                ? null
+                : new SubscriptionDto(subscription.Status, subscription.NextBillingAt, subscription.CardLast4));
     }
 }

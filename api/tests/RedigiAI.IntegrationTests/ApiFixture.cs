@@ -15,6 +15,7 @@ using System.Collections.Concurrent;
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Catalog;
 using RedigiAI.Application.Notifications;
+using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Common;
 using RedigiAI.Domain.Essays;
 using RedigiAI.Infrastructure.Persistence;
@@ -60,6 +61,11 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public FakeEmailSender Emails { get; } = new();
 
+    /// <summary>O Mercado Pago dos testes: nenhuma chamada sai da máquina.</summary>
+    public FakePaymentGateway Payments { get; } = new();
+
+    public const string MercadoPagoSecret = "mp-webhook-test-secret";
+
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
     public async Task InitializeAsync()
@@ -102,6 +108,8 @@ public sealed class ApiFixture : IAsyncLifetime
             // O .env da máquina de desenvolvimento pode ligar o acesso sem login; nos testes ele fica desligado.
             builder.UseSetting("DevAuth:Enabled", "false");
             builder.UseSetting("App:BaseUrl", WebOrigin);
+            builder.UseSetting("MercadoPago:WebhookSecret", MercadoPagoSecret);
+            builder.UseSetting("MercadoPago:AccessToken", "");
             configure?.Invoke(builder);
 
             builder.ConfigureTestServices(services =>
@@ -117,6 +125,7 @@ public sealed class ApiFixture : IAsyncLifetime
                 services.AddSingleton<IIdentityDirectory>(Directory);
                 services.AddSingleton<IPromptImageStorage>(PromptImages);
                 services.AddSingleton<IEmailSender>(Emails);
+                services.AddSingleton<IPaymentGateway>(Payments);
                 // O site dos testes é o do Vite, em http.
                 services.PostConfigure<SiteOptions>(site => site.RequireHttps = false);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, jwt =>
@@ -198,6 +207,29 @@ public sealed class ApiFixture : IAsyncLifetime
         request.Headers.Add("svix-id", id);
         request.Headers.Add("svix-timestamp", timestamp);
         request.Headers.Add("svix-signature", $"v1,{signature}");
+        return request;
+    }
+
+    /// <summary>Uma notificação do Mercado Pago, assinada como ele assina (ou com outra chave).</summary>
+    public static HttpRequestMessage CreateMercadoPagoWebhook(
+        string resourceId, string json, string type = "payment", string? secret = null, string? requestId = "req-1",
+        DateTimeOffset? signedAt = null)
+    {
+        var ts = (signedAt ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var manifest = requestId is null
+            ? $"id:{resourceId.ToLowerInvariant()};ts:{ts};"
+            : $"id:{resourceId.ToLowerInvariant()};request-id:{requestId};ts:{ts};";
+        var v1 = Convert.ToHexStringLower(System.Security.Cryptography.HMACSHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(secret ?? MercadoPagoSecret), System.Text.Encoding.UTF8.GetBytes(manifest)));
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/webhooks/mercadopago?data.id={resourceId}&type={type}")
+        {
+            Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("x-signature", $"ts={ts},v1={v1}");
+        if (requestId is not null)
+        {
+            request.Headers.Add("x-request-id", requestId);
+        }
         return request;
     }
 
@@ -324,5 +356,75 @@ public sealed class FakeEmailSender : IEmailSender
 
         Sent.Enqueue(message);
         return Task.FromResult<string?>($"fake-{Guid.NewGuid():N}");
+    }
+}
+
+/// <summary>
+/// O Mercado Pago dos testes. A criação com o mesmo id de compra devolve o mesmo pagamento, como a chave de
+/// idempotência faz lá; a situação de cada pagamento é a que o teste definir.
+/// </summary>
+public sealed class FakePaymentGateway : IPaymentGateway
+{
+    private readonly ConcurrentDictionary<Guid, string> _byPayment = new();
+    private readonly ConcurrentDictionary<string, ProviderPayment> _remote = new();
+    private int _creates;
+
+    /// <summary>Quantas vezes a criação chegou "lá".</summary>
+    public int Creates => _creates;
+
+    /// <summary>A situação dos próximos cartões na criação; o padrão é "em análise" (pendente).</summary>
+    public PaymentStatus NextCardStatus { get; set; } = PaymentStatus.Pending;
+
+    /// <summary>O roteiro faz as próximas criações falharem, na ordem.</summary>
+    public ConcurrentQueue<Exception> Failures { get; } = new();
+
+    public ConcurrentQueue<(ChargeRequest Request, CardToken? Card)> Requests { get; } = new();
+
+    public string? ProviderIdOf(Guid paymentId) => _byPayment.TryGetValue(paymentId, out var id) ? id : null;
+
+    /// <summary>Muda o pagamento "lá", como o aluno pagando, o banco estornando ou um chargeback.</summary>
+    public void Set(
+        string providerId, PaymentStatus? status = null, long? amountCents = null, string? currency = null, long? refundedCents = null)
+    {
+        var current = _remote[providerId];
+        _remote[providerId] = current with
+        {
+            Status = status ?? current.Status,
+            AmountCents = amountCents ?? current.AmountCents,
+            Currency = currency ?? current.Currency,
+            RefundedCents = refundedCents ?? current.RefundedCents,
+        };
+    }
+
+    public Task<CreatedCharge> CreatePixAsync(ChargeRequest request, DateTimeOffset expiresAt, CancellationToken ct) =>
+        Task.FromResult(Create(request, null, PaymentStatus.Pending) with
+        {
+            PixQrCode = $"00020126pix-{request.PaymentId:N}",
+            PixQrCodeBase64 = "iVBORw0KGgo=",
+            PixExpiresAt = expiresAt,
+        });
+
+    public Task<CreatedCharge> CreateCardAsync(ChargeRequest request, CardToken card, CancellationToken ct) =>
+        Task.FromResult(Create(request, card, NextCardStatus));
+
+    public Task<ProviderPayment?> GetPaymentAsync(string providerId, CancellationToken ct) =>
+        Task.FromResult(_remote.TryGetValue(providerId, out var payment) ? payment : null);
+
+    private CreatedCharge Create(ChargeRequest request, CardToken? card, PaymentStatus status)
+    {
+        if (Failures.TryDequeue(out var failure))
+        {
+            throw failure;
+        }
+
+        Requests.Enqueue((request, card));
+        var providerId = _byPayment.GetOrAdd(request.PaymentId, _ =>
+        {
+            Interlocked.Increment(ref _creates);
+            var id = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            _remote[id] = new ProviderPayment(id, status, request.PaymentId.ToString(), request.AmountCents, "BRL");
+            return id;
+        });
+        return new CreatedCharge(providerId, _remote[providerId].Status);
     }
 }

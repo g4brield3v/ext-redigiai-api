@@ -107,7 +107,7 @@ Especificação: seções 3 (Créditos e cobrança), 9 e 15 (arrependimento e au
 
 - `credit_ledger` só com inserção; `credit_buckets` como cache; ordem de consumo plano → grátis → avulso; devolução para bucket vencido vira avulso.
 - Mercado Pago: avulsa por Pix e cartão; plano por preapproval no cartão; webhooks com `x-signature`, `webhook_events` e job `process_payment` que consulta a API.
-- Jobs agendados: segunda 00h (3 créditos) e dia 1º 00h (vencimento), em horário de Brasília.
+- Plano mensal: 12 créditos a cada cobrança aprovada, que vencem na cobrança seguinte; vencimento por varredura periódica.
 - Estorno e chargeback; direito de arrependimento com `refund_requests` e job `process_refund`.
 - Tela de checkout; compras e assinatura no Perfil; e-mails de pagamento.
 
@@ -115,7 +115,7 @@ Especificação: seções 3 (Créditos e cobrança), 9 e 15 (arrependimento e au
 - Webhook repetido não concede crédito duas vezes.
 - Crédito só é concedido após consulta à API do Mercado Pago.
 - Saldo nunca fica negativo sob concorrência (teste com 20 envios paralelos).
-- Testes das bordas de data: segunda 00h, dia 1º 00h, troca de mês no meio da semana, fuso de Brasília.
+- Testes das bordas de data: o vencimento um minuto antes e depois da cobrança seguinte, e a renovação que concede o novo ciclo.
 
 ## Etapa 5 · Conta e lançamento
 

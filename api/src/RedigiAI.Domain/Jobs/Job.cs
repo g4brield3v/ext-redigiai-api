@@ -13,6 +13,7 @@ public static class JobTypes
     public const string Transcribe = "transcribe";
     public const string Grade = "grade";
     public const string SendEmail = "send_email";
+    public const string ProcessPayment = "process_payment";
 }
 
 /// <summary>Trabalho da fila. É gravado na mesma transação da mudança que o disparou.</summary>

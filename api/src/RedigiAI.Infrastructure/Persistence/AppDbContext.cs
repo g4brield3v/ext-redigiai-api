@@ -20,6 +20,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<CreditBucket> CreditBuckets => Set<CreditBucket>();
     public DbSet<CreditLedgerEntry> CreditLedger => Set<CreditLedgerEntry>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<Essay> Essays => Set<Essay>();
     public DbSet<EssayBatch> EssayBatches => Set<EssayBatch>();
     public DbSet<Asset> Assets => Set<Asset>();
@@ -46,6 +49,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<AssetScope>().HaveConversion<SnakeCaseEnumConverter<AssetScope>>();
         configuration.Properties<UserRole>().HaveConversion<SnakeCaseEnumConverter<UserRole>>();
         configuration.Properties<CreditSource>().HaveConversion<SnakeCaseEnumConverter<CreditSource>>();
+        configuration.Properties<SubscriptionStatus>().HaveConversion<SnakeCaseEnumConverter<SubscriptionStatus>>();
+        configuration.Properties<PaymentKind>().HaveConversion<SnakeCaseEnumConverter<PaymentKind>>();
+        configuration.Properties<PaymentMethod>().HaveConversion<SnakeCaseEnumConverter<PaymentMethod>>();
+        configuration.Properties<PaymentStatus>().HaveConversion<SnakeCaseEnumConverter<PaymentStatus>>();
         configuration.Properties<EssayStatus>().HaveConversion<SnakeCaseEnumConverter<EssayStatus>>();
         configuration.Properties<JobStatus>().HaveConversion<SnakeCaseEnumConverter<JobStatus>>();
         configuration.Properties<PromptKind>().HaveConversion<SnakeCaseEnumConverter<PromptKind>>();

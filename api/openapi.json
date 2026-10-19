@@ -2059,6 +2059,248 @@
           }
         }
       }
+    },
+    "/v1/webhooks/mercadopago": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Recebe uma notificação (cabeçalhos `x-signature` e `x-request-id`; consulta `data.id` e\r\n`type`). Grava e responde 200 em seguida; o pagamento é consultado na API do Mercado Pago depois, na fila.",
+        "operationId": "receiveMercadoPagoWebhook",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/checkout/single": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Compra correções avulsas (R$ 16 cada, de 1 a 10) por Pix ou cartão. Exige `Idempotency-Key`; repetir a\r\nchave devolve a mesma compra. O Pix volta com o QR code, válido por 30 minutos. Os créditos entram quando o\r\npagamento é confirmado: consulte `GET /v1/payments/{id}`.",
+        "operationId": "checkoutSingle",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutSingleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutSingleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutSingleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDto"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/payments": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "As compras do aluno, da mais recente para a mais antiga.",
+        "operationId": "listPayments",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentListDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/payments/{id}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Uma compra do aluno, com a situação atual. A tela do Pix consulta a cada 3 segundos.",
+        "operationId": "getPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2148,6 +2390,92 @@
               "integer"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "CardPaymentRequest": {
+        "required": [
+          "token",
+          "paymentMethodId",
+          "issuerId",
+          "identificationType",
+          "identificationNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paymentMethodId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "issuerId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "identificationType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "identificationNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CheckoutSingleRequest": {
+        "required": [
+          "quantity",
+          "method",
+          "guardianAuthorized",
+          "card"
+        ],
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "method": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PaymentMethod"
+              }
+            ]
+          },
+          "guardianAuthorized": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "card": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardPaymentRequest"
+              }
+            ]
           }
         }
       },
@@ -2622,7 +2950,7 @@
       "CreditSource": {
         "enum": [
           "trial",
-          "plan_week",
+          "plan",
           "single",
           "refund"
         ]
@@ -3198,6 +3526,104 @@
           "issue"
         ]
       },
+      "PaymentDto": {
+        "required": [
+          "id",
+          "kind",
+          "method",
+          "amountCents",
+          "quantity",
+          "status",
+          "createdAt",
+          "approvedAt",
+          "refundable",
+          "pix"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PaymentKind"
+          },
+          "method": {
+            "$ref": "#/components/schemas/PaymentMethod"
+          },
+          "amountCents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "refundable": {
+            "type": "boolean"
+          },
+          "pix": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PixDto"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentKind": {
+        "enum": [
+          "single",
+          "plan"
+        ]
+      },
+      "PaymentListDto": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentDto"
+            }
+          }
+        }
+      },
+      "PaymentMethod": {
+        "enum": [
+          "pix",
+          "card"
+        ]
+      },
+      "PaymentStatus": {
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled",
+          "refunded",
+          "charged_back"
+        ]
+      },
       "PhotoUrlDto": {
         "required": [
           "url"
@@ -3206,6 +3632,26 @@
         "properties": {
           "url": {
             "type": "string"
+          }
+        }
+      },
+      "PixDto": {
+        "required": [
+          "qrCodeBase64",
+          "copyPaste",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "qrCodeBase64": {
+            "type": "string"
+          },
+          "copyPaste": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -3218,7 +3664,8 @@
           "termsAcceptanceRequired",
           "aiNoticeAccepted",
           "emailPreferences",
-          "credits"
+          "credits",
+          "subscription"
         ],
         "type": "object",
         "properties": {
@@ -3249,6 +3696,16 @@
           },
           "credits": {
             "$ref": "#/components/schemas/CreditBalanceDto"
+          },
+          "subscription": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SubscriptionDto"
+              }
+            ]
           }
         }
       },
@@ -4232,6 +4689,39 @@
           }
         }
       },
+      "SubscriptionDto": {
+        "required": [
+          "status",
+          "nextBillingAt",
+          "cardLast4"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "nextBillingAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "cardLast4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SubscriptionStatus": {
+        "enum": [
+          "active",
+          "paused",
+          "cancelled"
+        ]
+      },
       "TranscriptionLineDto": {
         "required": [
           "number",
@@ -4377,6 +4867,9 @@
     },
     {
       "name": "Health"
+    },
+    {
+      "name": "Payments"
     }
   ]
 }

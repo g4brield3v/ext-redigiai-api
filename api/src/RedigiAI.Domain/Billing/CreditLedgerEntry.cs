@@ -43,6 +43,53 @@ public sealed class CreditLedgerEntry
             CreatedAt = now,
         };
 
+    /// <summary>Vencimento das correções que sobraram num bucket do plano (dia 1º): lançamento negativo.</summary>
+    public static CreditLedgerEntry ForExpiry(CreditBucket bucket, int amount, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(amount, 1);
+        return new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = -amount,
+            BucketId = bucket.Id,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+    }
+
+    /// <summary>A concessão das correções de uma compra, ligada a ela.</summary>
+    public static CreditLedgerEntry ForPaymentGrant(CreditBucket bucket, Guid paymentId, DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = bucket.Granted,
+            BucketId = bucket.Id,
+            PaymentId = paymentId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+
+    /// <summary>Estorno ou chargeback: saem do saldo as correções ainda não usadas daquela compra.</summary>
+    public static CreditLedgerEntry ForPaymentReversal(CreditBucket bucket, int amount, Guid paymentId, DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(amount, 1);
+        return new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = bucket.UserId,
+            Source = bucket.Source,
+            Delta = -amount,
+            BucketId = bucket.Id,
+            PaymentId = paymentId,
+            ExpiresAt = bucket.ExpiresAt,
+            CreatedAt = now,
+        };
+    }
+
     public static CreditLedgerEntry ForGrant(CreditBucket bucket, DateTimeOffset now) =>
         new()
         {
