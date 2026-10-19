@@ -19,7 +19,9 @@ public sealed record ProcessPaymentPayload(string MpPaymentId, Guid? EventId);
 internal sealed class ProcessPaymentHandler(
     IPaymentGateway gateway,
     IPaymentRepository payments,
+    ISubscriptionRepository subscriptions,
     ICreditRepository credits,
+    PlanCredits planCredits,
     IWebhookEventRepository events,
     IJobQueue jobs,
     IAuditLog audit,
@@ -36,9 +38,14 @@ internal sealed class ProcessPaymentHandler(
     {
         var job = JsonSerializer.Deserialize<ProcessPaymentPayload>(payload, Json)!;
         var remote = await gateway.GetPaymentAsync(job.MpPaymentId, ct);
+        // A compra avulsa vai lá com o id dela como referência; a cobrança do plano é achada pelo id do pagamento.
         var payment = remote is { ExternalReference: { } reference } && Guid.TryParse(reference, out var paymentId)
             ? await payments.FindAsync(paymentId, ct)
             : null;
+        if (payment is null && remote is not null)
+        {
+            payment = await payments.FindByProviderIdAsync(remote.ProviderId, ct);
+        }
 
         if (remote is not null && payment is not null && (remote.AmountCents != payment.AmountCents || remote.Currency != "BRL"))
         {
@@ -109,11 +116,19 @@ internal sealed class ProcessPaymentHandler(
         switch (remote.Status)
         {
             case PaymentStatus.Approved:
-                var bucket = CreditBucket.GrantForPayment(payment, now);
-                credits.AddGrant(bucket, CreditLedgerEntry.ForPaymentGrant(bucket, payment.Id, now));
+                if (payment.Kind == PaymentKind.Plan)
+                {
+                    await ApprovePlanChargeAsync(payment, now, ct);
+                }
+                else
+                {
+                    var bucket = CreditBucket.GrantForPayment(payment, now);
+                    credits.AddGrant(bucket, CreditLedgerEntry.ForPaymentGrant(bucket, payment.Id, now));
+                    audit.Record(
+                        "system", "credit.granted", "credit_bucket", bucket.Id, new { source = "single", delta = bucket.Granted, paymentId = payment.Id });
+                }
+
                 audit.Record("system", "payment.approved", "payment", payment.Id, data);
-                audit.Record(
-                    "system", "credit.granted", "credit_bucket", bucket.Id, new { source = "single", delta = bucket.Granted, paymentId = payment.Id });
                 EmailJobs.Enqueue(jobs, EmailTemplates.PaymentApproved, payment.Id);
                 break;
 
@@ -133,7 +148,35 @@ internal sealed class ProcessPaymentHandler(
 
             default:
                 audit.Record("system", $"payment.{Name(remote.Status)}", "payment", payment.Id, data);
+                if (remote.Status == PaymentStatus.Rejected && payment is { Kind: PaymentKind.Plan, SubscriptionId: { } subscriptionId })
+                {
+                    // Cobrança do plano recusada: sem renovação até regularizar; as correções que o aluno tem seguem valendo.
+                    if (await subscriptions.TryTransitionAsync(subscriptionId, SubscriptionStatus.Paused, now, ct))
+                    {
+                        audit.Record("system", "subscription.paused", "subscription", subscriptionId, new { paymentId = payment.Id });
+                    }
+
+                    EmailJobs.Enqueue(jobs, EmailTemplates.SubscriptionPaymentFailed, payment.Id);
+                }
+
                 break;
+        }
+    }
+
+    /// <summary>
+    /// A cobrança do plano aprovada: zera o ciclo anterior e concede as 12 correções até a cobrança seguinte, e a
+    /// assinatura pausada por uma recusa volta a ficar ativa.
+    /// </summary>
+    private async Task ApprovePlanChargeAsync(Payment payment, DateTimeOffset now, CancellationToken ct)
+    {
+        var subscription = payment.SubscriptionId is { } id ? await subscriptions.FindAsync(id, ct) : null;
+        // A próxima cobrança que o Mercado Pago informou; sem ela (ou já passada), um mês depois da aprovação.
+        var cycleEnd = subscription?.NextBillingAt is { } next && next > now.AddDays(1) ? next : now.AddMonths(1);
+        await planCredits.RenewAsync(payment, cycleEnd, now, ct);
+
+        if (subscription is not null && await subscriptions.TryTransitionAsync(subscription.Id, SubscriptionStatus.Active, now, ct))
+        {
+            audit.Record("system", "subscription.active", "subscription", subscription.Id, new { paymentId = payment.Id });
         }
     }
 

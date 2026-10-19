@@ -7,29 +7,42 @@ public class SubscriptionTests
     private static readonly DateTimeOffset Now = new(2026, 10, 19, 15, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void A_subscription_starts_active()
+    public void A_subscription_request_starts_pending_without_the_mercado_pago_id()
     {
-        var subscription = Subscription.Start(Guid.NewGuid(), "pre-1", Now.AddMonths(1), "4242", Now);
+        var subscription = Subscription.Request(Guid.NewGuid(), "key", guardianAuthorizedAt: null, Now);
 
-        Assert.Equal(SubscriptionStatus.Active, subscription.Status);
-        Assert.Equal("4242", subscription.CardLast4);
+        Assert.Equal(SubscriptionStatus.Pending, subscription.Status);
+        Assert.Null(subscription.MpPreapprovalId);
+        Assert.Null(subscription.CheckoutUrl);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void A_subscription_needs_the_preapproval_id(string preapprovalId)
+    public void A_subscription_request_needs_the_idempotency_key(string key)
     {
-        Assert.Throws<ArgumentException>(() => Subscription.Start(Guid.NewGuid(), preapprovalId, null, null, Now));
+        Assert.Throws<ArgumentException>(() => Subscription.Request(Guid.NewGuid(), key, null, Now));
     }
 
     [Theory]
-    [InlineData("424")]
-    [InlineData("42a2")]
-    [InlineData("42424")]
-    public void The_card_digits_are_exactly_four_digits(string last4)
+    [InlineData(SubscriptionStatus.Active, new[] { SubscriptionStatus.Pending, SubscriptionStatus.Paused })]
+    [InlineData(SubscriptionStatus.Paused, new[] { SubscriptionStatus.Active })]
+    [InlineData(SubscriptionStatus.Cancelled, new[] { SubscriptionStatus.Pending, SubscriptionStatus.Active, SubscriptionStatus.Paused })]
+    [InlineData(SubscriptionStatus.Pending, new SubscriptionStatus[0])]
+    public void Each_status_is_reached_only_from_the_expected_ones(SubscriptionStatus to, SubscriptionStatus[] from)
     {
-        Assert.Throws<ArgumentException>(() => Subscription.Start(Guid.NewGuid(), "pre-1", null, last4, Now));
+        Assert.Equal(from, Subscription.ReachableFrom(to));
+    }
+
+    [Theory]
+    [InlineData("4242", "4242")]
+    [InlineData("424", null)]
+    [InlineData("42a2", null)]
+    [InlineData("4111111111111111", null)]
+    [InlineData(null, null)]
+    public void Only_four_digits_are_kept_as_the_card_ending(string? informed, string? kept)
+    {
+        Assert.Equal(kept, Subscription.CardLast4From(informed));
     }
 
     [Fact]

@@ -60,6 +60,9 @@ public static class Errors
     public static AppError PaymentFailed() =>
         new("PAYMENT_FAILED", 402, "O pagamento não foi aprovado. Tente outro meio de pagamento.", retryable: true);
 
+    public static AppError PlanAlreadyActive() =>
+        new("PLAN_ALREADY_ACTIVE", 409, "Você já tem um plano mensal ativo.");
+
     public static AppError GuardianAuthorizationRequired() =>
         new("GUARDIAN_AUTHORIZATION_REQUIRED", 422, "Confirme que o seu responsável autorizou esta compra.");
 

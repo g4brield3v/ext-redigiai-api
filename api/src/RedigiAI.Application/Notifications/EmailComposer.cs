@@ -22,10 +22,20 @@ public sealed record EssayEmailFacts(
     int? FailureIllegibleCount,
     string PromptSlug);
 
-/// <summary>O que o aviso de uma compra aprovada mostra (texto aprovado em 19/10/2026).</summary>
+/// <summary>O que os avisos de pagamento mostram (textos aprovados em 19/10/2026).</summary>
 /// <param name="RefundDeadline">Até quando vale o direito de arrependimento.</param>
+/// <param name="PlanCreditsUntil">No plano: até quando valem as correções do ciclo.</param>
+/// <param name="CardLast4">Na cobrança recusada do plano, o final do cartão, se o Mercado Pago informou.</param>
 public sealed record PaymentEmailFacts(
-    string To, string? Name, Guid PaymentId, int Quantity, long AmountCents, DateTimeOffset RefundDeadline);
+    string To,
+    string? Name,
+    Guid PaymentId,
+    Domain.Billing.PaymentKind Kind,
+    int Quantity,
+    long AmountCents,
+    DateTimeOffset RefundDeadline,
+    DateTimeOffset? PlanCreditsUntil = null,
+    string? CardLast4 = null);
 
 /// <summary>
 /// Monta os e-mails da redação: assunto com o título "Vestibular – Tipo – Tema", um aviso curto e um botão para a
@@ -110,12 +120,54 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
         return new EmailMessage(facts.To, content.Subject, Html(recipient, content), Text(recipient, content), template, facts.EssayId);
     }
 
-    /// <summary>O aviso de uma compra de correções avulsas aprovada.</summary>
+    /// <summary>Os avisos de pagamento: compra avulsa aprovada, plano mensal ativo e cobrança do plano recusada.</summary>
     public EmailMessage ComposePayment(string template, PaymentEmailFacts facts)
     {
+        var amount = $"R$ {(facts.AmountCents / 100m).ToString("N2", PtBr)}";
+        var until = facts.PlanCreditsUntil is { } date ? BrasiliaTime.At(date).ToString("dd/MM", PtBr) : null;
+        if (template == EmailTemplates.SubscriptionPaymentFailed)
+        {
+            var card = facts.CardLast4 is { } last4 ? $"no cartão com final {last4}" : "no seu cartão";
+            List<string> paragraphs = [$"A cobrança de {amount} {card} foi recusada. Enquanto ela não for regularizada, o plano não renova."];
+            if (until is not null)
+            {
+                paragraphs.Add($"As correções que você já tem valem até {until}.");
+            }
+
+            return Message(
+                template,
+                facts,
+                new Content(
+                    "Não conseguimos cobrar o seu plano mensal",
+                    "Não conseguimos cobrar o seu plano mensal",
+                    paragraphs,
+                    "Gerenciar assinatura",
+                    "/perfil",
+                    CanTurnOff: false),
+                "Plano mensal");
+        }
+
         if (template != EmailTemplates.PaymentApproved)
         {
             throw new ArgumentOutOfRangeException(nameof(template), template, "Unknown e-mail template.");
+        }
+
+        if (facts.Kind == Domain.Billing.PaymentKind.Plan)
+        {
+            return Message(
+                template,
+                facts,
+                new Content(
+                    "Seu plano mensal está ativo",
+                    "Seu plano mensal está ativo",
+                    [
+                        $"Recebemos o pagamento de {amount}. Você tem 12 correções para usar até {until ?? "a próxima cobrança"}. "
+                            + "Nessa data o plano renova e o seu saldo do plano volta a 12; as correções que sobrarem não passam para o mês seguinte.",
+                    ],
+                    "Ir para o painel",
+                    "/painel",
+                    CanTurnOff: false),
+                "Plano mensal");
         }
 
         var corrections = facts.Quantity == 1 ? "1 correção avulsa" : $"{facts.Quantity} correções avulsas";
@@ -123,14 +175,19 @@ public sealed class EmailComposer(IOptions<SiteOptions> site, IOptions<CompanyOp
             $"Pagamento aprovado: {corrections}",
             "Seu pagamento foi aprovado",
             [
-                $"Recebemos o pagamento de R$ {(facts.AmountCents / 100m).ToString("N2", PtBr)} por {corrections}. "
+                $"Recebemos o pagamento de {amount} por {corrections}. "
                     + (facts.Quantity == 1 ? "Ela já está no seu saldo e não vence." : "Elas já estão no seu saldo e não vencem."),
                 $"Se mudar de ideia, você pode desistir da compra até {BrasiliaTime.At(facts.RefundDeadline).ToString("dd/MM", PtBr)} e receber o valor das correções que não usou.",
             ],
             "Ir para o painel",
             "/painel",
             CanTurnOff: false);
-        var recipient = new Recipient(facts.Name, corrections);
+        return Message(template, facts, content, corrections);
+    }
+
+    private EmailMessage Message(string template, PaymentEmailFacts facts, Content content, string preview)
+    {
+        var recipient = new Recipient(facts.Name, preview);
         return new EmailMessage(facts.To, content.Subject, Html(recipient, content), Text(recipient, content), template, facts.PaymentId);
     }
 

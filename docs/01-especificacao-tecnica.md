@@ -157,7 +157,7 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 |---|---|---|
 | `credit_ledger` | id, user_id, source (`trial`, `plan`, `single`, `refund`), delta (quantidade concedida, positiva; reservada ou vencida, negativa), bucket_id, essay_id, payment_id, expires_at, created_at | Livro-razão: só insere, nunca altera. Saldo = soma por bucket não vencido. |
 | `credit_buckets` | id, user_id, source, granted, remaining, expires_at (null = não vence), grant_key, revoked_at | Cache do saldo, atualizado na mesma transação do ledger com `UPDATE … WHERE remaining >= n`. `grant_key` (único quando preenchido) identifica a concessão que não pode se repetir: uma cobrança (`payment:{compra}`). `revoked_at`: a compra foi estornada ou contestada; o saldo saiu e nenhuma correção volta para o bucket, nem a que estava reservada para uma redação em andamento. |
-| `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único), status (`active`, `paused`, `cancelled`), next_billing_at, card_last4, created_at, updated_at | Plano mensal no Mercado Pago. Cada cobrança aprovada concede 12 correções, que vencem em `next_billing_at`. |
+| `subscriptions` | id, user_id (no máximo uma assinatura `active` ou `paused` por aluno), mp_preapproval_id (único quando preenchido), status (`pending`, `active`, `paused`, `cancelled`), idempotency_key (única por aluno), checkout_url, guardian_authorized_at, next_billing_at, card_last4, created_at, updated_at, cancelled_at | Plano mensal no Mercado Pago. Cada cobrança aprovada concede 12 correções, que vencem em `next_billing_at`. |
 | `payments` | id, user_id, mp_payment_id (único quando preenchido), kind (`plan`, `single`), method (`pix`, `card`), amount_cents, quantity, status (`pending`, `approved`, `rejected`, `cancelled`, `refunded`, `charged_back`), idempotency_key (única por aluno), guardian_authorized_at, refunded_cents, pix_qr_code, pix_qr_code_base64, pix_expires_at, created_at, updated_at, approved_at | Idempotência pelo id do Mercado Pago e pela `Idempotency-Key` do aluno. A compra é gravada antes da chamada ao Mercado Pago e recebe o id de lá depois; o id da compra vai como `external_reference` e como `X-Idempotency-Key`. Status muda por `UPDATE` condicional: pendente → aprovado, recusado, cancelado (Pix vencido), estornado ou contestado; aprovado → estornado ou contestado. |
 | `webhook_events` | id, provider, external_id (único por provedor), topic, resource_id, payload, received_at, processed_at | Guarda todo webhook antes de processar. `external_id` é o `x-request-id`, que entra na assinatura, então a reentrega não duplica. O `payload` guarda só os campos conhecidos (id, tipo, ação, `data.id`). A assinatura vale até 10 minutos do `ts`. |
 
@@ -215,8 +215,8 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catál
 | `POST /v1/checkout/single` | Corpo: `quantity` (1 a 10), `method` (`pix` ou `card`), `guardianAuthorized` e, no cartão, `card` (`token`, `paymentMethodId`, `issuerId`, `identificationType`, `identificationNumber`, vindos do Card Payment Brick). Exige `Idempotency-Key`. Cria o pagamento no Mercado Pago e responde 201 com a compra; Pix devolve QR code e copia-e-cola. Cartão em 1 parcela. |
 | `GET /v1/payments` | Compras do aluno, da mais recente para a mais antiga, com `refundable` (dentro dos 7 dias). |
 | `GET /v1/payments/{id}` | Uma compra do aluno, com a situação atual; a tela do Pix consulta a cada 3 s. De outro aluno, 404. |
-| `POST /v1/checkout/plan` | Cria a assinatura (preapproval) no cartão e devolve a URL de checkout. |
-| `POST /v1/subscription/cancel` | Cancela a renovação; os créditos já concedidos seguem até o dia 1º. |
+| `POST /v1/checkout/plan` | Corpo: `guardianAuthorized`. Exige `Idempotency-Key`. Cria a assinatura (preapproval) pendente no Mercado Pago e devolve `{ subscriptionId, checkoutUrl }`, o checkout de lá. Com plano ativo ou pausado: `PLAN_ALREADY_ACTIVE` (409). |
+| `POST /v1/subscription/cancel` | Cancela a assinatura no Mercado Pago e aqui; os créditos já concedidos seguem até o fim do ciclo pago. Devolve a assinatura (`status`, `nextBillingAt`, `cardLast4`). Sem plano ativo ou pausado: 404. |
 | `POST /v1/webhooks/mercadopago` | Recebe notificações; valida a assinatura `x-signature`, grava em `webhook_events` e enfileira job. Sem token do Clerk. |
 | `POST /v1/webhooks/clerk` | Eventos de usuário (e-mail alterado, conta excluída); valida a assinatura Svix. |
 
@@ -245,6 +245,7 @@ A fila é a tabela `jobs` no PostgreSQL: gravar a mudança de status e o job na 
 | `transcribe` | Confirmação do envio | Transcreve a foto (seção 8). 0 ilegíveis → `queued` + job `grade`; 1 a 10 → `awaiting_review` + e-mail; mais de 10 → `failed` (PHOTO_UNREADABLE) + devolve crédito | 4 | `failed` (TRANSCRIPTION_FAILED), devolve crédito, e-mail |
 | `grade` | Transcrição sem ilegíveis ou revisão confirmada | Corrige (seção 8), valida, calcula a nota, grava, consome o crédito, `completed`, job `send_email` | 4 | `failed` (GRADING_FAILED), devolve crédito, e-mail |
 | `send_email` | Eventos da seção 10 | Envia pelo SendGrid; único por template + referência | 6 | Registra e alerta |
+| `process_subscription` | Webhook de assinatura (`subscription_preapproval`) ou de cobrança (`subscription_authorized_payment`), ou a reconciliação | Consulta a assinatura na API e muda a situação dela; a cobrança vira uma compra do plano e enfileira `process_payment` | 6 | Alerta para verificação manual |
 | `process_payment` | Webhook do Mercado Pago | Consulta o pagamento na API, concede créditos ou atualiza a assinatura | 6 | Alerta para verificação manual |
 | `export_user` / `delete_user` | Pedido do aluno ou inatividade | Gera arquivo de dados / apaga e anonimiza | 3 | Alerta |
 
@@ -422,10 +423,11 @@ O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados 
 
 **Plano mensal (cartão, recorrente)**
 
-1. `POST /v1/checkout/plan` cria uma assinatura (preapproval) de R$ 39,90 mensais e devolve a URL de checkout.
+1. `POST /v1/checkout/plan` grava a assinatura como `pending` e cria lá uma assinatura (preapproval) de R$ 39,90 mensais, com o id daqui como `external_reference`; devolve a URL de checkout, onde o aluno autoriza o cartão. Compras de 16 e 17 anos exigem a autorização do responsável.
 2. O webhook de assinatura autorizada cria `subscriptions` com `status = active`. Cada cobrança aprovada (a primeira e cada renovação mensal) concede 12 créditos do plano, válidos até a cobrança seguinte (`next_billing_at`). Não acumulam: na mesma transação, a renovação encerra o bucket do ciclo anterior (saldo zerado, com lançamento negativo, e vencido naquele instante), seja qual for o horário em que a cobrança chega. Uma correção reservada no ciclo anterior e devolvida depois volta como avulsa, como em todo bucket vencido.
 3. Cada cobrança mensal aprovada mantém a assinatura ativa e atualiza `next_billing_at`. Cobrança recusada → `paused`: sem novas concessões até regularizar; os créditos já concedidos seguem até o vencimento deles.
-4. Cancelamento pelo aluno → `cancelled` ao fim do período pago.
+4. Cancelamento pelo aluno → a assinatura é cancelada no Mercado Pago (não há mais cobranças) e fica `cancelled` aqui na hora; as correções já concedidas valem até o fim do ciclo pago.
+5. Cada cobrança (aviso `subscription_authorized_payment`) vira uma compra `plan` ligada à assinatura (`payments.subscription_id`), achada depois pelo id do pagamento; a aprovação, o estorno e a recusa seguem o `process_payment`. A recusa pausa a assinatura e manda `subscription_payment_failed`; a próxima cobrança aprovada a reativa.
 
 **Correção avulsa (Pix ou cartão)**
 
@@ -519,6 +521,7 @@ Toda exceção conhecida é lançada como `AppError(code, httpStatus, userMessag
 | `TRANSCRIPTION_FAILED` | — | Sim | Não conseguimos ler a foto. Sua correção foi devolvida. |
 | `GRADING_FAILED` | — | Sim | A correção falhou. Sua correção foi devolvida; envie de novo. |
 | `PAYMENT_FAILED` | 402 | Sim | O pagamento não foi aprovado. Tente outro meio de pagamento. |
+| `PLAN_ALREADY_ACTIVE` | 409 | Não | Você já tem um plano mensal ativo. |
 | `PAYMENT_UNAVAILABLE` | 503 | Sim | Não conseguimos falar com o meio de pagamento. Tente de novo em instantes. |
 | `GUARDIAN_AUTHORIZATION_REQUIRED` | 422 | Não | Confirme que o seu responsável autorizou esta compra. |
 | `RATE_LIMITED` | 429 | Sim | Muitas tentativas seguidas. Aguarde um minuto. |

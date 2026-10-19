@@ -6,6 +6,8 @@ public interface IPaymentRepository
 
     Task<Payment?> FindAsync(Guid paymentId, CancellationToken ct);
 
+    Task<Payment?> FindByProviderIdAsync(string mpPaymentId, CancellationToken ct);
+
     /// <summary>A compra do aluno com esta <c>Idempotency-Key</c>.</summary>
     Task<Payment?> FindByKeyAsync(Guid userId, string idempotencyKey, CancellationToken ct);
 

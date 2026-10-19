@@ -179,15 +179,3 @@ internal sealed class CreditRepository(AppDbContext db) : ICreditRepository
         return refunded.ToHashSet();
     }
 }
-
-internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRepository
-{
-    public void Add(Subscription subscription) => db.Subscriptions.Add(subscription);
-
-    public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
-        db.Subscriptions
-            .AsNoTracking()
-            .Where(s => s.UserId == userId)
-            .OrderByDescending(s => s.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-}

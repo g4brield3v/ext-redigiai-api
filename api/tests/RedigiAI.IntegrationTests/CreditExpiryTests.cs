@@ -99,7 +99,8 @@ public class CreditExpiryTests(ApiFixture api)
         var student = await app.StudentAsync();
         await app.SubscribeAsync(student);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => app.SubscribeAsync(student));
+        var conflict = await Assert.ThrowsAnyAsync<Exception>(() => app.SubscribeAsync(student));
+        Assert.Contains("ux_subscriptions_open_per_user", conflict.ToString());
     }
 
     [Fact]
@@ -174,14 +175,19 @@ public class CreditExpiryTests(ApiFixture api)
             return new Student((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid(), client);
         }
 
-        /// <summary>Grava a assinatura direto no banco; a ligação com o Mercado Pago vem na etapa 4c.</summary>
+        /// <summary>Uma assinatura já autorizada, gravada direto no banco (o fluxo do Mercado Pago está em SubscriptionTests).</summary>
         public async Task<Subscription> SubscribeAsync(Student student, DateTimeOffset? nextBillingAt = null, string? cardLast4 = null)
         {
-            var subscription = Subscription.Start(student.Id, $"pre-{Guid.NewGuid():N}", nextBillingAt, cardLast4, Clock.GetUtcNow());
+            var subscription = Subscription.Request(student.Id, Guid.NewGuid().ToString(), null, Clock.GetUtcNow());
             await using var scope = factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Subscriptions.Add(subscription);
             await db.SaveChangesAsync();
+            await db.Subscriptions.Where(s => s.Id == subscription.Id).ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Status, SubscriptionStatus.Active)
+                .SetProperty(x => x.MpPreapprovalId, $"pre-{Guid.NewGuid():N}")
+                .SetProperty(x => x.NextBillingAt, nextBillingAt)
+                .SetProperty(x => x.CardLast4, cardLast4));
             return subscription;
         }
 
@@ -196,12 +202,14 @@ public class CreditExpiryTests(ApiFixture api)
                 .Select(b => b.Id).FirstAsync());
         }
 
-        /// <summary>Uma cobrança do plano aprovada, como o job de pagamento fará na etapa 4c.</summary>
+        /// <summary>Uma cobrança do plano aprovada: a renovação que o job de pagamento faz.</summary>
         public async Task<Guid> RenewAsync(Student student, DateTimeOffset cycleEnd)
         {
-            var payment = Payment.StartPlan(student.Id, Guid.NewGuid().ToString(), null, Clock.GetUtcNow());
             await using var scope = factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var subscription = Subscription.Request(student.Id, Guid.NewGuid().ToString(), null, Clock.GetUtcNow());
+            db.Subscriptions.Add(subscription);
+            var payment = Payment.StartPlanCharge(subscription, Random.Shared.NextInt64(1, long.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture), Clock.GetUtcNow());
             db.Payments.Add(payment);
             await db.SaveChangesAsync();
 

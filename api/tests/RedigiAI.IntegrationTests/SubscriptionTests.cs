@@ -1,0 +1,274 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using RedigiAI.Application.Abstractions;
+using RedigiAI.Application.Billing;
+using RedigiAI.Domain.Billing;
+using RedigiAI.Domain.Common;
+using RedigiAI.Domain.Jobs;
+
+namespace RedigiAI.IntegrationTests;
+
+/// <summary>
+/// Plano mensal no Mercado Pago (etapa 4c): checkout da assinatura, autorização, cobranças mensais com 12 correções que
+/// não acumulam, cobrança recusada e cancelamento. O Mercado Pago é o simulado da fixture.
+/// </summary>
+[Collection(ApiCollection.Name)]
+public class SubscriptionTests(ApiFixture api)
+{
+    [Fact]
+    public async Task The_plan_checkout_returns_the_mercado_pago_page_and_the_same_key_returns_it_again()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+
+        var first = await student.CheckoutAsync(key: key);
+        var again = await student.CheckoutAsync(key: key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var checkout = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var subscriptionId = checkout.GetProperty("subscriptionId").GetGuid();
+        Assert.StartsWith("https://www.mercadopago.com.br/", checkout.GetProperty("checkoutUrl").GetString());
+        Assert.Equal(checkout.GetProperty("checkoutUrl").GetString(), (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("checkoutUrl").GetString());
+        Assert.NotNull(api.Payments.PreapprovalIdOf(subscriptionId));
+        Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
+
+        // Antes de o cartão ser autorizado, o perfil não mostra plano nem correções do plano.
+        var profile = await student.ProfileAsync();
+        Assert.Equal(JsonValueKind.Null, profile.GetProperty("subscription").ValueKind);
+        Assert.Equal(1, profile.GetProperty("credits").GetProperty("total").GetInt32());
+    }
+
+    [Fact]
+    public async Task Buyers_aged_16_or_17_must_declare_the_guardian_authorization_for_the_plan()
+    {
+        var minor = await Subscriber.CreateAsync(api, birthDate: DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-16).AddDays(-10));
+
+        var refused = await minor.CheckoutAsync();
+        var accepted = await minor.CheckoutAsync(guardianAuthorized: true);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Equal("GUARDIAN_AUTHORIZATION_REQUIRED", (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.NotNull(await api.QueryAsync(db => db.Subscriptions.Where(s => s.UserId == minor.Id).Select(s => s.GuardianAuthorizedAt).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task Each_approved_charge_gives_12_corrections_that_reset_at_the_next_one()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync(nextChargeAt: DateTimeOffset.UtcNow.AddMonths(1));
+        Assert.Equal("active", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+
+        var first = await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+        Assert.Equal(13, await student.CreditsAsync()); // 12 do plano + o teste grátis
+        var payment = await api.QueryAsync(db => db.Payments.SingleAsync(p => p.MpPaymentId == first));
+        Assert.Equal((PaymentKind.Plan, PaymentStatus.Approved, 3990L), (payment.Kind, payment.Status, payment.AmountCents));
+        var bucket = await api.QueryAsync(db => db.CreditBuckets.SingleAsync(b => b.GrantKey == CreditBucket.PaymentGrantKey(payment.Id)));
+        Assert.Equal(CreditSource.Plan, bucket.Source);
+        // O banco guarda microssegundos.
+        Assert.Equal(api.Payments.SubscriptionThere(preapprovalId).NextChargeAt!.Value, bucket.ExpiresAt!.Value, TimeSpan.FromMilliseconds(1));
+
+        // Usou 5; o mês seguinte zera o que sobrou e volta a 12.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.Id == bucket.Id).ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, 7)));
+        api.Payments.SetSubscription(preapprovalId, SubscriptionStatus.Active, nextChargeAt: DateTimeOffset.UtcNow.AddMonths(2));
+        await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+
+        Assert.Equal(13, await student.CreditsAsync());
+        Assert.Equal(0, (await api.QueryAsync(db => db.CreditBuckets.SingleAsync(b => b.Id == bucket.Id))).Remaining);
+    }
+
+    [Fact]
+    public async Task The_same_charge_notified_twice_becomes_one_purchase()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync();
+        var (chargeId, paymentId) = api.Payments.Charge(preapprovalId, PaymentStatus.Approved);
+
+        await student.NotifyAsync("subscription_authorized_payment", chargeId);
+        await student.NotifyAsync("subscription_authorized_payment", chargeId);
+        await RunAsync(JobTypes.ProcessSubscription);
+        await RunAsync(JobTypes.ProcessPayment);
+
+        Assert.Single(await api.QueryAsync(db => db.Payments.Where(p => p.MpPaymentId == paymentId).ToListAsync()));
+        Assert.Equal(13, await student.CreditsAsync());
+    }
+
+    [Fact]
+    public async Task A_refused_charge_pauses_the_plan_and_the_next_approved_one_resumes_it()
+    {
+        await SetEmailSendingAsync(true);
+        try
+        {
+            var student = await Subscriber.CreateAsync(api);
+            var preapprovalId = await student.SubscribeAsync(cardLast4: "4242");
+            await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+
+            var refused = await student.ChargeAsync(preapprovalId, PaymentStatus.Rejected);
+
+            Assert.Equal("paused", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+            // As correções que o aluno já tem continuam.
+            Assert.Equal(13, await student.CreditsAsync());
+            await RunAsync(JobTypes.SendEmail);
+            var refusedId = await api.QueryAsync(db => db.Payments.Where(p => p.MpPaymentId == refused).Select(p => p.Id).SingleAsync());
+            var notice = Assert.Single(api.Emails.For(refusedId));
+            Assert.Equal("subscription_payment_failed", notice.Template);
+            Assert.Contains("no cartão com final 4242", notice.Text);
+
+            await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+            Assert.Equal("active", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+        }
+        finally
+        {
+            await SetEmailSendingAsync(false);
+        }
+    }
+
+    [Fact]
+    public async Task A_student_with_an_open_plan_cannot_subscribe_again()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        await student.SubscribeAsync();
+
+        var again = await student.CheckoutAsync();
+
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Equal("PLAN_ALREADY_ACTIVE", (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Cancelling_stops_the_renewal_there_and_keeps_the_corrections_until_the_end_of_the_cycle()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync(nextChargeAt: DateTimeOffset.UtcNow.AddDays(20));
+        await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+
+        var response = await student.Client.PostAsync("/v1/subscription/cancel", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("cancelled", (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString());
+        Assert.Equal(SubscriptionStatus.Cancelled, api.Payments.SubscriptionThere(preapprovalId).Status);
+        Assert.Equal(13, await student.CreditsAsync());
+        Assert.NotNull(await api.QueryAsync(db => db.Subscriptions.Where(s => s.MpPreapprovalId == preapprovalId).Select(s => s.CancelledAt).SingleAsync()));
+
+        // Sem plano aberto, cancelar de novo é 404; e o aluno pode assinar outra vez.
+        Assert.Equal(HttpStatusCode.NotFound, (await student.Client.PostAsync("/v1/subscription/cancel", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await student.CheckoutAsync()).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_subscription_authorized_without_a_notification_is_found_by_the_reconciliation()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var subscriptionId = (await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
+        var preapprovalId = api.Payments.PreapprovalIdOf(subscriptionId)!;
+        api.Payments.SetSubscription(preapprovalId, SubscriptionStatus.Active, nextChargeAt: DateTimeOffset.UtcNow.AddMonths(1));
+        await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatedAt, x => x.CreatedAt.AddMinutes(-5))));
+
+        await using (var scope = api.Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IPaymentService>().RecheckPendingAsync(CancellationToken.None);
+        }
+
+        await RunAsync(JobTypes.ProcessSubscription);
+        Assert.Equal("active", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task When_mercado_pago_is_down_nothing_is_created_there_and_the_same_key_tries_again()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+        api.Payments.Failures.Enqueue(Errors.PaymentUnavailable());
+
+        var down = await student.CheckoutAsync(key: key);
+        var retry = await student.CheckoutAsync(key: key);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, down.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
+    }
+
+    private Task<int> SetEmailSendingAsync(bool enabled) =>
+        api.QueryAsync(db => db.FeatureFlags
+            .Where(f => f.Key == FeatureFlag.EmailSending)
+            .ExecuteUpdateAsync(f => f.SetProperty(x => x.Enabled, enabled)));
+
+    private async Task RunAsync(string type)
+    {
+        var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+        while (await runner.RunNextAsync([type], CancellationToken.None))
+        {
+        }
+    }
+
+    /// <summary>Um aluno cadastrado, com o teste grátis, e os passos do plano como o Mercado Pago os avisa.</summary>
+    private sealed class Subscriber(ApiFixture api, HttpClient client, Guid id)
+    {
+        public HttpClient Client { get; } = client;
+
+        public Guid Id { get; } = id;
+
+        public static async Task<Subscriber> CreateAsync(ApiFixture api, DateOnly? birthDate = null)
+        {
+            var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
+            var profile = await client.PostAsJsonAsync(
+                "/v1/me", new { birthDate = (birthDate ?? new DateOnly(2000, 5, 17)).ToString("yyyy-MM-dd"), termsAccepted = true });
+            profile.EnsureSuccessStatusCode();
+            return new Subscriber(api, client, (await profile.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
+        }
+
+        public Task<HttpResponseMessage> CheckoutAsync(string? key = null, bool guardianAuthorized = false)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/checkout/plan") { Content = JsonContent.Create(new { guardianAuthorized }) };
+            request.Headers.Add("Idempotency-Key", key ?? Guid.NewGuid().ToString());
+            return Client.SendAsync(request);
+        }
+
+        /// <summary>Assina, o aluno autoriza o cartão lá e o aviso chega.</summary>
+        /// <returns>O id da assinatura no Mercado Pago.</returns>
+        public async Task<string> SubscribeAsync(DateTimeOffset? nextChargeAt = null, string? cardLast4 = null)
+        {
+            var checkout = await (await CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
+            var preapprovalId = api.Payments.PreapprovalIdOf(checkout.GetProperty("subscriptionId").GetGuid())!;
+            api.Payments.SetSubscription(preapprovalId, SubscriptionStatus.Active, nextChargeAt ?? DateTimeOffset.UtcNow.AddMonths(1), cardLast4);
+            await NotifyAsync("subscription_preapproval", preapprovalId);
+            await RunJobsAsync();
+            return preapprovalId;
+        }
+
+        /// <summary>Uma cobrança mensal lá, avisada e processada.</summary>
+        /// <returns>O id do pagamento no Mercado Pago.</returns>
+        public async Task<string> ChargeAsync(string preapprovalId, PaymentStatus status)
+        {
+            var (chargeId, paymentId) = api.Payments.Charge(preapprovalId, status);
+            await NotifyAsync("subscription_authorized_payment", chargeId);
+            await RunJobsAsync();
+            return paymentId;
+        }
+
+        public async Task NotifyAsync(string type, string resourceId)
+        {
+            var json = $$$"""{"id":{{{Random.Shared.NextInt64(1, long.MaxValue)}}},"type":"{{{type}}}","action":"updated","data":{"id":"{{{resourceId}}}"}}""";
+            var response = await api.CreateClient().SendAsync(
+                ApiFixture.CreateMercadoPagoWebhook(resourceId, json, type: type, requestId: Guid.NewGuid().ToString()));
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task<JsonElement> ProfileAsync() => await Client.GetFromJsonAsync<JsonElement>("/v1/me");
+
+        public async Task<int> CreditsAsync() =>
+            (await ProfileAsync()).GetProperty("credits").GetProperty("total").GetInt32();
+
+        private async Task RunJobsAsync()
+        {
+            var runner = api.Factory.Services.GetRequiredService<IJobRunner>();
+            while (await runner.RunNextAsync([JobTypes.ProcessSubscription, JobTypes.ProcessPayment], CancellationToken.None))
+            {
+            }
+        }
+    }
+}

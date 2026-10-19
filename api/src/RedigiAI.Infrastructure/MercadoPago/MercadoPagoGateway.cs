@@ -101,6 +101,117 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             Math.Max(0, Cents(payment["transaction_amount_refunded"])));
     }
 
+    // Assinaturas (preapproval). Os nomes dos campos seguem a API de assinaturas do Mercado Pago e precisam ser
+    // conferidos no sandbox antes de ir para produção (docs/decisoes.md, etapa 4c).
+
+    public async Task<CreatedSubscription> CreateSubscriptionAsync(SubscriptionRequest request, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Post, "/preapproval");
+        message.Headers.Add("X-Idempotency-Key", request.SubscriptionId.ToString());
+        message.Content = JsonContent.Create(new JsonObject
+        {
+            ["reason"] = request.Reason,
+            ["external_reference"] = request.SubscriptionId.ToString(),
+            ["payer_email"] = request.PayerEmail,
+            ["back_url"] = request.BackUrl,
+            ["status"] = "pending",
+            ["auto_recurring"] = new JsonObject
+            {
+                ["frequency"] = 1,
+                ["frequency_type"] = "months",
+                ["transaction_amount"] = request.AmountCents / 100m,
+                ["currency_id"] = "BRL",
+            },
+        });
+        var (status, created) = await SendAsync(message, ct);
+        if (created is null)
+        {
+            throw status is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity
+                ? Errors.PaymentFailed()
+                : Errors.PaymentUnavailable();
+        }
+
+        var checkoutUrl = created["init_point"]?.GetValue<string>();
+        if (checkoutUrl is null || !Uri.TryCreate(checkoutUrl, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps)
+        {
+            logger.LogError("Mercado Pago created a subscription without a valid checkout URL");
+            throw Errors.PaymentUnavailable();
+        }
+
+        return new CreatedSubscription(Id(created), checkoutUrl);
+    }
+
+    public async Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, $"/preapproval/{Uri.EscapeDataString(providerId)}");
+        var (status, subscription) = await SendAsync(message, ct);
+        if (status == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (subscription is null)
+        {
+            throw Errors.PaymentUnavailable();
+        }
+
+        return new ProviderSubscription(
+            Id(subscription),
+            subscription["status"]?.GetValue<string>() switch
+            {
+                "authorized" => SubscriptionStatus.Active,
+                "paused" => SubscriptionStatus.Paused,
+                "cancelled" => SubscriptionStatus.Cancelled,
+                _ => SubscriptionStatus.Pending,
+            },
+            subscription["external_reference"]?.GetValue<string>(),
+            Date(subscription["next_payment_date"]),
+            Subscription.CardLast4From(subscription["last_four_digits"]?.GetValue<string>()));
+    }
+
+    public async Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, $"/authorized_payments/{Uri.EscapeDataString(providerId)}");
+        var (status, charge) = await SendAsync(message, ct);
+        if (status == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (charge?["preapproval_id"]?.GetValue<string>() is not { } preapprovalId)
+        {
+            throw Errors.PaymentUnavailable();
+        }
+
+        var payment = charge["payment"] is JsonObject paid ? Text(paid["id"]) : null;
+        return new ProviderSubscriptionCharge(Id(charge), preapprovalId, payment);
+    }
+
+    public async Task CancelSubscriptionAsync(string providerId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Put, $"/preapproval/{Uri.EscapeDataString(providerId)}");
+        message.Content = JsonContent.Create(new JsonObject { ["status"] = "cancelled" });
+        var (_, cancelled) = await SendAsync(message, ct);
+        if (cancelled is null)
+        {
+            throw Errors.PaymentUnavailable();
+        }
+    }
+
+    private static DateTimeOffset? Date(JsonNode? value) =>
+        value is JsonValue node && node.TryGetValue<string>(out var text)
+            && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
+            ? date.ToUniversalTime()
+            : null;
+
+    private static string? Text(JsonNode? value) =>
+        value switch
+        {
+            JsonValue node when node.TryGetValue<long>(out var number) => number.ToString(CultureInfo.InvariantCulture),
+            JsonValue node when node.TryGetValue<string>(out var text) => text,
+            _ => null,
+        };
+
     private static JsonObject Base(ChargeRequest request) =>
         new()
         {
@@ -169,13 +280,7 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
 
     private static CreatedCharge ReadCreated(JsonObject payment) => new(Id(payment), StatusOf(payment));
 
-    private static string Id(JsonObject payment) =>
-        payment["id"] switch
-        {
-            JsonValue value when value.TryGetValue<long>(out var number) => number.ToString(CultureInfo.InvariantCulture),
-            JsonValue value when value.TryGetValue<string>(out var text) => text,
-            _ => throw Errors.PaymentUnavailable(),
-        };
+    private static string Id(JsonObject resource) => Text(resource["id"]) ?? throw Errors.PaymentUnavailable();
 
     /// <summary>
     /// As situações do Mercado Pago na nossa: autorizado, em análise e em mediação ainda não são dinheiro recebido.

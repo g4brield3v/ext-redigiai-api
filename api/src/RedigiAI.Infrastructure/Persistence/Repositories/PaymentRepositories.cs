@@ -10,6 +10,9 @@ internal sealed class PaymentRepository(AppDbContext db) : IPaymentRepository
     public Task<Payment?> FindAsync(Guid paymentId, CancellationToken ct) =>
         db.Payments.AsNoTracking().FirstOrDefaultAsync(p => p.Id == paymentId, ct);
 
+    public Task<Payment?> FindByProviderIdAsync(string mpPaymentId, CancellationToken ct) =>
+        db.Payments.AsNoTracking().FirstOrDefaultAsync(p => p.MpPaymentId == mpPaymentId, ct);
+
     public Task<Payment?> FindByKeyAsync(Guid userId, string idempotencyKey, CancellationToken ct) =>
         db.Payments.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == userId && p.IdempotencyKey == idempotencyKey, ct);
 
@@ -80,6 +83,105 @@ internal sealed class PaymentRepository(AppDbContext db) : IPaymentRepository
                     .SetProperty(x => x.ApprovedAt, x => to == PaymentStatus.Approved ? now : x.ApprovedAt)
                     .SetProperty(x => x.UpdatedAt, now),
                 ct) == 1;
+    }
+}
+
+internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRepository
+{
+    public void Add(Subscription subscription) => db.Subscriptions.Add(subscription);
+
+    public Task<Subscription?> FindAsync(Guid subscriptionId, CancellationToken ct) =>
+        db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == subscriptionId, ct);
+
+    public Task<Subscription?> FindByKeyAsync(Guid userId, string idempotencyKey, CancellationToken ct) =>
+        db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == userId && s.IdempotencyKey == idempotencyKey, ct);
+
+    public Task<Subscription?> FindByProviderIdAsync(string mpPreapprovalId, CancellationToken ct) =>
+        db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.MpPreapprovalId == mpPreapprovalId, ct);
+
+    public Task<Subscription?> FindOpenAsync(Guid userId, CancellationToken ct) =>
+        db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(
+            s => s.UserId == userId && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Paused), ct);
+
+    public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
+        db.Subscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId && s.Status != SubscriptionStatus.Pending)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> TryAttachProviderAsync(
+        Guid subscriptionId, string mpPreapprovalId, string checkoutUrl, DateTimeOffset now, CancellationToken ct) =>
+        await db.Subscriptions
+            .Where(s => s.Id == subscriptionId && (s.MpPreapprovalId == null || s.MpPreapprovalId == mpPreapprovalId))
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(x => x.MpPreapprovalId, mpPreapprovalId)
+                    .SetProperty(x => x.CheckoutUrl, x => checkoutUrl.Length > 0 ? checkoutUrl : x.CheckoutUrl)
+                    .SetProperty(x => x.UpdatedAt, now),
+                ct) == 1;
+
+    public async Task<bool> TryTransitionAsync(Guid subscriptionId, SubscriptionStatus to, DateTimeOffset now, CancellationToken ct)
+    {
+        var from = Subscription.ReachableFrom(to);
+        if (from.Count == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            return await db.Subscriptions
+                .Where(s => s.Id == subscriptionId && from.Contains(s.Status))
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(x => x.Status, to)
+                        .SetProperty(x => x.CancelledAt, x => to == SubscriptionStatus.Cancelled ? now : x.CancelledAt)
+                        .SetProperty(x => x.UpdatedAt, now),
+                    ct) == 1;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+        {
+            throw new RedigiAI.Application.Abstractions.UniqueConflictException(ex);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
+        {
+            throw new RedigiAI.Application.Abstractions.UniqueConflictException(ex);
+        }
+    }
+
+    public Task UpdateBillingAsync(
+        Guid subscriptionId, DateTimeOffset? nextBillingAt, string? cardLast4, DateTimeOffset now, CancellationToken ct) =>
+        db.Subscriptions
+            .Where(s => s.Id == subscriptionId)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(x => x.NextBillingAt, x => nextBillingAt ?? x.NextBillingAt)
+                    .SetProperty(x => x.CardLast4, x => cardLast4 ?? x.CardLast4)
+                    .SetProperty(x => x.UpdatedAt, now),
+                ct);
+
+    public async Task<IReadOnlyList<string>> ListPendingToRecheckAsync(
+        DateTimeOffset createdAfter, DateTimeOffset createdBefore, int limit, CancellationToken ct)
+    {
+        var pending = SnakeCaseEnum<SubscriptionStatus>.ToName(SubscriptionStatus.Pending);
+        var type = RedigiAI.Domain.Jobs.JobTypes.ProcessSubscription;
+        var ready = SnakeCaseEnum<RedigiAI.Domain.Jobs.JobStatus>.ToName(RedigiAI.Domain.Jobs.JobStatus.Ready);
+        var running = SnakeCaseEnum<RedigiAI.Domain.Jobs.JobStatus>.ToName(RedigiAI.Domain.Jobs.JobStatus.Running);
+        return await db.Database
+            .SqlQuery<string>(
+                $"""
+                SELECT s.mp_preapproval_id AS "Value" FROM subscriptions s
+                WHERE s.status = {pending} AND s.mp_preapproval_id IS NOT NULL
+                  AND s.created_at > {createdAfter} AND s.created_at <= {createdBefore}
+                  AND NOT EXISTS (
+                      SELECT 1 FROM jobs j
+                      WHERE j.type = {type} AND j.status IN ({ready}, {running})
+                        AND j.payload ->> 'providerId' = s.mp_preapproval_id)
+                ORDER BY s.created_at
+                LIMIT {limit}
+                """)
+            .ToListAsync(ct);
     }
 }
 

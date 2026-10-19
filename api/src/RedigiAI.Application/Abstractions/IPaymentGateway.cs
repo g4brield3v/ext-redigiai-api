@@ -24,6 +24,22 @@ public sealed record CreatedCharge(
 public sealed record ProviderPayment(
     string ProviderId, PaymentStatus Status, string? ExternalReference, long AmountCents, string Currency, long RefundedCents = 0);
 
+/// <param name="SubscriptionId">O id da assinatura aqui: vai como referência externa.</param>
+/// <param name="BackUrl">Para onde o Mercado Pago devolve o aluno depois do checkout.</param>
+public sealed record SubscriptionRequest(Guid SubscriptionId, long AmountCents, string Reason, string PayerEmail, string BackUrl);
+
+/// <param name="CheckoutUrl">O checkout do Mercado Pago, onde o aluno autoriza o cartão.</param>
+public sealed record CreatedSubscription(string ProviderId, string CheckoutUrl);
+
+/// <summary>Uma assinatura como o provedor a vê agora.</summary>
+/// <param name="ExternalReference">O id da assinatura aqui, enviado na criação.</param>
+/// <param name="NextChargeAt">A próxima cobrança.</param>
+public sealed record ProviderSubscription(
+    string ProviderId, SubscriptionStatus Status, string? ExternalReference, DateTimeOffset? NextChargeAt, string? CardLast4);
+
+/// <summary>Uma cobrança de uma assinatura; o pagamento dela só existe depois que o provedor tenta cobrar.</summary>
+public sealed record ProviderSubscriptionCharge(string ProviderId, string PreapprovalId, string? PaymentId);
+
 /// <summary>O provedor de pagamentos (Mercado Pago). O cartão nunca passa por aqui: só o token do navegador.</summary>
 public interface IPaymentGateway
 {
@@ -39,6 +55,19 @@ public interface IPaymentGateway
     /// <summary>Consulta o pagamento na API do provedor. É a única fonte para conceder créditos (regra 19).</summary>
     /// <returns><c>null</c> se o provedor não conhece o id.</returns>
     Task<ProviderPayment?> GetPaymentAsync(string providerId, CancellationToken ct);
+
+    /// <summary>Cria a assinatura (preapproval) pendente; o aluno autoriza o cartão no checkout de lá.</summary>
+    /// <inheritdoc cref="CreatePixAsync" path="/exception" />
+    Task<CreatedSubscription> CreateSubscriptionAsync(SubscriptionRequest request, CancellationToken ct);
+
+    /// <returns><c>null</c> se o provedor não conhece o id.</returns>
+    Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct);
+
+    /// <returns><c>null</c> se o provedor não conhece o id.</returns>
+    Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct);
+
+    /// <summary>Cancela a assinatura lá: não há mais cobranças.</summary>
+    Task CancelSubscriptionAsync(string providerId, CancellationToken ct);
 }
 
 /// <summary>Confere a assinatura das notificações do provedor.</summary>

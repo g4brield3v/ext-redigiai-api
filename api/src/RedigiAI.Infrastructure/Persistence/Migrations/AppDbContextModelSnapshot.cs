@@ -410,6 +410,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<Guid?>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -425,6 +429,9 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_payments_mp_payment_id")
                         .HasFilter("mp_payment_id IS NOT NULL");
+
+                    b.HasIndex("SubscriptionId")
+                        .HasDatabaseName("ix_payments_subscription_id");
 
                     b.HasIndex("UserId", "CreatedAt")
                         .HasDatabaseName("ix_payments_user_id_created_at");
@@ -447,17 +454,35 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
                     b.Property<string>("CardLast4")
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)")
                         .HasColumnName("card_last4");
 
+                    b.Property<string>("CheckoutUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("checkout_url");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("MpPreapprovalId")
+                    b.Property<DateTimeOffset?>("GuardianAuthorizedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("guardian_authorized_at");
+
+                    b.Property<string>("IdempotencyKey")
                         .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("MpPreapprovalId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("mp_preapproval_id");
@@ -485,13 +510,18 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("MpPreapprovalId")
                         .IsUnique()
-                        .HasDatabaseName("ix_subscriptions_mp_preapproval_id");
+                        .HasDatabaseName("ix_subscriptions_mp_preapproval_id")
+                        .HasFilter("mp_preapproval_id IS NOT NULL");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_subscriptions_status");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_subscriptions_user_id");
+
+                    b.HasIndex("UserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subscriptions_user_id_idempotency_key");
 
                     b.HasIndex(new[] { "UserId" }, "ux_subscriptions_open_per_user")
                         .IsUnique()
@@ -2200,6 +2230,12 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RedigiAI.Domain.Billing.Payment", b =>
                 {
+                    b.HasOne("RedigiAI.Domain.Billing.Subscription", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_payments_subscriptions_subscription_id");
+
                     b.HasOne("RedigiAI.Domain.Accounts.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
