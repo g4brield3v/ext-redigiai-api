@@ -113,7 +113,7 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
     public Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct) =>
         db.Subscriptions
             .AsNoTracking()
-            .Where(s => s.UserId == userId && s.Status != SubscriptionStatus.Pending)
+            .Where(s => s.UserId == userId && (s.Status != SubscriptionStatus.Pending || s.MpPreapprovalId != null))
             .OrderByDescending(s => s.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
