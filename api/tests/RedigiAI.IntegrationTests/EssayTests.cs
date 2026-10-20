@@ -97,6 +97,37 @@ public class EssayTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Twenty_simultaneous_submissions_never_take_the_balance_below_zero()
+    {
+        // Aceite da etapa 4: 6 correções em três origens (plano, teste grátis e avulsa) e 20 envios ao mesmo tempo.
+        var student = await Student.CreateAsync(api);
+        await student.GrantAsync(CreditSource.Plan, 3, DateTimeOffset.UtcNow.AddDays(10));
+        await student.GrantAsync(CreditSource.Single, 2, expiresAt: null);
+        var assets = new List<Guid>();
+        for (var i = 0; i < 20; i++)
+        {
+            assets.Add(await student.UploadAsync());
+        }
+
+        var responses = await Task.WhenAll(assets.Select(asset => student.SubmitAsync([student.Item(asset)])));
+
+        Assert.Equal(6, responses.Count(r => r.StatusCode == HttpStatusCode.Accepted));
+        Assert.All(responses.Where(r => r.StatusCode != HttpStatusCode.Accepted), r => Assert.Equal(HttpStatusCode.PaymentRequired, r.StatusCode));
+        Assert.Equal(6, await api.QueryAsync(db => db.Essays.CountAsync(e => e.UserId == student.Id)));
+        Assert.Equal(0, await student.BalanceAsync());
+        // Nenhum bucket abaixo de zero, e o ledger fecha com o saldo de cada um.
+        var buckets = await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id).ToListAsync());
+        Assert.All(buckets, b => Assert.True(b.Remaining >= 0));
+        foreach (var bucket in buckets)
+        {
+            var sum = await api.QueryAsync(db => db.CreditLedger.Where(e => e.BucketId == bucket.Id).SumAsync(e => e.Delta));
+            Assert.Equal(bucket.Remaining, sum);
+        }
+
+        Assert.Equal(6, await api.QueryAsync(db => db.CreditLedger.CountAsync(e => e.UserId == student.Id && e.Delta < 0)));
+    }
+
+    [Fact]
     public async Task Batch_is_all_or_nothing_when_the_balance_does_not_cover_it()
     {
         var student = await Student.CreateAsync(api);
