@@ -45,7 +45,7 @@ public interface ISubscriptionService
 internal sealed class SubscriptionService(
     IUserRepository users,
     ISubscriptionRepository subscriptions,
-    ICreditRepository credits,
+    PlanResume planResume,
     IPaymentGateway gateway,
     IJobQueue jobs,
     IAuditLog audit,
@@ -54,9 +54,6 @@ internal sealed class SubscriptionService(
     TimeProvider time) : ISubscriptionService
 {
     private const string Reason = "RedigiAI: plano mensal (12 correções por mês)";
-
-    /// <summary>Um ciclo que termina antes disso não adia a cobrança: ela é feita agora.</summary>
-    private static readonly TimeSpan MinimumDeferral = TimeSpan.FromHours(1);
 
     public async Task<PlanCheckoutDto> CheckoutPlanAsync(CheckoutPlanCommand command, CancellationToken ct)
     {
@@ -155,7 +152,7 @@ internal sealed class SubscriptionService(
         }
 
         return subscription.MpPreapprovalId is not null
-            ? new PlanCheckoutDto(subscription.Id, subscription.Status, await FirstChargeAtAsync(user.Id, ct))
+            ? new PlanCheckoutDto(subscription.Id, subscription.Status, await planResume.FirstChargeAtAsync(user.Id, ct))
             : await CreateThereAsync(subscription, user, card, ct);
     }
 
@@ -168,7 +165,7 @@ internal sealed class SubscriptionService(
             throw Errors.CheckoutInProgress();
         }
 
-        var firstChargeAt = await FirstChargeAtAsync(user.Id, ct);
+        var firstChargeAt = await planResume.FirstChargeAtAsync(user.Id, ct);
         CreatedSubscription created;
         try
         {
@@ -240,22 +237,6 @@ internal sealed class SubscriptionService(
         await unitOfWork.SaveChangesAsync(ct);
         await gateway.CancelSubscriptionAsync(created.ProviderId, ct);
         return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending, firstChargeAt);
-    }
-
-    /// <summary>
-    /// Assinar de novo com o ciclo pago ainda valendo (decisão de 20/10/2026): a primeira cobrança fica para o fim desse
-    /// ciclo, como se o cancelamento fosse desfeito. Nem cobra duas vezes no mesmo mês, nem tira as correções que o aluno
-    /// já pagou; a cobrança, quando vier, renova o saldo do plano para 12 como sempre. Ciclo estornado não conta.
-    /// </summary>
-    private async Task<DateTimeOffset?> FirstChargeAtAsync(Guid userId, CancellationToken ct)
-    {
-        var now = time.GetUtcNow();
-        var cycleEnd = (await credits.ListOpenPlanBucketsAsync(userId, now, ct))
-            .Where(b => b.RevokedAt is null && b.ExpiresAt is not null)
-            .Select(b => b.ExpiresAt!.Value)
-            .DefaultIfEmpty()
-            .Max();
-        return cycleEnd > now + MinimumDeferral ? cycleEnd : null;
     }
 
     /// <summary>

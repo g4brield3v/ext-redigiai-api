@@ -10,6 +10,7 @@ internal sealed class AccountService(
     IUserRepository users,
     ICreditRepository credits,
     ISubscriptionRepository subscriptions,
+    Billing.PlanResume planResume,
     IAuditLog audit,
     IAccessLog accessLog,
     IUnitOfWork unitOfWork,
@@ -145,6 +146,10 @@ internal sealed class AccountService(
                 ? null
                 : new SubscriptionDto(subscription.Status, subscription.NextBillingAt, subscription.CardLast4),
             // A tela de compra pede a declaração do responsável; o backend a exige de novo na compra.
-            NeedsGuardianAuthorization: user.BirthDate.IsMinorOn(BrasiliaTime.DateOf(time.GetUtcNow())));
+            NeedsGuardianAuthorization: user.BirthDate.IsMinorOn(BrasiliaTime.DateOf(time.GetUtcNow())),
+            // Só vale para quem não tem plano aberto (cancelado ou nunca assinou): é o que uma assinatura nova faria.
+            PlanResumesAt: subscription?.Status is SubscriptionStatus.Active or SubscriptionStatus.Paused or SubscriptionStatus.Pending
+                ? null
+                : await planResume.FirstChargeAtAsync(user.Id, ct));
     }
 }

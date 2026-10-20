@@ -4012,7 +4012,8 @@
           "emailPreferences",
           "credits",
           "subscription",
-          "needsGuardianAuthorization"
+          "needsGuardianAuthorization",
+          "planResumesAt"
         ],
         "type": "object",
         "properties": {
@@ -4056,6 +4057,13 @@
           },
           "needsGuardianAuthorization": {
             "type": "boolean"
+          },
+          "planResumesAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },

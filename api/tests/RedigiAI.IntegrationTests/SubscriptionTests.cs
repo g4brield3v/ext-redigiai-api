@@ -58,7 +58,12 @@ public class SubscriptionTests(ApiFixture api)
         // Usou 5 das 12, e cancelou.
         await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id && b.Source == CreditSource.Plan)
             .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, 7)));
+        Assert.Equal(JsonValueKind.Null, (await student.ProfileAsync()).GetProperty("planResumesAt").ValueKind);
         (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+
+        // O perfil avisa antes de pagar, com a mesma data que a assinatura vai usar.
+        var resumesAt = (await student.ProfileAsync()).GetProperty("planResumesAt").GetDateTimeOffset();
+        Assert.Equal(cycleEnd, resumesAt, TimeSpan.FromMilliseconds(1));
 
         var again = await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
 
@@ -67,6 +72,7 @@ public class SubscriptionTests(ApiFixture api)
         var firstChargeAt = again.GetProperty("firstChargeAt").GetDateTimeOffset();
         Assert.Equal(cycleEnd, firstChargeAt, TimeSpan.FromMilliseconds(1));
         Assert.Equal(firstChargeAt, api.Payments.FirstChargeAts[subscriptionId]!.Value);
+        Assert.Equal(resumesAt, firstChargeAt);
         Assert.Equal(8, await student.CreditsAsync()); // 7 do plano + o teste grátis
 
         // A primeira cobrança da nova chega como uma renovação: o saldo do plano volta a 12.
@@ -79,6 +85,8 @@ public class SubscriptionTests(ApiFixture api)
     public async Task A_first_subscription_is_charged_now()
     {
         var student = await Subscriber.CreateAsync(api);
+
+        Assert.Equal(JsonValueKind.Null, (await student.ProfileAsync()).GetProperty("planResumesAt").ValueKind);
 
         var checkout = await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
 
