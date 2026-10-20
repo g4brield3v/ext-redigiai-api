@@ -25,8 +25,10 @@ public sealed class MercadoPagoOptions
 }
 
 /// <summary>
-/// A API de pagamentos do Mercado Pago (<c>/v1/payments</c>). O cartão chega só como o token gerado no navegador.
-/// Nada do pagador (e-mail, documento) nem o token vai para o log.
+/// O Mercado Pago. As compras avulsas (Pix e cartão) são orders (<c>/v1/orders</c>, checkout transparente): o id da
+/// compra lá é o da order (<c>ORD…</c>). As cobranças do plano mensal vêm da API de assinaturas e são pagamentos
+/// (<c>/v1/payments</c>, id numérico); consulta e reembolso escolhem a API pelo id. O cartão chega só como o token
+/// gerado no navegador. Nada do pagador (e-mail, documento) nem o token vai para o log.
 /// </summary>
 internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, ILogger<MercadoPagoGateway> logger)
     : IPaymentGateway
@@ -41,46 +43,80 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
 
     public async Task<CreatedCharge> CreatePixAsync(ChargeRequest request, DateTimeOffset expiresAt, CancellationToken ct)
     {
-        var body = Base(request);
-        body["payment_method_id"] = "pix";
-        // O Mercado Pago pede a validade com o fuso; vai no horário de Brasília.
-        body["date_of_expiration"] = TimeZoneInfo.ConvertTime(expiresAt, Brasilia).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
+        // A validade vai como duração (ISO 8601) a partir de agora, em minutos inteiros.
+        var minutes = Math.Max(1, (int)Math.Ceiling((expiresAt - DateTimeOffset.UtcNow).TotalMinutes));
+        var body = Order(request, new JsonObject { ["id"] = "pix", ["type"] = "bank_transfer" });
+        body["expiration_time"] = $"PT{minutes}M";
 
-        var created = await CreateAsync(body, request.PaymentId, ct);
-        var transaction = created["point_of_interaction"]?["transaction_data"];
-        var qrCode = transaction?["qr_code"]?.GetValue<string>();
-        var qrCodeBase64 = transaction?["qr_code_base64"]?.GetValue<string>();
+        var created = await CreateOrderAsync(body, request.PaymentId, ct);
+        var method = FirstPayment(created)?["payment_method"];
+        var qrCode = method?["qr_code"]?.GetValue<string>();
+        var qrCodeBase64 = method?["qr_code_base64"]?.GetValue<string>();
         if (qrCode is null || qrCodeBase64 is null)
         {
-            logger.LogError("Mercado Pago created a Pix payment without a QR code");
+            logger.LogError("Mercado Pago created a Pix order without a QR code");
             throw Errors.PaymentUnavailable();
         }
 
-        return ReadCreated(created) with { PixQrCode = qrCode, PixQrCodeBase64 = qrCodeBase64, PixExpiresAt = expiresAt };
+        return new CreatedCharge(Id(created), OrderStatusOf(created), qrCode, qrCodeBase64, expiresAt);
     }
 
     public async Task<CreatedCharge> CreateCardAsync(ChargeRequest request, CardToken card, CancellationToken ct)
     {
-        var body = Base(request);
-        body["token"] = card.Token;
-        body["payment_method_id"] = card.PaymentMethodId;
-        body["installments"] = 1;
-        if (card.IssuerId is not null)
+        var method = new JsonObject
         {
-            body["issuer_id"] = card.IssuerId;
-        }
-
+            ["id"] = card.PaymentMethodId,
+            ["type"] = CardTypeOf(card.PaymentMethodId),
+            ["token"] = card.Token,
+            ["installments"] = 1,
+        };
+        var body = Order(request, method);
         if (card is { IdentificationType: { } type, IdentificationNumber: { } number })
         {
             body["payer"]!["identification"] = new JsonObject { ["type"] = type, ["number"] = number };
         }
 
-        return ReadCreated(await CreateAsync(body, request.PaymentId, ct));
+        var created = await CreateOrderAsync(body, request.PaymentId, ct);
+        return new CreatedCharge(Id(created), OrderStatusOf(created));
     }
 
-    public async Task<ProviderPayment?> GetPaymentAsync(string providerId, CancellationToken ct)
+    public async Task<ProviderPayment?> GetPaymentAsync(string providerId, CancellationToken ct) =>
+        IsOrder(providerId) ? await GetOrderAsync(providerId, ct) : await GetPlanPaymentAsync(providerId, ct);
+
+    private async Task<ProviderPayment?> GetOrderAsync(string orderId, CancellationToken ct)
     {
-        using var message = Request(HttpMethod.Get, $"/v1/payments/{Uri.EscapeDataString(providerId)}");
+        var order = await FindOrderAsync(orderId, ct);
+        if (order is null)
+        {
+            return null;
+        }
+
+        var refunded = Math.Max(0, FirstPayment(order) is { } payment ? Cents(payment["refunded_amount"]) : 0);
+        return new ProviderPayment(
+            Id(order),
+            OrderStatusOf(order),
+            order["external_reference"]?.GetValue<string>(),
+            Cents(order["total_amount"]),
+            order["currency"]?.GetValue<string>() ?? "",
+            refunded);
+    }
+
+    private async Task<JsonObject?> FindOrderAsync(string orderId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, $"/v1/orders/{Uri.EscapeDataString(orderId)}");
+        var (status, order) = await SendAsync(message, ct);
+        if (status == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        return order ?? throw Errors.PaymentUnavailable();
+    }
+
+    /// <summary>Uma cobrança do plano mensal: um pagamento da API de assinaturas.</summary>
+    private async Task<ProviderPayment?> GetPlanPaymentAsync(string paymentId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, $"/v1/payments/{Uri.EscapeDataString(paymentId)}");
         var (status, payment) = await SendAsync(message, ct);
         if (status == HttpStatusCode.NotFound)
         {
@@ -94,7 +130,7 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
 
         return new ProviderPayment(
             Id(payment),
-            StatusOf(payment),
+            PaymentStatusOf(payment),
             payment["external_reference"]?.GetValue<string>(),
             Cents(payment["transaction_amount"]),
             payment["currency_id"]?.GetValue<string>() ?? "",
@@ -199,8 +235,44 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
 
     public async Task<string> RefundAsync(string paymentProviderId, long amountCents, Guid idempotencyKey, CancellationToken ct)
     {
-        using var message = Request(HttpMethod.Post, $"/v1/payments/{Uri.EscapeDataString(paymentProviderId)}/refunds");
+        if (!IsOrder(paymentProviderId))
+        {
+            return await RefundPlanPaymentAsync(paymentProviderId, amountCents, idempotencyKey, ct);
+        }
+
+        // O reembolso parcial da order vai na transação dela.
+        var order = await FindOrderAsync(paymentProviderId, ct) ?? throw Errors.PaymentFailed();
+        var transactionId = FirstPayment(order) is { } payment ? Text(payment["id"]) : null;
+        if (transactionId is null)
+        {
+            throw Errors.PaymentUnavailable();
+        }
+
+        using var message = Request(HttpMethod.Post, $"/v1/orders/{Uri.EscapeDataString(paymentProviderId)}/refund");
         // O mesmo pedido de arrependimento nunca vira dois reembolsos lá.
+        message.Headers.Add("X-Idempotency-Key", idempotencyKey.ToString());
+        message.Content = JsonContent.Create(new JsonObject
+        {
+            ["transactions"] = new JsonArray(new JsonObject { ["id"] = transactionId, ["amount"] = Money(amountCents) }),
+        });
+        var (status, refunded) = await SendAsync(message, ct);
+        if (refunded is null)
+        {
+            throw status is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity
+                ? Errors.PaymentFailed()
+                : Errors.PaymentUnavailable();
+        }
+
+        // O reembolso desta chamada é o último da transação.
+        return refunded["transactions"]?["refunds"] is JsonArray refunds
+            && refunds.OfType<JsonObject>().LastOrDefault(r => Text(r["transaction_id"]) == transactionId) is { } refund
+            ? Id(refund)
+            : throw Errors.PaymentUnavailable();
+    }
+
+    private async Task<string> RefundPlanPaymentAsync(string paymentId, long amountCents, Guid idempotencyKey, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Post, $"/v1/payments/{Uri.EscapeDataString(paymentId)}/refunds");
         message.Headers.Add("X-Idempotency-Key", idempotencyKey.ToString());
         message.Content = JsonContent.Create(new JsonObject { ["amount"] = amountCents / 100m });
         var (status, refund) = await SendAsync(message, ct);
@@ -239,25 +311,32 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             _ => null,
         };
 
-    private static JsonObject Base(ChargeRequest request) =>
+    /// <summary>Uma order online, processada na criação, com um pagamento só.</summary>
+    private static JsonObject Order(ChargeRequest request, JsonObject paymentMethod) =>
         new()
         {
-            ["transaction_amount"] = request.AmountCents / 100m,
-            ["description"] = request.Description,
+            ["type"] = "online",
+            ["processing_mode"] = "automatic",
             ["external_reference"] = request.PaymentId.ToString(),
+            ["description"] = request.Description,
+            ["total_amount"] = Money(request.AmountCents),
             ["payer"] = new JsonObject { ["email"] = request.PayerEmail },
+            ["transactions"] = new JsonObject
+            {
+                ["payments"] = new JsonArray(new JsonObject { ["amount"] = Money(request.AmountCents), ["payment_method"] = paymentMethod }),
+            },
         };
 
-    private async Task<JsonObject> CreateAsync(JsonObject body, Guid paymentId, CancellationToken ct)
+    private async Task<JsonObject> CreateOrderAsync(JsonObject body, Guid paymentId, CancellationToken ct)
     {
-        using var message = Request(HttpMethod.Post, "/v1/payments");
-        // A mesma compra nunca vira dois pagamentos lá: repetir a criação devolve o primeiro.
+        using var message = Request(HttpMethod.Post, "/v1/orders");
+        // A mesma compra nunca vira duas orders lá: repetir a criação devolve a primeira.
         message.Headers.Add("X-Idempotency-Key", paymentId.ToString());
         message.Content = JsonContent.Create(body);
-        var (status, payment) = await SendAsync(message, ct);
-        if (payment is not null)
+        var (status, order) = await SendAsync(message, ct, keepRejectedOrder: true);
+        if (order is not null)
         {
-            return payment;
+            return order;
         }
 
         // 400 e 422: o Mercado Pago recusou o pedido (token de cartão inválido, por exemplo).
@@ -265,6 +344,18 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             ? Errors.PaymentFailed()
             : Errors.PaymentUnavailable();
     }
+
+    private static bool IsOrder(string providerId) => providerId.StartsWith("ORD", StringComparison.Ordinal);
+
+    private static JsonObject? FirstPayment(JsonObject order) =>
+        order["transactions"]?["payments"] is JsonArray payments ? payments.OfType<JsonObject>().FirstOrDefault() : null;
+
+    /// <summary>Os cartões de débito do Mercado Pago têm id começando por "deb" (debelo, debvisa, debmaster…).</summary>
+    private static string CardTypeOf(string paymentMethodId) =>
+        paymentMethodId.StartsWith("deb", StringComparison.OrdinalIgnoreCase) ? "debit_card" : "credit_card";
+
+    /// <summary>Valores das orders: texto com duas casas, ponto decimal.</summary>
+    private static string Money(long cents) => (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture);
 
     private HttpRequestMessage Request(HttpMethod method, string path)
     {
@@ -281,7 +372,11 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
     }
 
     /// <returns>O código e o corpo, quando a resposta foi 2xx; sem resposta, <c>PAYMENT_UNAVAILABLE</c>.</returns>
-    private async Task<(HttpStatusCode Status, JsonObject? Body)> SendAsync(HttpRequestMessage message, CancellationToken ct)
+    /// <param name="keepRejectedOrder">
+    /// Na criação de order: a recusa do cartão vem como 402 com a order em <c>data</c>, que é devolvida como resposta.
+    /// </param>
+    private async Task<(HttpStatusCode Status, JsonObject? Body)> SendAsync(
+        HttpRequestMessage message, CancellationToken ct, bool keepRejectedOrder = false)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(CallTimeout);
@@ -290,7 +385,14 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             using var response = await Http.SendAsync(message, timeout.Token);
             if (!response.IsSuccessStatusCode)
             {
-                var (error, reason, causes) = await ErrorOf(response, timeout.Token);
+                var text = await response.Content.ReadAsStringAsync(timeout.Token);
+                if (keepRejectedOrder && response.StatusCode == HttpStatusCode.PaymentRequired
+                    && ParseObject(text)?["data"] is JsonObject rejected)
+                {
+                    return (response.StatusCode, rejected.DeepClone().AsObject());
+                }
+
+                var (error, reason, causes) = ErrorOf(text);
                 logger.LogWarning(
                     "Mercado Pago {Method} {Path} answered {Status}: {Error} {Reason} {Causes}",
                     message.Method,
@@ -316,37 +418,67 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
     /// O motivo de uma recusa, para o log: <c>error</c>, <c>message</c> e os códigos de <c>cause</c>, curtos e sem
     /// caracteres de controle. Nunca o corpo inteiro nem as descrições das causas, que podem repetir dados enviados.
     /// </summary>
-    private static async Task<(string? Error, string? Reason, string? Causes)> ErrorOf(HttpResponseMessage response, CancellationToken ct)
+    private static (string? Error, string? Reason, string? Causes) ErrorOf(string text)
+    {
+        if (ParseObject(text) is not { } body)
+        {
+            return (null, null, null);
+        }
+
+        var causes = body["cause"] is JsonArray list
+            ? string.Join(',', list.OfType<JsonObject>().Select(c => Clean(Text(c["code"]))).Where(c => c is not null))
+            : body["errors"] is JsonArray errors
+                ? string.Join(',', errors.OfType<JsonObject>().Select(e => Clean(Text(e["code"]))).Where(c => c is not null))
+                : null;
+        return (Clean(Text(body["error"])), Clean(Text(body["message"])), causes);
+    }
+
+    private static JsonObject? ParseObject(string text)
     {
         try
         {
-            if (JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) is not JsonObject body)
-            {
-                return (null, null, null);
-            }
-
-            var causes = body["cause"] is JsonArray list
-                ? string.Join(',', list.OfType<JsonObject>().Select(c => Clean(Text(c["code"]))).Where(c => c is not null))
-                : null;
-            return (Clean(Text(body["error"])), Clean(Text(body["message"])), causes);
+            return JsonNode.Parse(text) as JsonObject;
         }
         catch (JsonException)
         {
-            return (null, null, null);
+            return null;
         }
     }
 
     private static string? Clean(string? value) =>
         value is null ? null : new string(value.Where(c => !char.IsControl(c)).Take(200).ToArray());
 
-    private static CreatedCharge ReadCreated(JsonObject payment) => new(Id(payment), StatusOf(payment));
-
     private static string Id(JsonObject resource) => Text(resource["id"]) ?? throw Errors.PaymentUnavailable();
 
     /// <summary>
-    /// As situações do Mercado Pago na nossa: autorizado, em análise e em mediação ainda não são dinheiro recebido.
+    /// A situação de uma order na nossa. Reembolsada em parte continua aprovada (o valor estornado vem à parte);
+    /// criada, aguardando pagamento e em análise ainda não são dinheiro recebido.
     /// </summary>
-    private static PaymentStatus StatusOf(JsonObject payment) =>
+    internal static PaymentStatus OrderStatusOf(JsonObject order)
+    {
+        var detail = order["status_detail"]?.GetValue<string>();
+        var transaction = FirstPayment(order);
+        if (detail == "charged_back" || transaction?["status"]?.GetValue<string>() == "charged_back"
+            || transaction?["status_detail"]?.GetValue<string>() == "charged_back")
+        {
+            return PaymentStatus.ChargedBack;
+        }
+
+        return (order["status"]?.GetValue<string>(), detail) switch
+        {
+            ("processed", "refunded") or ("refunded", _) => PaymentStatus.Refunded,
+            ("processed", _) => PaymentStatus.Approved,
+            ("failed", _) => PaymentStatus.Rejected,
+            ("canceled" or "cancelled" or "expired", _) => PaymentStatus.Cancelled,
+            _ => PaymentStatus.Pending,
+        };
+    }
+
+    /// <summary>
+    /// As situações de um pagamento (cobrança do plano) na nossa: autorizado, em análise e em mediação ainda não são
+    /// dinheiro recebido.
+    /// </summary>
+    private static PaymentStatus PaymentStatusOf(JsonObject payment) =>
         payment["status"]?.GetValue<string>() switch
         {
             "approved" => PaymentStatus.Approved,
@@ -357,8 +489,12 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             _ => PaymentStatus.Pending,
         };
 
+    /// <summary>Valor em centavos; as orders mandam texto ("32.00"), os pagamentos, número.</summary>
     private static long Cents(JsonNode? amount) =>
-        amount is JsonValue value && value.TryGetValue<decimal>(out var reais)
+        amount is JsonValue value
+        && (value.TryGetValue<decimal>(out var reais)
+            || (value.TryGetValue<string>(out var text)
+                && decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out reais)))
             ? (long)Math.Round(reais * 100m, MidpointRounding.AwayFromZero)
             : -1;
 }

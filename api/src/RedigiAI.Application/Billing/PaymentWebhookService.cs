@@ -27,6 +27,9 @@ internal sealed class PaymentWebhookService(
     TimeProvider time) : IPaymentWebhookService
 {
     private const string PaymentTopic = "payment";
+
+    /// <summary>As compras avulsas são orders: o aviso traz o id da order, consultado pelo mesmo job.</summary>
+    private const string OrderTopic = "order";
     private const int MaxIdLength = 64;
 
     public async Task ReceiveMercadoPagoAsync(MercadoPagoNotification notification, CancellationToken ct)
@@ -62,7 +65,7 @@ internal sealed class PaymentWebhookService(
 
                 switch (topic)
                 {
-                    case PaymentTopic:
+                    case PaymentTopic or OrderTopic:
                         jobs.Enqueue(
                             JobTypes.ProcessPayment, new ProcessPaymentPayload(resourceId!, webhookEvent.Id), ProcessPaymentHandler.Attempts);
                         break;

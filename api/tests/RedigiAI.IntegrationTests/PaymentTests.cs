@@ -182,24 +182,24 @@ public class PaymentTests(ApiFixture api)
         var paymentId = await student.BuyPixAsync();
         var providerId = api.Payments.ProviderIdOf(paymentId)!;
         var notificationId = Random.Shared.NextInt64(1, long.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var json = $$$"""{"id":{{{notificationId}}},"type":"payment","action":"payment.updated","data":{"id":"{{{providerId}}}"}}""";
+        var json = $$$"""{"id":{{{notificationId}}},"type":"order","action":"order.updated","data":{"id":"{{{providerId}}}"}}""";
         var client = api.CreateClient();
 
-        var forged = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, secret: "outra-chave"));
-        var unsigned = await client.PostAsync($"/v1/webhooks/mercadopago?data.id={providerId}&type=payment", new StringContent(json));
+        var forged = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order", secret: "outra-chave"));
+        var unsigned = await client.PostAsync($"/v1/webhooks/mercadopago?data.id={providerId}&type=order", new StringContent(json));
         Assert.Equal(HttpStatusCode.Unauthorized, forged.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, unsigned.StatusCode);
         Assert.Equal(0, await api.QueryAsync(db => db.WebhookEvents.CountAsync(e => e.ResourceId == providerId)));
 
         // Uma assinatura antiga (capturada e reenviada) e uma notificação sem x-request-id também não valem.
-        var replayed = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, signedAt: DateTimeOffset.UtcNow.AddMinutes(-30)));
-        var withoutRequestId = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: null));
+        var replayed = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order", signedAt: DateTimeOffset.UtcNow.AddMinutes(-30)));
+        var withoutRequestId = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order", requestId: null));
         Assert.Equal(HttpStatusCode.Unauthorized, replayed.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, withoutRequestId.StatusCode);
 
         var requestId = $"req-{Guid.NewGuid():N}";
-        var first = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: requestId));
-        var again = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: requestId));
+        var first = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order", requestId: requestId));
+        var again = await client.SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order", requestId: requestId));
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);
@@ -216,8 +216,8 @@ public class PaymentTests(ApiFixture api)
         var providerId = api.Payments.ProviderIdOf(paymentId)!;
 
         // O corpo diz aprovado; lá o pagamento continua pendente.
-        var json = $$$"""{"id":{{{Random.Shared.NextInt64(1, long.MaxValue)}}},"type":"payment","action":"payment.updated","data":{"id":"{{{providerId}}}","status":"approved"}}""";
-        await api.CreateClient().SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json));
+        var json = $$$"""{"id":{{{Random.Shared.NextInt64(1, long.MaxValue)}}},"type":"order","action":"order.updated","data":{"id":"{{{providerId}}}","status":"approved"}}""";
+        await api.CreateClient().SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order"));
         await RunPaymentJobsAsync();
 
         Assert.Equal(1, await student.CreditsAsync());
@@ -497,8 +497,8 @@ public class PaymentTests(ApiFixture api)
         public async Task NotifyAsync(Guid paymentId)
         {
             var providerId = api.Payments.ProviderIdOf(paymentId)!;
-            var json = $$$"""{"id":{{{Random.Shared.NextInt64(1, long.MaxValue)}}},"type":"payment","action":"payment.updated","data":{"id":"{{{providerId}}}"}}""";
-            var response = await api.CreateClient().SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, requestId: Guid.NewGuid().ToString()));
+            var json = $$$"""{"id":{{{Random.Shared.NextInt64(1, long.MaxValue)}}},"type":"order","action":"order.updated","data":{"id":"{{{providerId}}}"}}""";
+            var response = await api.CreateClient().SendAsync(ApiFixture.CreateMercadoPagoWebhook(providerId, json, type: "order", requestId: Guid.NewGuid().ToString()));
             response.EnsureSuccessStatusCode();
         }
 

@@ -523,7 +523,8 @@ public sealed class FakePaymentGateway : IPaymentGateway
         var providerId = _byPayment.GetOrAdd(request.PaymentId, _ =>
         {
             Interlocked.Increment(ref _creates);
-            var id = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            // Como lá: a compra avulsa é uma order, com id em maiúsculas (ORD…).
+            var id = $"ORDTST{Guid.NewGuid():N}".ToUpperInvariant()[..32];
             _remote[id] = new ProviderPayment(id, status, request.PaymentId.ToString(), request.AmountCents, "BRL");
             return id;
         });
