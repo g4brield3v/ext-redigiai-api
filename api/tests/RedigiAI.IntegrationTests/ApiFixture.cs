@@ -426,6 +426,12 @@ public sealed class FakePaymentGateway : IPaymentGateway
             throw Errors.PaymentFailed();
         }
 
+        // Como lá: o back_url precisa ser um endereço público em https (localhost é recusado com 400).
+        if (!Uri.TryCreate(request.BackUrl, UriKind.Absolute, out var backUrl) || backUrl.Scheme != Uri.UriSchemeHttps || backUrl.IsLoopback)
+        {
+            throw Errors.PaymentFailed();
+        }
+
         // Como lá: a assinatura nasce autorizada com o cartão (checkout transparente), e só a mesma chave de
         // idempotência devolve a mesma; outra chave cria outra.
         var id = _byCreationKey.GetOrAdd(request.IdempotencyKey, _ =>
@@ -523,7 +529,8 @@ public sealed class FakePaymentGateway : IPaymentGateway
         var providerId = _byPayment.GetOrAdd(request.PaymentId, _ =>
         {
             Interlocked.Increment(ref _creates);
-            var id = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            // Como lá: a compra avulsa é uma order, com id em maiúsculas (ORD…).
+            var id = $"ORDTST{Guid.NewGuid():N}".ToUpperInvariant()[..32];
             _remote[id] = new ProviderPayment(id, status, request.PaymentId.ToString(), request.AmountCents, "BRL");
             return id;
         });

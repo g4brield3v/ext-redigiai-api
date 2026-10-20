@@ -192,7 +192,7 @@ public class RefundTests(ApiFixture api)
             var paymentId = (await (await Client.SendAsync(request)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
             var providerId = api.Payments.ProviderIdOf(paymentId)!;
             api.Payments.Set(providerId, PaymentStatus.Approved);
-            await NotifyAsync("payment", providerId);
+            await NotifyAsync("order", providerId);
             await RunJobsAsync();
             return paymentId;
         }

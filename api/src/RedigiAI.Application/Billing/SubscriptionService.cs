@@ -233,12 +233,26 @@ internal sealed class SubscriptionService(
     private static string AttemptKey(Guid subscriptionId, CardToken card) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{subscriptionId:N}:{card.Token}")))[..32];
 
-    /// <summary>Exigido pelo Mercado Pago na criação: o perfil, onde o aluno vê a assinatura.</summary>
+    /// <summary>
+    /// Exigido pelo Mercado Pago na criação: o perfil, onde o aluno vê a assinatura. No checkout transparente ninguém é
+    /// levado para lá, mas o Mercado Pago só aceita endereço público em https: no desenvolvimento (http, localhost), vai
+    /// o perfil do site.
+    /// </summary>
     private string BackUrl()
     {
         var options = site.Value;
-        var valid = Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var url)
-            && (url.Scheme == Uri.UriSchemeHttps || (!options.RequireHttps && url.Scheme == Uri.UriSchemeHttp));
-        return valid ? $"{options.BaseUrl.TrimEnd('/')}/perfil" : throw Errors.PaymentUnavailable();
+        if (!Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var url))
+        {
+            throw Errors.PaymentUnavailable();
+        }
+
+        if (url.Scheme == Uri.UriSchemeHttps && !url.IsLoopback)
+        {
+            return $"{options.BaseUrl.TrimEnd('/')}/perfil";
+        }
+
+        return !options.RequireHttps ? PublicProfileUrl : throw Errors.PaymentUnavailable();
     }
+
+    private const string PublicProfileUrl = "https://redigiai.com.br/perfil";
 }
