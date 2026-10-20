@@ -6,9 +6,9 @@ using RedigiAI.Domain.Common;
 
 namespace RedigiAI.Api.Controllers;
 
-/// <summary>Catálogo público: vestibulares, propostas de redação e grades de correção.</summary>
+/// <summary>Catálogo: vestibulares, propostas de redação e grades de correção. Só para quem está logado.</summary>
 [ApiController]
-[AllowAnonymous]
+[Authorize]
 [Route("v1")]
 [Tags("Catalog")]
 [Produces("application/json")]

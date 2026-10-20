@@ -56,7 +56,8 @@ public class PlatformTests(ApiFixture api)
             statuses.Add((await client.GetAsync("/v1/exams")).StatusCode);
         }
 
-        Assert.Equal(Enumerable.Repeat(HttpStatusCode.OK, 3), statuses.Take(3));
+        // Sem login, o catálogo responde 401, e o limite por IP vale do mesmo jeito.
+        Assert.Equal(Enumerable.Repeat(HttpStatusCode.Unauthorized, 3), statuses.Take(3));
         var refused = await client.GetAsync("/v1/exams");
         var error = await AccountTests.AssertErrorAsync(refused, HttpStatusCode.TooManyRequests, "RATE_LIMITED");
         Assert.True(error.GetProperty("retryable").GetBoolean());

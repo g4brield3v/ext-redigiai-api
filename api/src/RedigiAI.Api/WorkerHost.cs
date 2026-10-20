@@ -28,8 +28,6 @@ internal static class WorkerHost
     public static HostApplicationBuilder CreateBuilder(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
-        // Worker, migrate e seed também se recusam a subir com o acesso de desenvolvimento ligado fora de Development.
-        _ = Auth.DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
         builder.Logging.UseJsonConsole();
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure();

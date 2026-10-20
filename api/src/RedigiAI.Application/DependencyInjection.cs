@@ -18,7 +18,6 @@ public static class DependencyInjection
         services.AddScoped<IAdminAccessService, AdminAccessService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IClerkWebhookService, ClerkWebhookService>();
-        services.AddScoped<ITestAccountService, TestAccountService>();
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<PlanCredits>();

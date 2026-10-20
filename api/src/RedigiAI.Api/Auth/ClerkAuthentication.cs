@@ -21,23 +21,12 @@ internal static class ClerkAuthentication
     /// O token de sessão do Clerk não traz <c>aud</c> por padrão; a parte autorizada (<c>azp</c>) é conferida
     /// contra as origens permitidas (token sem <c>azp</c> é recusado) e <c>aud</c> é exigido quando <c>Clerk__Audience</c> está configurado.
     /// </summary>
-    /// <summary>Com <paramref name="devAccess"/>, aceita também os alunos de teste (ver <see cref="DevAuthentication"/>).</summary>
     public static IServiceCollection AddClerkAuthentication(
-        this IServiceCollection services, IConfiguration configuration, bool devAccess = false)
+        this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ClerkOptions>(configuration.GetSection(ClerkOptions.Section));
-        var authentication = services
-            .AddAuthentication(devAccess ? DevAuthentication.SmartScheme : JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
-        if (devAccess)
-        {
-            authentication
-                .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>(DevAuthentication.Scheme, null)
-                .AddPolicyScheme(DevAuthentication.SmartScheme, null, scheme => scheme.ForwardDefaultSelector = http =>
-                    http.Request.Headers.ContainsKey(DevAuthentication.Header)
-                        ? DevAuthentication.Scheme
-                        : JwtBearerDefaults.AuthenticationScheme);
-        }
+        // Só o token do Clerk: não existe acesso sem login, nem no desenvolvimento.
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 
         // Toda rota exige login, salvo as marcadas com [AllowAnonymous]: um controller novo sem atributo nasce fechado.
         services.AddAuthorizationBuilder()

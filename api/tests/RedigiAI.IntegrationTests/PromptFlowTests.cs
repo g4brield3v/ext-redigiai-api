@@ -28,9 +28,9 @@ public class PromptFlowTests(ApiFixture api)
         var admin = await AdminAsync();
         var (id, slug) = await PublishAsync(admin, "Proposta para o aluno");
 
-        var listed = (await api.CreateClient().GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts"))
+        var listed = (await api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId())).GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts"))
             .EnumerateArray().Single(p => p.GetProperty("id").GetGuid() == id);
-        var raw = await api.CreateClient().GetStringAsync($"/v1/prompts/{slug}");
+        var raw = await api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId())).GetStringAsync($"/v1/prompts/{slug}");
         var prompt = JsonDocument.Parse(raw).RootElement;
 
         Assert.Equal(("Proposta para o aluno", "Dissertação em prosa", 5), (
@@ -149,7 +149,7 @@ public class PromptFlowTests(ApiFixture api)
         var id = await CreateAsync(admin, document);
         (await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null)).EnsureSuccessStatusCode();
 
-        var raw = await api.CreateClient().GetStringAsync($"/v1/prompts/{slug}");
+        var raw = await api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId())).GetStringAsync($"/v1/prompts/{slug}");
         var card = JsonDocument.Parse(raw).RootElement.GetProperty("blocks").EnumerateArray()
             .Single(b => b.GetProperty("kind").GetString() == "card").GetProperty("data");
 

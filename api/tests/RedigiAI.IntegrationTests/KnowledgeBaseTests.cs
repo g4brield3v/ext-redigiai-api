@@ -69,7 +69,7 @@ public class KnowledgeBaseTests(ApiFixture api)
     [Fact]
     public async Task Each_fuvest_essay_type_has_one_active_profile_pointing_to_the_layers()
     {
-        var exams = await api.CreateClient().GetFromJsonAsync<JsonElement>("/v1/exams");
+        var exams = await api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId())).GetFromJsonAsync<JsonElement>("/v1/exams");
         var rubricId = exams[0].GetProperty("currentRubricVersionId").GetGuid();
 
         var profiles = await api.QueryAsync(db => db.GradingProfiles.ToListAsync());

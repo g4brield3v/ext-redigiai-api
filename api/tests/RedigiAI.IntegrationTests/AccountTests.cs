@@ -183,11 +183,30 @@ public class AccountTests(ApiFixture api)
             e.RoutePattern.RawText));
     }
 
+    [Fact]
+    public void Only_health_and_signed_webhooks_open_without_login()
+    {
+        // Nada do conteúdo da plataforma abre sem login: só a saúde da API e os avisos assinados do Mercado Pago e do Clerk.
+        var anonymous = api.Factory.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints
+            .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+            .Where(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>() is not null
+                && e.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null)
+            .Select(e => e.RoutePattern.RawText!.TrimStart('/'))
+            .Order()
+            .ToList();
+
+        Assert.Equal(["health", "ready", "v1/webhooks/clerk", "v1/webhooks/mercadopago"], anonymous);
+    }
+
     [Theory]
     [InlineData("/v1/me")]
     [InlineData("/v1/essays")]
     [InlineData("/v1/payments")]
     [InlineData("/v1/admin/prompts")]
+    [InlineData("/v1/exams")]
+    [InlineData("/v1/exams/fuvest/prompts")]
+    [InlineData("/v1/prompts/algoritmos-e-o-debate-publico")]
+    [InlineData("/v1/rubrics/0198f0c0-0000-7000-8000-000000000000")]
     public async Task Logged_routes_without_a_token_answer_401(string path)
     {
         Assert.Equal(HttpStatusCode.Unauthorized, (await api.CreateClient().GetAsync(path)).StatusCode);

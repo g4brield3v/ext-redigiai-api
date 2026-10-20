@@ -96,6 +96,8 @@ public sealed class ApiFixture : IAsyncLifetime
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            // A fila e o preparo do banco local ficam com os testes, mesmo nos que sobem como Development.
+            builder.UseSetting("LocalRun:Enabled", "false");
             builder.UseSetting("ConnectionStrings:Default", _database.GetConnectionString());
             builder.UseSetting("Clerk:Issuer", Issuer);
             builder.UseSetting("Clerk:JwksUrl", "");
@@ -108,7 +110,6 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("RateLimit:EssayBatchPerHour", "10000");
             builder.UseSetting("Proxy:TrustForwardedHeaders", "false");
             // O .env da máquina de desenvolvimento pode ligar o acesso sem login; nos testes ele fica desligado.
-            builder.UseSetting("DevAuth:Enabled", "false");
             builder.UseSetting("App:BaseUrl", WebOrigin);
             builder.UseSetting("MercadoPago:WebhookSecret", MercadoPagoSecret);
             builder.UseSetting("MercadoPago:AccessToken", "");

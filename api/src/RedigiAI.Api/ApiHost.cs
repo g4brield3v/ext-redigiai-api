@@ -66,12 +66,11 @@ internal static class ApiHost
         services.AddEmailSender(builder.Environment.IsDevelopment());
         services.Configure<RedigiAI.Infrastructure.Jobs.JobQueueOptions>(
             builder.Configuration.GetSection(RedigiAI.Infrastructure.Jobs.JobQueueOptions.Section));
-        var devAccess = DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
-        services.AddClerkAuthentication(builder.Configuration, devAccess);
-        if (devAccess)
+        services.AddClerkAuthentication(builder.Configuration);
+        if (builder.Environment.IsDevelopment() && builder.Configuration.GetValue("LocalRun:Enabled", true))
         {
-            services.AddSingleton<DevUsers>();
-            services.AddHostedService<DevEnvironmentSetup>();
+            // Na máquina de quem desenvolve, a própria API prepara o banco e roda a fila (sem precisar do worker à parte).
+            services.AddHostedService<LocalDatabaseSetup>();
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();
             services.AddHostedService<CreditExpirySweeper>();
@@ -84,7 +83,7 @@ internal static class ApiHost
         services.AddCors(cors => cors.AddPolicy(CorsPolicy, policy => policy
             .WithOrigins([.. CorsOrigins.From(builder.Configuration)])
             .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
-            .WithHeaders(["Authorization", "Content-Type", "Idempotency-Key", .. devAccess ? new[] { DevAuthentication.Header } : []])
+            .WithHeaders("Authorization", "Content-Type", "Idempotency-Key")
             .WithExposedHeaders("X-Trace-Id")));
 
         AddRateLimiting(services, builder.Configuration);
