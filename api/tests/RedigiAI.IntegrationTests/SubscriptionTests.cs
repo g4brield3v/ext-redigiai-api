@@ -82,6 +82,25 @@ public class SubscriptionTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Repeating_the_same_key_returns_the_first_charge_date_sent_even_if_the_cycle_changed()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var cycleEnd = DateTimeOffset.UtcNow.AddDays(10);
+        var first = await student.SubscribeAsync(nextChargeAt: cycleEnd);
+        await student.ChargeAsync(first, PaymentStatus.Approved);
+        (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+        var key = Guid.NewGuid().ToString();
+
+        var sent = (await (await student.CheckoutAsync(key: key)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("firstChargeAt").GetDateTimeOffset();
+        // O ciclo antigo acaba (por exemplo, estornado) antes de a tela repetir o pedido.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id && b.Source == CreditSource.Plan)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.ExpiresAt, DateTimeOffset.UtcNow.AddMinutes(-1))));
+        var again = (await (await student.CheckoutAsync(key: key)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("firstChargeAt").GetDateTimeOffset();
+
+        Assert.Equal(sent, again, TimeSpan.FromMilliseconds(1));
+    }
+
+    [Fact]
     public async Task A_first_subscription_is_charged_now()
     {
         var student = await Subscriber.CreateAsync(api);

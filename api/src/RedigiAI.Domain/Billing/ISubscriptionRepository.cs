@@ -24,10 +24,11 @@ public interface ISubscriptionRepository
     Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct);
 
     /// <summary>
-    /// Grava o que o Mercado Pago devolveu na criação: o id e a URL do checkout. Só vale enquanto a assinatura não tem id
-    /// ou tem este mesmo.
+    /// Grava o id da assinatura no Mercado Pago e, na criação, a data da primeira cobrança pedida lá. Só vale enquanto a
+    /// assinatura não tem id ou tem este mesmo.
     /// </summary>
-    Task<bool> TryAttachProviderAsync(Guid subscriptionId, string mpPreapprovalId, DateTimeOffset now, CancellationToken ct);
+    Task<bool> TryAttachProviderAsync(
+        Guid subscriptionId, string mpPreapprovalId, DateTimeOffset now, CancellationToken ct, DateTimeOffset? firstChargeAt = null);
 
     /// <summary>
     /// Trava a criação lá: <c>UPDATE … SET creating_until = @now + trava WHERE id = @id AND status = 'pending' AND
