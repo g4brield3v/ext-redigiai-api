@@ -98,14 +98,20 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             return null;
         }
 
-        var refunded = Math.Max(0, FirstPayment(order) is { } payment ? Cents(payment["refunded_amount"]) : 0);
+        var status = OrderStatusOf(order);
+        if (status == PaymentStatus.Pending && order["status"]?.GetValue<string>() == "processed")
+        {
+            // Um detalhe de "processed" que não conhecemos não vira aprovação: fica pendente até alguém conferir.
+            logger.LogWarning("Mercado Pago order {OrderId} processed with unknown detail {Detail}", orderId, Clean(order["status_detail"]?.GetValue<string>()));
+        }
+
         return new ProviderPayment(
             Id(order),
-            OrderStatusOf(order),
+            status,
             order["external_reference"]?.GetValue<string>(),
             Cents(order["total_amount"]),
             order["currency"]?.GetValue<string>() ?? "",
-            refunded);
+            RefundedCentsOf(order));
     }
 
     private async Task<JsonObject?> FindOrderAsync(string orderId, CancellationToken ct)
@@ -270,9 +276,10 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
                 : Errors.PaymentUnavailable();
         }
 
-        // O reembolso desta chamada é o último da transação.
+        // O reembolso desta chamada: o último da transação com este valor.
         return refunded["transactions"]?["refunds"] is JsonArray refunds
-            && refunds.OfType<JsonObject>().LastOrDefault(r => Text(r["transaction_id"]) == transactionId) is { } refund
+            && refunds.OfType<JsonObject>().LastOrDefault(r => Text(r["transaction_id"]) == transactionId && Cents(r["amount"]) == amountCents)
+                is { } refund
             ? Id(refund)
             : throw Errors.PaymentUnavailable();
     }
@@ -352,7 +359,31 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             : Errors.PaymentUnavailable();
     }
 
-    private static bool IsOrder(string providerId) => providerId.StartsWith("ORD", StringComparison.Ordinal);
+    private static bool IsOrder(string providerId) => providerId.StartsWith("ORD", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Quanto já foi estornado da order: o <c>refunded_amount</c> da transação; sem ele, a soma dos reembolsos
+    /// processados dela.
+    /// </summary>
+    private static long RefundedCentsOf(JsonObject order)
+    {
+        if (FirstPayment(order) is not { } payment)
+        {
+            return 0;
+        }
+
+        if (payment["refunded_amount"] is JsonNode amount && Cents(amount) is var cents and >= 0)
+        {
+            return cents;
+        }
+
+        var transactionId = Text(payment["id"]);
+        return order["transactions"]?["refunds"] is JsonArray refunds
+            ? refunds.OfType<JsonObject>()
+                .Where(r => Text(r["transaction_id"]) == transactionId && r["status"]?.GetValue<string>() == "processed")
+                .Sum(r => Math.Max(0, Cents(r["amount"])))
+            : 0;
+    }
 
     private static JsonObject? FirstPayment(JsonObject order) =>
         order["transactions"]?["payments"] is JsonArray payments ? payments.OfType<JsonObject>().FirstOrDefault() : null;
@@ -437,7 +468,7 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             : body["errors"] is JsonArray errors
                 ? string.Join(',', errors.OfType<JsonObject>().Select(e => Clean(Text(e["code"]))).Where(c => c is not null))
                 : null;
-        return (Clean(Text(body["error"])), Clean(Text(body["message"])), causes);
+        return (Clean(Text(body["error"])), Mask(Clean(Text(body["message"]))), causes);
     }
 
     private static JsonObject? ParseObject(string text)
@@ -451,6 +482,13 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             return null;
         }
     }
+
+    /// <summary>A mensagem do Mercado Pago é texto livre: e-mails e sequências de 6 ou mais dígitos saem mascarados.</summary>
+    private static string? Mask(string? value) =>
+        value is null
+            ? null
+            : System.Text.RegularExpressions.Regex.Replace(
+                System.Text.RegularExpressions.Regex.Replace(value, @"\S+@\S+", "[e-mail]"), @"\d{6,}", "[número]");
 
     private static string? Clean(string? value) =>
         value is null ? null : new string(value.Where(c => !char.IsControl(c)).Take(200).ToArray());
@@ -471,10 +509,16 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             return PaymentStatus.ChargedBack;
         }
 
+        if (order["status"]?.GetValue<string>() == "charged_back")
+        {
+            return PaymentStatus.ChargedBack;
+        }
+
+        // Aprovada só com os detalhes conhecidos; um detalhe novo de "processed" (uma disputa, por exemplo) fica pendente.
         return (order["status"]?.GetValue<string>(), detail) switch
         {
             ("processed", "refunded") or ("refunded", _) => PaymentStatus.Refunded,
-            ("processed", _) => PaymentStatus.Approved,
+            ("processed", "accredited" or "partially_refunded") => PaymentStatus.Approved,
             ("failed", _) => PaymentStatus.Rejected,
             ("canceled" or "cancelled" or "expired", _) => PaymentStatus.Cancelled,
             _ => PaymentStatus.Pending,

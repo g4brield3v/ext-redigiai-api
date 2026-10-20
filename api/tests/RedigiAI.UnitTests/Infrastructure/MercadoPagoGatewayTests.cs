@@ -115,6 +115,9 @@ public sealed class MercadoPagoGatewayTests : IDisposable
     [InlineData("processing", "in_process", PaymentStatus.Pending)]
     [InlineData("created", "created", PaymentStatus.Pending)]
     [InlineData("processed", "charged_back", PaymentStatus.ChargedBack)]
+    [InlineData("charged_back", "charged_back", PaymentStatus.ChargedBack)]
+    [InlineData("processed", "in_mediation", PaymentStatus.Pending)]
+    [InlineData("processed", "um_detalhe_novo", PaymentStatus.Pending)]
     public async Task The_order_status_is_read_as_ours(string status, string detail, PaymentStatus expected)
     {
         _server.Reply($"GET /v1/orders/{OrderId}", 200, Order(status, detail));
@@ -132,6 +135,29 @@ public sealed class MercadoPagoGatewayTests : IDisposable
         var payment = await _gateway.GetPaymentAsync(OrderId, CancellationToken.None);
 
         Assert.Equal((3200L, 1600L, "BRL", "compra-1"), (payment!.AmountCents, payment.RefundedCents, payment.Currency, payment.ExternalReference));
+    }
+
+    [Fact]
+    public async Task Without_refunded_amount_the_refunds_of_the_transaction_are_summed()
+    {
+        var order = JsonNode.Parse(Order("processed", "partially_refunded"))!.AsObject();
+        order["transactions"]!["refunds"] = JsonNode.Parse(
+            $$$"""[{"id":"R1","transaction_id":"{{{TransactionId}}}","amount":"16.00","status":"processed"},{"id":"R2","transaction_id":"{{{TransactionId}}}","amount":"5.00","status":"failed"}]""");
+        _server.Reply($"GET /v1/orders/{OrderId}", 200, order.ToJsonString());
+
+        var payment = await _gateway.GetPaymentAsync(OrderId, CancellationToken.None);
+
+        Assert.Equal(1600L, payment!.RefundedCents);
+    }
+
+    [Fact]
+    public async Task A_lowercase_order_id_is_still_an_order()
+    {
+        _server.Reply($"GET /v1/orders/{OrderId.ToLowerInvariant()}", 200, Order("processed", "accredited"));
+
+        var payment = await _gateway.GetPaymentAsync(OrderId.ToLowerInvariant(), CancellationToken.None);
+
+        Assert.Equal(PaymentStatus.Approved, payment!.Status);
     }
 
     [Fact]
