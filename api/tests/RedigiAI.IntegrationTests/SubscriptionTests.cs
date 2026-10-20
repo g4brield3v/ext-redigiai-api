@@ -74,9 +74,17 @@ public class SubscriptionTests(ApiFixture api)
         // Duplo clique e outra aba: cada envio do formulário traz um token novo.
         var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(i => student.CheckoutAsync(key: i < 3 ? key : null)));
 
-        Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        // Quem chega no meio da criação recebe um erro que dá para repetir; nenhum cria uma segunda lá.
+        Assert.All(responses, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
+        foreach (var conflict in responses.Where(r => r.StatusCode == HttpStatusCode.Conflict))
+        {
+            Assert.Equal("CHECKOUT_IN_PROGRESS", (await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        }
+
         var subscriptionId = await api.QueryAsync(db => db.Subscriptions.Where(s => s.UserId == student.Id).Select(s => s.Id).SingleAsync());
         Assert.Single(api.Payments.SubscriptionsFor(subscriptionId));
+        Assert.Null(await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.CreatingUntil).SingleAsync()));
     }
 
     [Fact]
@@ -127,9 +135,12 @@ public class SubscriptionTests(ApiFixture api)
     public void The_card_token_never_appears_when_the_record_is_printed()
     {
         var card = new CardToken("tok-secreto", "master", "25", "CPF", "12345678909");
+        var request = new CheckoutPlanCommand("user", "key", false, new CardPaymentRequest("tok-secreto", "master", "25", "CPF", "12345678909"));
 
         Assert.DoesNotContain("tok-secreto", card.ToString());
         Assert.DoesNotContain("12345678909", card.ToString());
+        Assert.DoesNotContain("tok-secreto", request.ToString());
+        Assert.DoesNotContain("12345678909", request.ToString());
     }
 
     [Theory]

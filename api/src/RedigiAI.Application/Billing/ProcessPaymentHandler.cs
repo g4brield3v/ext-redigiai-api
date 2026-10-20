@@ -180,7 +180,14 @@ internal sealed class ProcessPaymentHandler(
             return null;
         }
 
-        if (remote.PreapprovalId is { } preapprovalId && preapprovalId != subscription.MpPreapprovalId)
+        if (remote.PreapprovalId is null)
+        {
+            // Sem saber de qual preapproval veio, não dá para descartar uma cobrança de assinatura duplicada: quem a
+            // registra é o aviso da cobrança (process_subscription), que traz o preapproval.
+            return null;
+        }
+
+        if (remote.PreapprovalId != subscription.MpPreapprovalId)
         {
             // Cobrança de um preapproval duplicado lá, não do gravado: não renova; fica para estorno manual.
             audit.Record("system", "payment.orphan_subscription_charge", "subscription", subscription.Id, new { mpPaymentId = remote.ProviderId });

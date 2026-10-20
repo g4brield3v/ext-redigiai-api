@@ -124,21 +124,24 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(x => x.MpPreapprovalId, mpPreapprovalId)
+                    .SetProperty(x => x.CreatingUntil, (DateTimeOffset?)null)
                     .SetProperty(x => x.UpdatedAt, now),
                 ct) == 1;
 
-    public async Task<bool> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct)
+    public async Task<DateTimeOffset?> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct)
     {
         var until = now + Subscription.CreationLock;
-        return await db.Subscriptions
+        var locked = await db.Subscriptions
             .Where(s => s.Id == subscriptionId && s.Status == SubscriptionStatus.Pending && s.MpPreapprovalId == null
                 && (s.CreatingUntil == null || s.CreatingUntil <= now))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatingUntil, until), ct) == 1;
+        // O valor como o banco o guarda (microssegundos), para conferir o dono ao soltar.
+        return locked ? await db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.CreatingUntil).SingleAsync(ct) : null;
     }
 
-    public Task EndCreationAsync(Guid subscriptionId, CancellationToken ct) =>
+    public Task EndCreationAsync(Guid subscriptionId, DateTimeOffset lockedUntil, CancellationToken ct) =>
         db.Subscriptions
-            .Where(s => s.Id == subscriptionId)
+            .Where(s => s.Id == subscriptionId && s.CreatingUntil == lockedUntil)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatingUntil, (DateTimeOffset?)null), ct);
 
     public async Task<bool> TryTransitionAsync(Guid subscriptionId, SubscriptionStatus to, DateTimeOffset now, CancellationToken ct)

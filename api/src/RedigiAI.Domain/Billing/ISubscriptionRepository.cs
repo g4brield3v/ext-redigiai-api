@@ -30,13 +30,14 @@ public interface ISubscriptionRepository
 
     /// <summary>
     /// Trava a criação lá: <c>UPDATE … SET creating_until = @now + trava WHERE id = @id AND status = 'pending' AND
-    /// mp_preapproval_id IS NULL AND (creating_until IS NULL OR creating_until &lt;= @now)</c>. Falso: outra requisição
-    /// está criando, ou já criou.
+    /// mp_preapproval_id IS NULL AND (creating_until IS NULL OR creating_until &lt;= @now)</c>. Devolve o valor gravado,
+    /// que identifica o dono da trava; nulo se outra requisição está criando, ou já criou. No sucesso, quem solta a trava
+    /// é <see cref="TryAttachProviderAsync"/>, junto com o id de lá.
     /// </summary>
-    Task<bool> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct);
+    Task<DateTimeOffset?> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct);
 
-    /// <summary>Solta a trava da criação, com ou sem sucesso.</summary>
-    Task EndCreationAsync(Guid subscriptionId, CancellationToken ct);
+    /// <summary>Solta a trava depois de uma criação que falhou, só se ainda for a desta requisição.</summary>
+    Task EndCreationAsync(Guid subscriptionId, DateTimeOffset lockedUntil, CancellationToken ct);
 
     /// <summary>
     /// Muda a situação com <c>UPDATE … WHERE status IN (…)</c> (regra 10), na transação aberta. Zero linhas: outro

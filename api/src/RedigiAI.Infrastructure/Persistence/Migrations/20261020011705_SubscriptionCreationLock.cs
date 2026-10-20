@@ -17,6 +17,17 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                 type: "timestamp with time zone",
                 nullable: true);
 
+            // Antes do índice: de cada aluno com mais de uma assinatura pendente, fica só a mais recente.
+            migrationBuilder.Sql("""
+                UPDATE subscriptions
+                SET status = 'cancelled', cancelled_at = now(), updated_at = now()
+                WHERE status = 'pending'
+                  AND id NOT IN (
+                      SELECT DISTINCT ON (user_id) id FROM subscriptions
+                      WHERE status = 'pending'
+                      ORDER BY user_id, created_at DESC);
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "ux_subscriptions_pending_per_user",
                 table: "subscriptions",

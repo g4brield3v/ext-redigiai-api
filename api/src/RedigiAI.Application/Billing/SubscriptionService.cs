@@ -153,11 +153,11 @@ internal sealed class SubscriptionService(
 
     private async Task<PlanCheckoutDto> CreateThereAsync(Subscription subscription, User user, CardToken card, CancellationToken ct)
     {
-        // Uma criação por vez: o duplo clique, a outra aba ou a mesma chave em paralelo esperam o resultado da primeira
-        // (o front acompanha em GET /v1/me), sem criar lá uma segunda assinatura com outro token.
-        if (!await subscriptions.TryBeginCreationAsync(subscription.Id, time.GetUtcNow(), ct))
+        // Uma criação por vez: o duplo clique, a outra aba ou a mesma chave em paralelo não criam lá uma segunda
+        // assinatura com outro token; recebem um erro que dá para repetir em instantes.
+        if (await subscriptions.TryBeginCreationAsync(subscription.Id, time.GetUtcNow(), ct) is not { } lockedUntil)
         {
-            return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending);
+            throw Errors.CheckoutInProgress();
         }
 
         CreatedSubscription created;
@@ -171,18 +171,30 @@ internal sealed class SubscriptionService(
                         subscription.Id, AttemptKey(subscription.Id, card), Payment.PlanPriceCents, Reason, user.Email, card, BackUrl()),
                     ct);
         }
-        catch (AppError error) when (error.Code == "PAYMENT_FAILED")
+        catch (Exception error)
         {
-            // Sem o token: só que houve a recusa, para notar tentativas seguidas de cartões.
-            audit.Record($"user:{user.Id}", "subscription.card_declined", "subscription", subscription.Id);
-            await unitOfWork.SaveChangesAsync(ct);
+            // Nada foi gravado lá (ou a busca da próxima tentativa acha o que foi): a trava sai para tentar de novo.
+            try
+            {
+                await subscriptions.EndCreationAsync(subscription.Id, lockedUntil, CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                // A trava vence sozinha; o erro que importa é o da criação.
+            }
+
+            if (error is AppError { Code: "PAYMENT_FAILED" })
+            {
+                // Sem o token: só que houve a recusa, para notar tentativas seguidas de cartões.
+                audit.Record($"user:{user.Id}", "subscription.card_declined", "subscription", subscription.Id);
+                await unitOfWork.SaveChangesAsync(CancellationToken.None);
+            }
+
             throw;
         }
-        finally
-        {
-            await subscriptions.EndCreationAsync(subscription.Id, CancellationToken.None);
-        }
 
+        // A assinatura já existe lá: gravar o id não depende de o aluno continuar na página.
+        ct = CancellationToken.None;
         var now = time.GetUtcNow();
         var attached = await unitOfWork.InTransactionAsync(
             async () =>
