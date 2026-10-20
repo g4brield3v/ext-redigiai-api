@@ -165,8 +165,10 @@ public class SubscriptionTests(ApiFixture api)
         var parallel = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => student.CheckoutAsync(key: key)));
         var otherTab = await student.CheckoutAsync();
 
-        Assert.All(parallel, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
-        var ids = await Task.WhenAll(parallel.Append(otherTab).Select(async r =>
+        // Quem chega no meio da criação recebe CHECKOUT_IN_PROGRESS (409) e pode repetir; os demais, a mesma assinatura.
+        Assert.All(parallel, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+        Assert.Equal(HttpStatusCode.OK, otherTab.StatusCode);
+        var ids = await Task.WhenAll(parallel.Where(r => r.StatusCode == HttpStatusCode.OK).Append(otherTab).Select(async r =>
             (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid()));
         Assert.Single(ids.Distinct());
         Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));

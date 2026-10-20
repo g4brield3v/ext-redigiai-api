@@ -24,13 +24,20 @@ internal static class DotEnv
             }
 
             var key = trimmed[..separator].Trim();
-            var value = trimmed[(separator + 1)..].Trim();
+            var value = Unquote(trimmed[(separator + 1)..].Trim());
             if (value.Length > 0 && Environment.GetEnvironmentVariable(key) is null)
             {
                 Environment.SetEnvironmentVariable(key, value);
             }
         }
     }
+
+    /// <summary>
+    /// <c>CHAVE="valor"</c> e <c>CHAVE='valor'</c> valem como <c>CHAVE=valor</c>, como nos outros leitores de .env: as aspas
+    /// não fazem parte do valor (um token com aspas é recusado pelo serviço).
+    /// </summary>
+    internal static string Unquote(string value) =>
+        value.Length >= 2 && (value[0] is '"' or '\'') && value[^1] == value[0] ? value[1..^1] : value;
 
     private static string? Find(string start)
     {
