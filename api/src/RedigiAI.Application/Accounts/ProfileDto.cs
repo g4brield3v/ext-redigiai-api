@@ -3,6 +3,10 @@ using RedigiAI.Domain.Billing;
 
 namespace RedigiAI.Application.Accounts;
 
+/// <param name="PlanResumesAt">
+/// Sem plano aberto e com o ciclo pago ainda valendo: a data em que o plano voltaria a cobrar se o aluno assinasse agora
+/// (nada é cobrado antes). Nula: assinar agora cobra na hora. A tela de compra avisa com ela antes de pagar.
+/// </param>
 public sealed record ProfileDto(
     Guid Id,
     string Email,
@@ -13,7 +17,8 @@ public sealed record ProfileDto(
     EmailPreferencesDto EmailPreferences,
     CreditBalanceDto Credits,
     SubscriptionDto? Subscription,
-    bool NeedsGuardianAuthorization);
+    bool NeedsGuardianAuthorization,
+    DateTimeOffset? PlanResumesAt);
 
 public sealed record EmailPreferencesDto(bool CorrectionReady, bool IllegibleReminder, bool NewThemes);
 

@@ -384,6 +384,9 @@ public sealed class FakePaymentGateway : IPaymentGateway
     public IReadOnlyList<ProviderSubscription> SubscriptionsFor(Guid subscriptionId) =>
         _subscriptions.Values.Where(s => s.ExternalReference == subscriptionId.ToString()).ToList();
 
+    /// <summary>A data da primeira cobrança pedida em cada assinatura criada (nula: agora).</summary>
+    public ConcurrentDictionary<Guid, DateTimeOffset?> FirstChargeAts { get; } = new();
+
     /// <summary>A próxima criação de assinatura é aceita lá, mas a resposta não chega (tempo esgotado).</summary>
     public bool LoseNextSubscriptionResponse { get; set; }
 
@@ -438,8 +441,10 @@ public sealed class FakePaymentGateway : IPaymentGateway
         {
             Interlocked.Increment(ref _subscriptionCreates);
             var preapprovalId = $"pre{Guid.NewGuid():N}";
+            // A primeira cobrança é agora, ou na data pedida (quem assina de novo com o ciclo pago valendo).
             _subscriptions[preapprovalId] = new ProviderSubscription(
-                preapprovalId, SubscriptionStatus.Active, request.SubscriptionId.ToString(), DateTimeOffset.UtcNow.AddMonths(1), "4242");
+                preapprovalId, SubscriptionStatus.Active, request.SubscriptionId.ToString(), request.FirstChargeAt ?? DateTimeOffset.UtcNow.AddMonths(1), "4242");
+            FirstChargeAts[request.SubscriptionId] = request.FirstChargeAt;
             _bySubscription.TryAdd(request.SubscriptionId, preapprovalId);
             return preapprovalId;
         });

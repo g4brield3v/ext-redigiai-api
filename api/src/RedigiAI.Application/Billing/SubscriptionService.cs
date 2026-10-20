@@ -20,7 +20,11 @@ public sealed record CheckoutPlanCommand(string ClerkUserId, string? Idempotency
 /// <param name="Status">
 /// <c>pending</c> até a consulta ao Mercado Pago confirmar o cartão (segundos); o front acompanha em <c>GET /v1/me</c>.
 /// </param>
-public sealed record PlanCheckoutDto(Guid SubscriptionId, SubscriptionStatus Status);
+/// <param name="FirstChargeAt">
+/// Quando o aluno assina de novo com o ciclo pago ainda valendo: a data da primeira cobrança, o fim desse ciclo. Até lá, as
+/// correções que ele tem continuam valendo e nada é cobrado. Nulo: a primeira cobrança é agora.
+/// </param>
+public sealed record PlanCheckoutDto(Guid SubscriptionId, SubscriptionStatus Status, DateTimeOffset? FirstChargeAt = null);
 
 public interface ISubscriptionService
 {
@@ -41,6 +45,7 @@ public interface ISubscriptionService
 internal sealed class SubscriptionService(
     IUserRepository users,
     ISubscriptionRepository subscriptions,
+    PlanResume planResume,
     IPaymentGateway gateway,
     IJobQueue jobs,
     IAuditLog audit,
@@ -147,7 +152,7 @@ internal sealed class SubscriptionService(
         }
 
         return subscription.MpPreapprovalId is not null
-            ? new PlanCheckoutDto(subscription.Id, subscription.Status)
+            ? new PlanCheckoutDto(subscription.Id, subscription.Status, await planResume.FirstChargeAtAsync(user.Id, ct))
             : await CreateThereAsync(subscription, user, card, ct);
     }
 
@@ -160,6 +165,7 @@ internal sealed class SubscriptionService(
             throw Errors.CheckoutInProgress();
         }
 
+        var firstChargeAt = await planResume.FirstChargeAtAsync(user.Id, ct);
         CreatedSubscription created;
         try
         {
@@ -168,7 +174,14 @@ internal sealed class SubscriptionService(
                 ? new CreatedSubscription(lost.ProviderId)
                 : await gateway.CreateSubscriptionAsync(
                     new SubscriptionRequest(
-                        subscription.Id, AttemptKey(subscription.Id, card), Payment.PlanPriceCents, Reason, user.Email, card, BackUrl()),
+                        subscription.Id,
+                        AttemptKey(subscription.Id, card),
+                        Payment.PlanPriceCents,
+                        Reason,
+                        user.Email,
+                        card,
+                        BackUrl(),
+                        firstChargeAt),
                     ct);
         }
         catch (Exception error)
@@ -215,7 +228,7 @@ internal sealed class SubscriptionService(
             ct);
         if (attached)
         {
-            return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending);
+            return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending, firstChargeAt);
         }
 
         // Outra requisição já ligou esta assinatura a outro preapproval lá: vale o dela, e este, sem dono, é cancelado.
@@ -223,7 +236,7 @@ internal sealed class SubscriptionService(
         audit.Record("system", "subscription.orphan", "subscription", subscription.Id, new { mpPreapprovalId = created.ProviderId });
         await unitOfWork.SaveChangesAsync(ct);
         await gateway.CancelSubscriptionAsync(created.ProviderId, ct);
-        return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending);
+        return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending, firstChargeAt);
     }
 
     /// <summary>

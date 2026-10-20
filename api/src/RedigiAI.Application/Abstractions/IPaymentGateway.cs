@@ -43,8 +43,18 @@ public sealed record ProviderPayment(
 /// <param name="IdempotencyKey">Uma por tentativa: o token do cartão só vale uma vez, e a tentativa seguinte traz outro.</param>
 /// <param name="Card">O cartão tokenizado no navegador pelo formulário do Mercado Pago; o número nunca passa por aqui.</param>
 /// <param name="BackUrl">O perfil, exigido pelo Mercado Pago na criação.</param>
+/// <param name="FirstChargeAt">
+/// A primeira cobrança, quando não é agora: o aluno que assina de novo com o ciclo pago ainda valendo só paga no fim dele.
+/// </param>
 public sealed record SubscriptionRequest(
-    Guid SubscriptionId, string IdempotencyKey, long AmountCents, string Reason, string PayerEmail, CardToken Card, string BackUrl);
+    Guid SubscriptionId,
+    string IdempotencyKey,
+    long AmountCents,
+    string Reason,
+    string PayerEmail,
+    CardToken Card,
+    string BackUrl,
+    DateTimeOffset? FirstChargeAt = null);
 
 /// <summary>A assinatura criada lá, já com o cartão autorizado. A situação aqui só muda pela consulta (regra 19).</summary>
 public sealed record CreatedSubscription(string ProviderId);
