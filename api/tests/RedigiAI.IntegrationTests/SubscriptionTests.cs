@@ -101,6 +101,25 @@ public class SubscriptionTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task A_cycle_ending_in_less_than_a_day_is_charged_now()
+    {
+        // O Mercado Pago só adia para outro dia; no mesmo dia, ele cobraria na criação.
+        var student = await Subscriber.CreateAsync(api);
+        var first = await student.SubscribeAsync();
+        await student.ChargeAsync(first, PaymentStatus.Approved);
+        // O ciclo pago termina daqui a 10 h.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id && b.Source == CreditSource.Plan)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.ExpiresAt, DateTimeOffset.UtcNow.AddHours(10))));
+        (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+
+        Assert.Equal(JsonValueKind.Null, (await student.ProfileAsync()).GetProperty("planResumesAt").ValueKind);
+        var checkout = await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(JsonValueKind.Null, checkout.GetProperty("firstChargeAt").ValueKind);
+        Assert.Null(api.Payments.FirstChargeAts[checkout.GetProperty("subscriptionId").GetGuid()]);
+    }
+
+    [Fact]
     public async Task A_first_subscription_is_charged_now()
     {
         var student = await Subscriber.CreateAsync(api);

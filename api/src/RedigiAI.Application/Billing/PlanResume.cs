@@ -10,8 +10,11 @@ namespace RedigiAI.Application.Billing;
 /// </summary>
 internal sealed class PlanResume(ICreditRepository credits, TimeProvider time)
 {
-    /// <summary>Um ciclo que termina antes disso não adia a cobrança: ela é feita agora.</summary>
-    private static readonly TimeSpan MinimumDeferral = TimeSpan.FromHours(1);
+    /// <summary>
+    /// Um ciclo que termina antes disso não adia a cobrança: ela é feita agora (com as 12 novas na hora). O Mercado Pago só
+    /// adia quando o início cai em outro dia; no mesmo dia, ele cobra na criação (medido no sandbox em 20/10/2026).
+    /// </summary>
+    private static readonly TimeSpan MinimumDeferral = TimeSpan.FromHours(24);
 
     /// <returns>A data da primeira cobrança de uma assinatura feita agora; nula se a cobrança é agora.</returns>
     public async Task<DateTimeOffset?> FirstChargeAtAsync(Guid userId, CancellationToken ct)
