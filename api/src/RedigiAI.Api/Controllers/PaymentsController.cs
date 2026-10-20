@@ -46,12 +46,14 @@ public sealed class PaymentsController(IPaymentService payments, ISubscriptionSe
     }
 
     /// <summary>
-    /// Assina o plano mensal (R$ 39,90 no cartão, 12 correções por cobrança): devolve o checkout do Mercado Pago, onde o
-    /// aluno autoriza o cartão. Exige <c>Idempotency-Key</c>; repetir a chave devolve o mesmo checkout. A assinatura
-    /// aparece em <c>GET /v1/me</c> quando o Mercado Pago confirma.
+    /// Assina o plano mensal (R$ 39,90 no cartão, 12 correções por cobrança) com o cartão tokenizado na nossa página
+    /// pelo Card Payment Brick, sem sair da plataforma. Exige <c>Idempotency-Key</c>; repetir a chave devolve a mesma
+    /// assinatura. Devolve <c>pending</c>: a assinatura aparece ativa em <c>GET /v1/me</c> quando a consulta ao Mercado
+    /// Pago confirma. Cartão recusado: 402 <c>PAYMENT_FAILED</c>, e a nova tentativa traz outro token.
     /// </summary>
     [HttpPost("checkout/plan", Name = "checkoutPlan")]
     [ProducesResponseType<PlanCheckoutDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status402PaymentRequired)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)]

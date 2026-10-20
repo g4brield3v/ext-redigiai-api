@@ -98,7 +98,8 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             payment["external_reference"]?.GetValue<string>(),
             Cents(payment["transaction_amount"]),
             payment["currency_id"]?.GetValue<string>() ?? "",
-            Math.Max(0, Cents(payment["transaction_amount_refunded"])));
+            Math.Max(0, Cents(payment["transaction_amount_refunded"])),
+            Text(payment["metadata"]?["preapproval_id"]));
     }
 
     // Assinaturas (preapproval). Os nomes dos campos seguem a API de assinaturas do Mercado Pago e precisam ser
@@ -146,12 +147,26 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             return null;
         }
 
-        if (subscription is null)
+        return subscription is null ? throw Errors.PaymentUnavailable() : SubscriptionFrom(subscription);
+    }
+
+    public async Task<ProviderSubscription?> FindSubscriptionByReferenceAsync(Guid subscriptionId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, $"/preapproval/search?external_reference={subscriptionId}");
+        var (_, found) = await SendAsync(message, ct);
+        if (found?["results"] is not JsonArray results)
         {
             throw Errors.PaymentUnavailable();
         }
 
-        return new ProviderSubscription(
+        return results
+            .OfType<JsonObject>()
+            .Select(SubscriptionFrom)
+            .FirstOrDefault(s => s.ExternalReference == subscriptionId.ToString() && s.Status != SubscriptionStatus.Cancelled);
+    }
+
+    private static ProviderSubscription SubscriptionFrom(JsonObject subscription) =>
+        new(
             Id(subscription),
             subscription["status"]?.GetValue<string>() switch
             {
@@ -163,7 +178,6 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             subscription["external_reference"]?.GetValue<string>(),
             Date(subscription["next_payment_date"]),
             Subscription.CardLast4From(subscription["last_four_digits"]?.GetValue<string>()));
-    }
 
     public async Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct)
     {

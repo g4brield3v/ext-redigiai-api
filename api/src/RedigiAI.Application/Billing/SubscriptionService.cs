@@ -48,7 +48,6 @@ internal sealed class SubscriptionService(
     IOptions<SiteOptions> site,
     TimeProvider time) : ISubscriptionService
 {
-    private const int AdultAge = 18;
     private const string Reason = "RedigiAI: plano mensal (12 correções por mês)";
 
     public async Task<PlanCheckoutDto> CheckoutPlanAsync(CheckoutPlanCommand command, CancellationToken ct)
@@ -80,7 +79,7 @@ internal sealed class SubscriptionService(
 
         var now = time.GetUtcNow();
         // Compras de 16 e 17 anos exigem a declaração de autorização do responsável (regra 9).
-        var minor = user.BirthDate.AgeOn(BrasiliaTime.DateOf(now)) < AdultAge;
+        var minor = user.BirthDate.IsMinorOn(BrasiliaTime.DateOf(now));
         if (minor && !command.GuardianAuthorized)
         {
             throw Errors.GuardianAuthorizationRequired();
@@ -95,8 +94,10 @@ internal sealed class SubscriptionService(
         }
         catch (UniqueConflictException)
         {
-            // Outra requisição com a mesma chave chegou primeiro: vale a assinatura dela.
-            var winner = await subscriptions.FindByKeyAsync(user.Id, key, ct) ?? throw Errors.Internal();
+            // Outra requisição (a mesma chave, ou outra aba) gravou a pendente primeiro: vale a assinatura dela.
+            var winner = await subscriptions.FindByKeyAsync(user.Id, key, ct)
+                ?? await subscriptions.FindPendingAsync(user.Id, ct)
+                ?? throw Errors.Internal();
             return await ResumeAsync(winner, user, card, ct);
         }
 
@@ -152,10 +153,35 @@ internal sealed class SubscriptionService(
 
     private async Task<PlanCheckoutDto> CreateThereAsync(Subscription subscription, User user, CardToken card, CancellationToken ct)
     {
-        var created = await gateway.CreateSubscriptionAsync(
-            new SubscriptionRequest(
-                subscription.Id, AttemptKey(subscription.Id, card), Payment.PlanPriceCents, Reason, user.Email, card, BackUrl()),
-            ct);
+        // Uma criação por vez: o duplo clique, a outra aba ou a mesma chave em paralelo esperam o resultado da primeira
+        // (o front acompanha em GET /v1/me), sem criar lá uma segunda assinatura com outro token.
+        if (!await subscriptions.TryBeginCreationAsync(subscription.Id, time.GetUtcNow(), ct))
+        {
+            return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending);
+        }
+
+        CreatedSubscription created;
+        try
+        {
+            // Uma tentativa anterior pode ter sido aceita lá sem a resposta chegar (tempo esgotado): vale a dela.
+            created = await gateway.FindSubscriptionByReferenceAsync(subscription.Id, ct) is { } lost
+                ? new CreatedSubscription(lost.ProviderId)
+                : await gateway.CreateSubscriptionAsync(
+                    new SubscriptionRequest(
+                        subscription.Id, AttemptKey(subscription.Id, card), Payment.PlanPriceCents, Reason, user.Email, card, BackUrl()),
+                    ct);
+        }
+        catch (AppError error) when (error.Code == "PAYMENT_FAILED")
+        {
+            // Sem o token: só que houve a recusa, para notar tentativas seguidas de cartões.
+            audit.Record($"user:{user.Id}", "subscription.card_declined", "subscription", subscription.Id);
+            await unitOfWork.SaveChangesAsync(ct);
+            throw;
+        }
+        finally
+        {
+            await subscriptions.EndCreationAsync(subscription.Id, CancellationToken.None);
+        }
 
         var now = time.GetUtcNow();
         var attached = await unitOfWork.InTransactionAsync(
@@ -181,6 +207,9 @@ internal sealed class SubscriptionService(
         }
 
         // Outra requisição já ligou esta assinatura a outro preapproval lá: vale o dela, e este, sem dono, é cancelado.
+        // Se o cancelamento falhar, o aviso dele chega ao process_subscription, que o cancela.
+        audit.Record("system", "subscription.orphan", "subscription", subscription.Id, new { mpPreapprovalId = created.ProviderId });
+        await unitOfWork.SaveChangesAsync(ct);
         await gateway.CancelSubscriptionAsync(created.ProviderId, ct);
         return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending);
     }

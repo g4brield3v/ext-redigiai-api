@@ -38,7 +38,6 @@ internal sealed class PaymentService(
     IUnitOfWork unitOfWork,
     TimeProvider time) : IPaymentService
 {
-    private const int AdultAge = 18;
     private const int ListLimit = 50;
     private const int RechecksPerSweep = 200;
     private static readonly TimeSpan RecheckAfter = TimeSpan.FromMinutes(2);
@@ -76,7 +75,7 @@ internal sealed class PaymentService(
 
         var now = time.GetUtcNow();
         // Compras de 16 e 17 anos exigem a declaração de autorização do responsável (regra 9).
-        var minor = user.BirthDate.AgeOn(BrasiliaTime.DateOf(now)) < AdultAge;
+        var minor = user.BirthDate.IsMinorOn(BrasiliaTime.DateOf(now));
         if (minor && !command.GuardianAuthorized)
         {
             throw Errors.GuardianAuthorizationRequired();

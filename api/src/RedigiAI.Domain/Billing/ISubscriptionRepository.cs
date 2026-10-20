@@ -29,6 +29,16 @@ public interface ISubscriptionRepository
     Task<bool> TryAttachProviderAsync(Guid subscriptionId, string mpPreapprovalId, DateTimeOffset now, CancellationToken ct);
 
     /// <summary>
+    /// Trava a criação lá: <c>UPDATE … SET creating_until = @now + trava WHERE id = @id AND status = 'pending' AND
+    /// mp_preapproval_id IS NULL AND (creating_until IS NULL OR creating_until &lt;= @now)</c>. Falso: outra requisição
+    /// está criando, ou já criou.
+    /// </summary>
+    Task<bool> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Solta a trava da criação, com ou sem sucesso.</summary>
+    Task EndCreationAsync(Guid subscriptionId, CancellationToken ct);
+
+    /// <summary>
     /// Muda a situação com <c>UPDATE … WHERE status IN (…)</c> (regra 10), na transação aberta. Zero linhas: outro
     /// processo já avançou, ou a transição não é permitida.
     /// </summary>

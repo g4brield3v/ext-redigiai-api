@@ -33,6 +33,15 @@ public sealed class Subscription
     /// <summary>A <c>Idempotency-Key</c> do pedido: repetir a chave devolve esta assinatura.</summary>
     public string IdempotencyKey { get; private set; } = null!;
 
+    /// <summary>
+    /// Até quando uma requisição está criando a assinatura lá: outra, no mesmo instante, não cria uma segunda (cada
+    /// tentativa leva um token de cartão diferente, e o Mercado Pago não as juntaria). Vale só se o processo cair no meio.
+    /// </summary>
+    public DateTimeOffset? CreatingUntil { get; private set; }
+
+    /// <summary>Quanto dura a trava da criação lá, folgado sobre o tempo limite da chamada ao Mercado Pago.</summary>
+    public static readonly TimeSpan CreationLock = TimeSpan.FromMinutes(2);
+
     /// <summary>Quando o assinante de 16 ou 17 anos declarou a autorização do responsável.</summary>
     public DateTimeOffset? GuardianAuthorizedAt { get; private set; }
     public DateTimeOffset? NextBillingAt { get; private set; }

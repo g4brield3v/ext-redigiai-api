@@ -38,6 +38,7 @@ public class SubscriptionTests(ApiFixture api)
         // Antes da consulta ao Mercado Pago, o perfil não mostra plano nem correções do plano.
         var profile = await student.ProfileAsync();
         Assert.Equal(JsonValueKind.Null, profile.GetProperty("subscription").ValueKind);
+        Assert.False(profile.GetProperty("needsGuardianAuthorization").GetBoolean());
 
         // A consulta já está na fila: sem esperar o aviso, o plano fica ativo; as correções só vêm com a cobrança.
         await RunAsync(JobTypes.ProcessSubscription);
@@ -62,6 +63,73 @@ public class SubscriptionTests(ApiFixture api)
         var subscriptionId = (await other.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
         Assert.NotNull(api.Payments.PreapprovalIdOf(subscriptionId));
         Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
+    }
+
+    [Fact]
+    public async Task Simultaneous_checkouts_with_different_card_tokens_create_one_subscription_there()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+
+        // Duplo clique e outra aba: cada envio do formulário traz um token novo.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(i => student.CheckoutAsync(key: i < 3 ? key : null)));
+
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        var subscriptionId = await api.QueryAsync(db => db.Subscriptions.Where(s => s.UserId == student.Id).Select(s => s.Id).SingleAsync());
+        Assert.Single(api.Payments.SubscriptionsFor(subscriptionId));
+    }
+
+    [Fact]
+    public async Task A_creation_accepted_there_without_the_answer_is_reused_by_the_next_attempt()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+        api.Payments.LoseNextSubscriptionResponse = true;
+
+        var lost = await student.CheckoutAsync(key: key);
+        var retry = await student.CheckoutAsync(key: key);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, lost.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        var subscriptionId = (await retry.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
+        var there = Assert.Single(api.Payments.SubscriptionsFor(subscriptionId));
+        Assert.Equal(there.ProviderId, await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.MpPreapprovalId).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task An_extra_subscription_there_with_our_reference_is_cancelled_and_its_charge_renews_nothing()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync();
+        await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+        var subscriptionId = await api.QueryAsync(db => db.Subscriptions.Where(s => s.MpPreapprovalId == preapprovalId).Select(s => s.Id).SingleAsync());
+
+        // Uma segunda criação lá, com a mesma referência, cuja resposta nunca chegou.
+        var orphan = await api.Payments.CreateSubscriptionAsync(
+            new SubscriptionRequest(
+                subscriptionId, Guid.NewGuid().ToString(), 3990, "plano", "aluna@exemplo.com", new CardToken("tok", "master", null, null, null), "https://redigiai.test/perfil"),
+            CancellationToken.None);
+        var charged = api.Payments.Charge(orphan.ProviderId, PaymentStatus.Approved);
+        await student.NotifyAsync("payment", charged.PaymentId);
+        await RunAsync(JobTypes.ProcessPayment);
+        await student.NotifyAsync("subscription_preapproval", orphan.ProviderId);
+        await RunAsync(JobTypes.ProcessSubscription);
+
+        Assert.Equal(SubscriptionStatus.Cancelled, api.Payments.SubscriptionThere(orphan.ProviderId).Status);
+        Assert.Equal(SubscriptionStatus.Active, api.Payments.SubscriptionThere(preapprovalId).Status);
+        Assert.Equal(13, await student.CreditsAsync());
+        Assert.Empty(await api.QueryAsync(db => db.Payments.Where(p => p.MpPaymentId == charged.PaymentId).ToListAsync()));
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.Action == "payment.orphan_subscription_charge" && a.EntityId == subscriptionId)));
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.Action == "subscription.orphan_cancelled" && a.EntityId == subscriptionId)));
+    }
+
+    [Fact]
+    public void The_card_token_never_appears_when_the_record_is_printed()
+    {
+        var card = new CardToken("tok-secreto", "master", "25", "CPF", "12345678909");
+
+        Assert.DoesNotContain("tok-secreto", card.ToString());
+        Assert.DoesNotContain("12345678909", card.ToString());
     }
 
     [Theory]
@@ -122,7 +190,7 @@ public class SubscriptionTests(ApiFixture api)
         });
         var created = await api.Payments.CreateSubscriptionAsync(
             new SubscriptionRequest(
-                duplicate.Id, "key", 3990, "plano", "aluna@exemplo.com", new CardToken("tok", "master", null, null, null), "https://redigiai.test/perfil"),
+                duplicate.Id, Guid.NewGuid().ToString(), 3990, "plano", "aluna@exemplo.com", new CardToken("tok", "master", null, null, null), "https://redigiai.test/perfil"),
             CancellationToken.None);
         await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == duplicate.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.MpPreapprovalId, created.ProviderId)));
@@ -196,6 +264,8 @@ public class SubscriptionTests(ApiFixture api)
     public async Task Buyers_aged_16_or_17_must_declare_the_guardian_authorization_for_the_plan()
     {
         var minor = await Subscriber.CreateAsync(api, birthDate: DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-16).AddDays(-10));
+        // O perfil avisa a tela de compra; a idade é sempre calculada aqui.
+        Assert.True((await minor.ProfileAsync()).GetProperty("needsGuardianAuthorization").GetBoolean());
 
         var refused = await minor.CheckoutAsync();
         var accepted = await minor.CheckoutAsync(guardianAuthorized: true);

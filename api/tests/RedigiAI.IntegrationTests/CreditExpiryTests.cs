@@ -207,8 +207,14 @@ public class CreditExpiryTests(ApiFixture api)
         {
             await using var scope = factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var subscription = Subscription.Request(student.Id, Guid.NewGuid().ToString(), null, Clock.GetUtcNow());
-            db.Subscriptions.Add(subscription);
+            // Todas as cobranças do aluno vêm da mesma assinatura (uma pendente por aluno).
+            var subscription = await db.Subscriptions.FirstOrDefaultAsync(s => s.UserId == student.Id);
+            if (subscription is null)
+            {
+                subscription = Subscription.Request(student.Id, Guid.NewGuid().ToString(), null, Clock.GetUtcNow());
+                db.Subscriptions.Add(subscription);
+            }
+
             var payment = Payment.StartPlanCharge(subscription, Random.Shared.NextInt64(1, long.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture), Clock.GetUtcNow());
             db.Payments.Add(payment);
             await db.SaveChangesAsync();

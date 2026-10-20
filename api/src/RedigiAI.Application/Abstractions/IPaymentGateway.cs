@@ -8,7 +8,15 @@ public sealed record ChargeRequest(Guid PaymentId, long AmountCents, string Desc
 
 /// <summary>O que o formulário de cartão do provedor (Card Payment Brick) devolve no navegador. Nunca o número do cartão.</summary>
 public sealed record CardToken(
-    string Token, string PaymentMethodId, string? IssuerId, string? IdentificationType, string? IdentificationNumber);
+    string Token, string PaymentMethodId, string? IssuerId, string? IdentificationType, string? IdentificationNumber)
+{
+    // O token e o documento nunca aparecem num log ou numa exceção que imprima o record (regra 20).
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        builder.Append("PaymentMethodId = ").Append(PaymentMethodId);
+        return true;
+    }
+}
 
 /// <param name="Status">A situação que o provedor informou na criação.</param>
 public sealed record CreatedCharge(
@@ -21,8 +29,15 @@ public sealed record CreatedCharge(
 /// <summary>Um pagamento como o provedor o vê agora.</summary>
 /// <param name="ExternalReference">O id da compra aqui, que foi enviado na criação.</param>
 /// <param name="RefundedCents">Quanto já foi estornado, somando os estornos parciais.</param>
+/// <param name="PreapprovalId">Na cobrança de uma assinatura, o preapproval que a gerou, quando o provedor informa.</param>
 public sealed record ProviderPayment(
-    string ProviderId, PaymentStatus Status, string? ExternalReference, long AmountCents, string Currency, long RefundedCents = 0);
+    string ProviderId,
+    PaymentStatus Status,
+    string? ExternalReference,
+    long AmountCents,
+    string Currency,
+    long RefundedCents = 0,
+    string? PreapprovalId = null);
 
 /// <param name="SubscriptionId">O id da assinatura aqui: vai como referência externa.</param>
 /// <param name="IdempotencyKey">Uma por tentativa: o token do cartão só vale uma vez, e a tentativa seguinte traz outro.</param>
@@ -65,6 +80,12 @@ public interface IPaymentGateway
 
     /// <returns><c>null</c> se o provedor não conhece o id.</returns>
     Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct);
+
+    /// <summary>
+    /// A assinatura lá com esta referência externa que não foi cancelada, se houver: a criação que o provedor aceitou
+    /// sem a resposta chegar aqui.
+    /// </summary>
+    Task<ProviderSubscription?> FindSubscriptionByReferenceAsync(Guid subscriptionId, CancellationToken ct);
 
     /// <returns><c>null</c> se o provedor não conhece o id.</returns>
     Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct);

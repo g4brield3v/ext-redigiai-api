@@ -2204,7 +2204,7 @@
         "tags": [
           "Payments"
         ],
-        "summary": "Assina o plano mensal (R$ 39,90 no cartão, 12 correções por cobrança): devolve o checkout do Mercado Pago, onde o\r\naluno autoriza o cartão. Exige `Idempotency-Key`; repetir a chave devolve o mesmo checkout. A assinatura\r\naparece em `GET /v1/me` quando o Mercado Pago confirma.",
+        "summary": "Assina o plano mensal (R$ 39,90 no cartão, 12 correções por cobrança) com o cartão tokenizado na nossa página\r\npelo Card Payment Brick, sem sair da plataforma. Exige `Idempotency-Key`; repetir a chave devolve a mesma\r\nassinatura. Devolve `pending`: a assinatura aparece ativa em `GET /v1/me` quando a consulta ao Mercado\r\nPago confirma. Cartão recusado: 402 `PAYMENT_FAILED`, e a nova tentativa traz outro token.",
         "operationId": "checkoutPlan",
         "parameters": [
           {
@@ -2252,6 +2252,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlanCheckoutDto"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3994,7 +4004,8 @@
           "aiNoticeAccepted",
           "emailPreferences",
           "credits",
-          "subscription"
+          "subscription",
+          "needsGuardianAuthorization"
         ],
         "type": "object",
         "properties": {
@@ -4035,6 +4046,9 @@
                 "$ref": "#/components/schemas/SubscriptionDto"
               }
             ]
+          },
+          "needsGuardianAuthorization": {
+            "type": "boolean"
           }
         }
       },

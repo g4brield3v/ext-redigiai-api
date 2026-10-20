@@ -180,6 +180,14 @@ internal sealed class ProcessPaymentHandler(
             return null;
         }
 
+        if (remote.PreapprovalId is { } preapprovalId && preapprovalId != subscription.MpPreapprovalId)
+        {
+            // Cobrança de um preapproval duplicado lá, não do gravado: não renova; fica para estorno manual.
+            audit.Record("system", "payment.orphan_subscription_charge", "subscription", subscription.Id, new { mpPaymentId = remote.ProviderId });
+            await unitOfWork.SaveChangesAsync(ct);
+            return null;
+        }
+
         try
         {
             var payment = Payment.StartPlanCharge(subscription, remote.ProviderId, time.GetUtcNow());

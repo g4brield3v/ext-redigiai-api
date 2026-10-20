@@ -127,6 +127,20 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
                     .SetProperty(x => x.UpdatedAt, now),
                 ct) == 1;
 
+    public async Task<bool> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct)
+    {
+        var until = now + Subscription.CreationLock;
+        return await db.Subscriptions
+            .Where(s => s.Id == subscriptionId && s.Status == SubscriptionStatus.Pending && s.MpPreapprovalId == null
+                && (s.CreatingUntil == null || s.CreatingUntil <= now))
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatingUntil, until), ct) == 1;
+    }
+
+    public Task EndCreationAsync(Guid subscriptionId, CancellationToken ct) =>
+        db.Subscriptions
+            .Where(s => s.Id == subscriptionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatingUntil, (DateTimeOffset?)null), ct);
+
     public async Task<bool> TryTransitionAsync(Guid subscriptionId, SubscriptionStatus to, DateTimeOffset now, CancellationToken ct)
     {
         var from = Subscription.ReachableFrom(to);

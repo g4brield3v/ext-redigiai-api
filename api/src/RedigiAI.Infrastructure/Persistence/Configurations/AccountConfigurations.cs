@@ -79,6 +79,11 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
             .HasDatabaseName("ux_subscriptions_open_per_user")
             .IsUnique()
             .HasFilter("status IN ('active', 'paused')");
+        // Uma assinatura pendente por aluno: duas abas ao mesmo tempo, com chaves diferentes, não criam duas lá.
+        builder.HasIndex(s => s.UserId, "ux_subscriptions_pending_per_user")
+            .HasDatabaseName("ux_subscriptions_pending_per_user")
+            .IsUnique()
+            .HasFilter("status = 'pending'");
     }
 }
 
