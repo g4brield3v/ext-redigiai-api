@@ -402,6 +402,9 @@ public sealed class FakePaymentGateway : IPaymentGateway
         return (chargeId, paymentId);
     }
 
+    /// <summary>Um token de cartão que o simulado recusa, como um cartão sem limite.</summary>
+    public const string DeclinedCardToken = "declined";
+
     public Task<CreatedSubscription> CreateSubscriptionAsync(SubscriptionRequest request, CancellationToken ct)
     {
         if (Failures.TryDequeue(out var failure))
@@ -409,15 +412,21 @@ public sealed class FakePaymentGateway : IPaymentGateway
             throw failure;
         }
 
+        if (request.Card.Token == DeclinedCardToken)
+        {
+            throw Errors.PaymentFailed();
+        }
+
+        // Como lá: a assinatura nasce autorizada com o cartão (checkout transparente).
         var id = _bySubscription.GetOrAdd(request.SubscriptionId, _ =>
         {
             Interlocked.Increment(ref _subscriptionCreates);
             var preapprovalId = $"pre{Guid.NewGuid():N}";
             _subscriptions[preapprovalId] = new ProviderSubscription(
-                preapprovalId, SubscriptionStatus.Pending, request.SubscriptionId.ToString(), null, null);
+                preapprovalId, SubscriptionStatus.Active, request.SubscriptionId.ToString(), DateTimeOffset.UtcNow.AddMonths(1), "4242");
             return preapprovalId;
         });
-        return Task.FromResult(new CreatedSubscription(id, $"https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id={id}"));
+        return Task.FromResult(new CreatedSubscription(id));
     }
 
     public Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct) =>

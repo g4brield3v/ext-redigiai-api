@@ -61,7 +61,7 @@ public sealed class PaymentsController(IPaymentService payments, ISubscriptionSe
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken ct) =>
         Ok(await subscriptions.CheckoutPlanAsync(
-            new CheckoutPlanCommand(User.GetClerkIdentity().UserId, idempotencyKey, request.GuardianAuthorized == true), ct));
+            new CheckoutPlanCommand(User.GetClerkIdentity().UserId, idempotencyKey, request.GuardianAuthorized == true, request.Card), ct));
 
     /// <summary>
     /// Cancela a renovação do plano mensal. As correções já concedidas valem até o fim do ciclo pago. Sem plano ativo

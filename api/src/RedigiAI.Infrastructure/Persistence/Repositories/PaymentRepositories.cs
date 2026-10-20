@@ -118,13 +118,12 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
             .FirstOrDefaultAsync(ct);
 
     public async Task<bool> TryAttachProviderAsync(
-        Guid subscriptionId, string mpPreapprovalId, string checkoutUrl, DateTimeOffset now, CancellationToken ct) =>
+        Guid subscriptionId, string mpPreapprovalId, DateTimeOffset now, CancellationToken ct) =>
         await db.Subscriptions
             .Where(s => s.Id == subscriptionId && (s.MpPreapprovalId == null || s.MpPreapprovalId == mpPreapprovalId))
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(x => x.MpPreapprovalId, mpPreapprovalId)
-                    .SetProperty(x => x.CheckoutUrl, x => checkoutUrl.Length > 0 ? checkoutUrl : x.CheckoutUrl)
                     .SetProperty(x => x.UpdatedAt, now),
                 ct) == 1;
 

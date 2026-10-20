@@ -33,9 +33,6 @@ public sealed class Subscription
     /// <summary>A <c>Idempotency-Key</c> do pedido: repetir a chave devolve esta assinatura.</summary>
     public string IdempotencyKey { get; private set; } = null!;
 
-    /// <summary>O endereço do checkout do Mercado Pago, onde o aluno autoriza o cartão.</summary>
-    public string? CheckoutUrl { get; private set; }
-
     /// <summary>Quando o assinante de 16 ou 17 anos declarou a autorização do responsável.</summary>
     public DateTimeOffset? GuardianAuthorizedAt { get; private set; }
     public DateTimeOffset? NextBillingAt { get; private set; }

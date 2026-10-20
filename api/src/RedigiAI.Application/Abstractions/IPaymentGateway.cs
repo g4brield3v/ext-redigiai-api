@@ -25,11 +25,14 @@ public sealed record ProviderPayment(
     string ProviderId, PaymentStatus Status, string? ExternalReference, long AmountCents, string Currency, long RefundedCents = 0);
 
 /// <param name="SubscriptionId">O id da assinatura aqui: vai como referência externa.</param>
-/// <param name="BackUrl">Para onde o Mercado Pago devolve o aluno depois do checkout.</param>
-public sealed record SubscriptionRequest(Guid SubscriptionId, long AmountCents, string Reason, string PayerEmail, string BackUrl);
+/// <param name="IdempotencyKey">Uma por tentativa: o token do cartão só vale uma vez, e a tentativa seguinte traz outro.</param>
+/// <param name="Card">O cartão tokenizado no navegador pelo formulário do Mercado Pago; o número nunca passa por aqui.</param>
+/// <param name="BackUrl">O perfil, exigido pelo Mercado Pago na criação.</param>
+public sealed record SubscriptionRequest(
+    Guid SubscriptionId, string IdempotencyKey, long AmountCents, string Reason, string PayerEmail, CardToken Card, string BackUrl);
 
-/// <param name="CheckoutUrl">O checkout do Mercado Pago, onde o aluno autoriza o cartão.</param>
-public sealed record CreatedSubscription(string ProviderId, string CheckoutUrl);
+/// <summary>A assinatura criada lá, já com o cartão autorizado. A situação aqui só muda pela consulta (regra 19).</summary>
+public sealed record CreatedSubscription(string ProviderId);
 
 /// <summary>Uma assinatura como o provedor a vê agora.</summary>
 /// <param name="ExternalReference">O id da assinatura aqui, enviado na criação.</param>

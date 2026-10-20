@@ -91,7 +91,7 @@ internal sealed class ProcessSubscriptionHandler(
                 {
                     if (subscription.MpPreapprovalId != providerId
                         && (subscription.MpPreapprovalId is not null
-                            || !await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, subscription.CheckoutUrl ?? "", now, ct)))
+                            || !await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, now, ct)))
                     {
                         audit.Record("system", "subscription.provider_mismatch", "subscription", subscription.Id, new { mpPreapprovalId = providerId });
                         return false;
@@ -141,7 +141,7 @@ internal sealed class ProcessSubscriptionHandler(
             {
                 if (subscription.MpPreapprovalId is null)
                 {
-                    await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, subscription.CheckoutUrl ?? "", now, ct);
+                    await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, now, ct);
                 }
 
                 if (await subscriptions.TryTransitionAsync(subscription.Id, SubscriptionStatus.Cancelled, now, ct))

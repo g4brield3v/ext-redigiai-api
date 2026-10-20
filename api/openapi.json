@@ -2725,7 +2725,8 @@
       },
       "CheckoutPlanRequest": {
         "required": [
-          "guardianAuthorized"
+          "guardianAuthorized",
+          "card"
         ],
         "type": "object",
         "properties": {
@@ -2733,6 +2734,16 @@
             "type": [
               "null",
               "boolean"
+            ]
+          },
+          "card": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardPaymentRequest"
+              }
             ]
           }
         }
@@ -3960,7 +3971,7 @@
       "PlanCheckoutDto": {
         "required": [
           "subscriptionId",
-          "checkoutUrl"
+          "status"
         ],
         "type": "object",
         "properties": {
@@ -3968,8 +3979,8 @@
             "type": "string",
             "format": "uuid"
           },
-          "checkoutUrl": {
-            "type": "string"
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
           }
         }
       },

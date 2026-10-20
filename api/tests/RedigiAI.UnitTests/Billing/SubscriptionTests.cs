@@ -13,7 +13,6 @@ public class SubscriptionTests
 
         Assert.Equal(SubscriptionStatus.Pending, subscription.Status);
         Assert.Null(subscription.MpPreapprovalId);
-        Assert.Null(subscription.CheckoutUrl);
     }
 
     [Theory]

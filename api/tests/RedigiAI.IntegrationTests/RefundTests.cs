@@ -200,7 +200,10 @@ public class RefundTests(ApiFixture api)
         /// <summary>Assina o plano, o cartão é autorizado e a primeira cobrança é aprovada.</summary>
         public async Task<(Guid PaymentId, string PreapprovalId)> SubscribeAndChargeAsync()
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/checkout/plan") { Content = JsonContent.Create(new { }) };
+            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/checkout/plan")
+            {
+                Content = JsonContent.Create(new { card = new { token = $"tok{Guid.NewGuid():N}", paymentMethodId = "master" } }),
+            };
             request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
             var subscriptionId = (await (await Client.SendAsync(request)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
             var preapprovalId = api.Payments.PreapprovalIdOf(subscriptionId)!;
