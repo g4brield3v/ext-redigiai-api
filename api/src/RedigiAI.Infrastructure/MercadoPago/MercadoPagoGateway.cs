@@ -290,8 +290,15 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             using var response = await Http.SendAsync(message, timeout.Token);
             if (!response.IsSuccessStatusCode)
             {
+                var (error, reason, causes) = await ErrorOf(response, timeout.Token);
                 logger.LogWarning(
-                    "Mercado Pago {Method} {Path} answered {Status}", message.Method, message.RequestUri?.AbsolutePath, (int)response.StatusCode);
+                    "Mercado Pago {Method} {Path} answered {Status}: {Error} {Reason} {Causes}",
+                    message.Method,
+                    message.RequestUri?.AbsolutePath,
+                    (int)response.StatusCode,
+                    error,
+                    reason,
+                    causes);
                 return (response.StatusCode, null);
             }
 
@@ -304,6 +311,33 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             throw Errors.PaymentUnavailable();
         }
     }
+
+    /// <summary>
+    /// O motivo de uma recusa, para o log: <c>error</c>, <c>message</c> e os códigos de <c>cause</c>, curtos e sem
+    /// caracteres de controle. Nunca o corpo inteiro nem as descrições das causas, que podem repetir dados enviados.
+    /// </summary>
+    private static async Task<(string? Error, string? Reason, string? Causes)> ErrorOf(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            if (JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) is not JsonObject body)
+            {
+                return (null, null, null);
+            }
+
+            var causes = body["cause"] is JsonArray list
+                ? string.Join(',', list.OfType<JsonObject>().Select(c => Clean(Text(c["code"]))).Where(c => c is not null))
+                : null;
+            return (Clean(Text(body["error"])), Clean(Text(body["message"])), causes);
+        }
+        catch (JsonException)
+        {
+            return (null, null, null);
+        }
+    }
+
+    private static string? Clean(string? value) =>
+        value is null ? null : new string(value.Where(c => !char.IsControl(c)).Take(200).ToArray());
 
     private static CreatedCharge ReadCreated(JsonObject payment) => new(Id(payment), StatusOf(payment));
 
