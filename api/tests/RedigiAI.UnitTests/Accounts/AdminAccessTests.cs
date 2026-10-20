@@ -1,32 +1,10 @@
 using System.Text.Json;
-using RedigiAI.Application.Accounts;
 using RedigiAI.Infrastructure.Clerk;
 
 namespace RedigiAI.UnitTests.Accounts;
 
 public class AdminAccessTests
 {
-    [Theory]
-    [InlineData("gabs@example.com", true)]
-    [InlineData("GABS@Example.com ", true)]
-    [InlineData("outra@example.com", true)]
-    [InlineData("gabs@example.com.br", false)]
-    [InlineData("gabs", false)]
-    [InlineData("", false)]
-    public void Admin_list_compares_whole_addresses_without_case(string email, bool listed)
-    {
-        var options = new AdminOptions { Emails = " gabs@example.com, outra@example.com ,," };
-
-        Assert.Equal(listed, options.IsListed(email));
-    }
-
-    [Fact]
-    public void Empty_list_has_no_admin()
-    {
-        Assert.False(new AdminOptions().IsListed("gabs@example.com"));
-        Assert.True(new AdminOptions().Require2fa);
-    }
-
     [Theory]
     [InlineData("verified", true)]
     [InlineData("unverified", false)]

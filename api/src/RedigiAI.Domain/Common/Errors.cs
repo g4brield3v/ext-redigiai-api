@@ -54,8 +54,6 @@ public static class Errors
     public static AppError ValidationFailed(IReadOnlyList<ValidationIssue> details) =>
         new("VALIDATION_FAILED", 422, "Há pendências na proposta.", details: details);
 
-    public static AppError AdminSecondFactorRequired() =>
-        new("ADMIN_2FA_REQUIRED", 403, "Ative a verificação em duas etapas para acessar a administração.");
 
     public static AppError PaymentFailed() =>
         new("PAYMENT_FAILED", 402, "O pagamento não foi aprovado. Tente outro meio de pagamento.", retryable: true);

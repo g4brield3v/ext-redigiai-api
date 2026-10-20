@@ -58,18 +58,6 @@ public class AdminPromptTests(ApiFixture api)
         await AccountTests.AssertErrorAsync(await student.SendAsync(Request(method, path, "{ not json")), HttpStatusCode.NotFound, "NOT_FOUND");
     }
 
-    [Theory]
-    [MemberData(nameof(AdminRoutes))]
-    public async Task Admin_route_asks_for_the_second_factor(string method, string path)
-    {
-        var admin = await AdminAsync(secondFactor: false);
-
-        var response = await admin.SendAsync(Request(method, path));
-
-        var error = await AccountTests.AssertErrorAsync(response, HttpStatusCode.Forbidden, "ADMIN_2FA_REQUIRED");
-        Assert.Equal("Ative a verificação em duas etapas para acessar a administração.", error.GetProperty("message").GetString());
-    }
-
     [Fact]
     public void Every_admin_route_is_guarded_by_the_admin_check()
     {
@@ -89,7 +77,7 @@ public class AdminPromptTests(ApiFixture api)
     {
         var userId = await RegisterAdminAsync();
         await using var factory = api.CreateFactory(builder => builder.UseSetting("RateLimit:AdminPerUserPerMinute", "3"));
-        var admin = ApiFixture.CreateClient(factory, api.CreateToken(userId, email: ApiFixture.AdminEmail, secondFactor: true));
+        var admin = ApiFixture.CreateClient(factory, api.CreateToken(userId, email: ApiFixture.AdminEmail));
 
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i < 4; i++)
@@ -233,27 +221,6 @@ public class AdminPromptTests(ApiFixture api)
         Assert.Equal(["asset.uploaded", "prompt.created", "prompt.reordered"], entries.Select(e => e.Action).Order());
         Assert.Single(entries.Select(e => e.Actor).Distinct());
         Assert.StartsWith("user:", entries[0].Actor);
-    }
-
-    [Fact]
-    public async Task Admin_without_second_factor_enters_when_it_is_not_required()
-    {
-        var userId = await RegisterAdminAsync();
-        await using var factory = api.CreateFactory(builder => builder.UseSetting("Admin:Require2fa", "false"));
-        var admin = ApiFixture.CreateClient(factory, api.CreateToken(userId, email: ApiFixture.AdminEmail, secondFactor: false));
-
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/v1/admin/prompts")).StatusCode);
-    }
-
-    [Fact]
-    public async Task Unverified_admin_email_does_not_open_the_admin_area()
-    {
-        var userId = ApiFixture.NewClerkUserId();
-        api.Directory.Accounts[userId] = new PrimaryEmail(ApiFixture.AdminEmail, Verified: false);
-        var client = api.CreateClient(api.CreateToken(userId, email: ApiFixture.AdminEmail, secondFactor: true));
-        await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true });
-
-        await AccountTests.AssertErrorAsync(await client.GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
     }
 
     [Fact]
@@ -776,18 +743,18 @@ public class AdminPromptTests(ApiFixture api)
     private async Task<string> RegisterAdminAsync()
     {
         var userId = ApiFixture.NewClerkUserId();
-        api.Directory.Accounts[userId] = new PrimaryEmail(ApiFixture.AdminEmail, Verified: true);
         var client = api.CreateClient(api.CreateToken(userId, email: ApiFixture.AdminEmail));
         (await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true })).EnsureSuccessStatusCode();
+        await api.MakeAdminAsync(userId);
         return userId;
     }
 
-    private async Task<HttpClient> AdminAsync(bool secondFactor = true) =>
-        api.CreateClient(api.CreateToken(await RegisterAdminAsync(), email: ApiFixture.AdminEmail, secondFactor: secondFactor));
+    private async Task<HttpClient> AdminAsync() =>
+        api.CreateClient(api.CreateToken(await RegisterAdminAsync(), email: ApiFixture.AdminEmail));
 
     private async Task<HttpClient> StudentAsync()
     {
-        var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId(), secondFactor: true));
+        var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
         (await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true })).EnsureSuccessStatusCode();
         return client;
     }

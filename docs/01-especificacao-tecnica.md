@@ -483,7 +483,7 @@ O público inclui adolescentes de 16 e 17 anos e as fotos podem conter caligrafi
 - Webhooks do Mercado Pago e do Clerk só aceitos com assinatura válida.
 - CORS restrito a `redigiai.com.br`; HTTPS em tudo; cabeçalhos de segurança (CSP, HSTS) na Vercel.
 - Prompt injection: texto do aluno delimitado como dado, saída validada (seção 8).
-- Administração: o papel `admin` vale só para o e-mail da lista `Admin__Emails`, com o e-mail principal verificado no Clerk (consultado na Backend API do Clerk, não no token) e o segundo fator na sessão (`Admin__Require2fa`). Para os demais, `/v1/admin/*` responde 404. Não existe chave de API de administração. Imagens de proposta ficam em pasta pública do Cloudinary; fotos de redação continuam privadas.
+- Administração: administrador é quem tem a flag `users.is_admin`, ligada só direto no banco (nunca pelo navegador, pelo token ou pelo e-mail), lida a cada requisição. Para os demais, `/v1/admin/*` responde 404; sem token, 401. O perfil (`GET /v1/me`) traz `isAdmin`, que o front usa só para mostrar o menu. Não existe chave de API de administração. Imagens de proposta ficam em pasta pública do Cloudinary; fotos de redação continuam privadas.
 
 **Segredos e infraestrutura**
 
@@ -508,7 +508,6 @@ Toda exceção conhecida é lançada como `AppError(code, httpStatus, userMessag
 | `AGE_BELOW_MINIMUM` | 422 | Não | A plataforma é destinada a pessoas com 16 anos ou mais. |
 | `QUOTA_EXCEEDED` | 402 | Não | Você não tem correções suficientes para este envio. |
 | `PROMPT_NOT_AVAILABLE` | 404 | Não | Essa proposta não está disponível. Escolha outra. |
-| `ADMIN_2FA_REQUIRED` | 403 | Não | Ative a verificação em duas etapas para acessar a administração. |
 | `PROMPT_NOT_DRAFT` | 409 | Não | Esta proposta já foi publicada. Crie uma nova versão para alterar. |
 | `PROMPT_CHANGED` | 409 | Não | A proposta foi alterada em outro lugar. Recarregue para continuar. |
 | `VALIDATION_FAILED` | 422 | Não | Há pendências na proposta. (Só nas rotas de administração; traz `details: [{ path, message }]`.) |

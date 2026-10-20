@@ -37,7 +37,6 @@ internal static class ApiHost
         services.AddApplication();
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
-        services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.Section));
         services.Configure<SeedOptions>(seed =>
             seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
@@ -72,7 +71,6 @@ internal static class ApiHost
         if (devAccess)
         {
             services.AddSingleton<DevUsers>();
-            services.AddSingleton<ITestIdentities>(provider => provider.GetRequiredService<DevUsers>());
             services.AddHostedService<DevEnvironmentSetup>();
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();

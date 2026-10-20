@@ -1,6 +1,6 @@
 # RedigiAI — Propostas de redação: modelo, área de administração e guia de uso
 
-> **Ajustes decididos na implementação (12/10/2026), registrados em `docs/decisoes.md`:** `Admin__Require2fa` fica desligado enquanto o plano do Clerk não tem MFA; `<copia_da_coletanea>` vem depois de `<redacao>`, fora do trecho em cache; com 30% ou mais copiado, qualquer hipótese de nota zero é aceita; a folha pautada (`sheet.pdf`) entra numa branch própria; `GET /v1/prompts/{slug}` aceita `?version=`. **Em 15/10/2026:** as categorias saem de `GET /v1/admin/exams/{slug}/essay-types`; os itens do card vão em `data.cardItems` (e não em `data.items`, que é das Instruções). No resto, vale o que está abaixo.
+> **Ajustes decididos na implementação (12/10/2026), registrados em `docs/decisoes.md`:** **em 20/10/2026, administrador passou a ser a flag `users.is_admin` no banco (A5 abaixo), sem lista de e-mails nem segundo fator;** `<copia_da_coletanea>` vem depois de `<redacao>`, fora do trecho em cache; com 30% ou mais copiado, qualquer hipótese de nota zero é aceita; a folha pautada (`sheet.pdf`) entra numa branch própria; `GET /v1/prompts/{slug}` aceita `?version=`. **Em 15/10/2026:** as categorias saem de `GET /v1/admin/exams/{slug}/essay-types`; os itens do card vão em `data.cardItems` (e não em `data.items`, que é das Instruções). No resto, vale o que está abaixo.
 
 Este documento **substitui** o modelo de temas da especificação (`themes`, `theme_texts`, `theme_essay_types`, `theme_grading_notes`). Ele tem duas partes:
 
@@ -81,10 +81,9 @@ Num rascunho, o salvamento aceita conteúdo incompleto e devolve a lista de pend
 ## A5. Acesso de administrador, API e telas
 
 **Quem é administrador**
-- Definido por configuração: `Admin__Emails` (lista separada por vírgula). Valor inicial: `gabspmachado@hotmail.com`.
-- No `POST /v1/me` e a cada login, o backend compara o **e-mail principal verificado** do usuário no Clerk com a lista. Se bater, grava `users.role = admin`; se o e-mail sair da lista, volta para `student`. E-mail não verificado nunca vira administrador.
-- Toda rota `/v1/admin/*` exige token válido e `role = admin`, conferido no banco a cada requisição. Para os demais usuários: `404`.
-- Verificação em duas etapas: com `Admin__Require2fa=true` (padrão em staging e produção), o backend exige o segundo fator na sessão (claim `fva` do Clerk); sem ele, `403 ADMIN_2FA_REQUIRED`, e a tela pede a ativação.
+- Flag `users.is_admin` (padrão `false`), ligada só direto no banco: `UPDATE users SET is_admin = true WHERE email = '<e-mail>';`. Nem o e-mail, nem o token, nem o navegador fazem alguém administrador.
+- Toda rota `/v1/admin/*` exige token válido e a flag, lida no banco a cada requisição: desligar a flag corta o acesso na requisição seguinte. Para os demais usuários: `404`.
+- O perfil (`GET /v1/me`) traz `isAdmin`; o front usa só para mostrar o menu e a área `/admin`.
 
 **Rotas** (prefixo `/v1/admin`; 120 requisições por minuto por usuário; toda escrita vai para o `audit_log`; validação → `422 VALIDATION_FAILED` com `details: [{ path, message }]`)
 
@@ -184,8 +183,8 @@ O critério 2 (modalidade) é avaliado contra o nome da categoria e o comando.
 - `card`: com 2 ou 4 itens → 422; item de imagem sem `aiDescription` → pendência.
 - Segurança:
   - rota de admin sem token → 401; com token de aluno → 404;
-  - e-mail da lista não verificado → não vira admin; e-mail removido da lista → perde o acesso no próximo login;
-  - sem segundo fator → 403;
+  - conta nova nunca é admin, qualquer que seja o e-mail; flag desligada → perde o acesso na requisição seguinte;
+  - o navegador não liga a flag (`PATCH`/`POST /v1/me` ignoram `isAdmin`);
   - `PUT` com `expectedUpdatedAt` antigo → 409;
   - `/admin` para aluno → página de não encontrado.
 - Cópia: redação com um parágrafo copiado gera trechos encontrados; com 30% ou mais copiado e sem nota zero da IA, a chamada é refeita.
@@ -196,7 +195,7 @@ O critério 2 (modalidade) é avaliado contra o nome da categoria e o comando.
 
 ## B1. Antes de começar
 
-1. Entre no site com **gabspmachado@hotmail.com** e ative a verificação em duas etapas quando o site pedir.
+1. Entre no site com a sua conta; ela precisa ter a flag de administrador ligada no banco (peça a quem cuida do banco).
 2. No menu do avatar, clique em **Admin** (ou acesse `/admin/propostas`).
 3. Cadastre primeiro em **staging**, confira e só depois em produção. Para levar uma proposta de um ambiente para o outro, use "Exportar JSON" num e "Importar JSON" no outro; as imagens precisam ser enviadas de novo.
 

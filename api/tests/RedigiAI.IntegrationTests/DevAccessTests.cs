@@ -57,36 +57,21 @@ public class DevAccessTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task Test_admin_enters_in_development_with_the_second_factor_simulated()
+    public async Task Test_admin_has_the_admin_flag_and_the_students_do_not()
     {
         await using var factory = DevFactory();
 
         var admin = await DevClient(factory, "admin").GetFromJsonAsync<JsonElement>("/v1/me");
 
-        Assert.Equal(ApiFixture.AdminEmail, admin.GetProperty("email").GetString());
-        Assert.Equal("admin", admin.GetProperty("role").GetString());
+        Assert.True(admin.GetProperty("isAdmin").GetBoolean());
         // Os alunos de teste continuam alunos.
         var ana = await DevClient(factory, "ana").GetFromJsonAsync<JsonElement>("/v1/me");
-        Assert.Equal("student", ana.GetProperty("role").GetString());
+        Assert.False(ana.GetProperty("isAdmin").GetBoolean());
 
-        // A exigência do segundo fator está ligada nos testes: o administrador de teste passa, a aluna não entra.
+        // O administrador de teste entra na administração; a aluna recebe 404.
         Assert.Equal(HttpStatusCode.OK, (await DevClient(factory, "admin").GetAsync("/v1/admin/prompts")).StatusCode);
         await AccountTests.AssertErrorAsync(
             await DevClient(factory, "ana").GetAsync("/v1/admin/prompts"), HttpStatusCode.NotFound, "NOT_FOUND");
-    }
-
-    [Fact]
-    public async Task Test_admin_does_not_exist_without_a_configured_admin_email()
-    {
-        await using var factory = api.CreateFactory(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.UseSetting("DevAuth:Enabled", "true");
-            builder.UseSetting("Admin:Emails", "");
-        });
-
-        await AccountTests.AssertErrorAsync(
-            await DevClient(factory, "admin").GetAsync("/v1/me"), HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
     }
 
     [Fact]

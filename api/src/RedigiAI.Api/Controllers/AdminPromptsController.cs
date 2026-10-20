@@ -14,8 +14,7 @@ public sealed record BlockPositionRequest(Guid? Id, int? Position);
 
 /// <summary>
 /// Administração das propostas de redação. Só para administradores: para os demais usuários, estas rotas respondem
-/// 404, como se não existissem. Com a verificação em duas etapas exigida, a sessão sem o segundo fator recebe
-/// <c>ADMIN_2FA_REQUIRED</c> (403).
+/// 404, como se não existissem. Administrador é quem tem a flag <c>is_admin</c> no banco, conferida a cada requisição.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -24,7 +23,6 @@ public sealed record BlockPositionRequest(Guid? Id, int? Position);
 [Tags("Admin")]
 [Produces("application/json")]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
-[ProducesResponseType<ErrorResponse>(StatusCodes.Status403Forbidden)]
 [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
 public sealed class AdminPromptsController(IPromptAdminService prompts) : ControllerBase
 {
