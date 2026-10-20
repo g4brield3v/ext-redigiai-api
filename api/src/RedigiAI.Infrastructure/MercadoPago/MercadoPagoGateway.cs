@@ -22,6 +22,13 @@ public sealed class MercadoPagoOptions
     public string WebhookSecret { get; set; } = "";
 
     public string BaseUrl { get; set; } = "https://api.mercadopago.com";
+
+    /// <summary>
+    /// Só em desenvolvimento: o e-mail do comprador de teste, que assina o plano no lugar do aluno. No sandbox, a
+    /// assinatura exige que pagador e recebedor sejam os dois contas de teste. Fora do desenvolvimento, a API não sobe
+    /// com ele preenchido.
+    /// </summary>
+    public string TestPayerEmail { get; set; } = "";
 }
 
 /// <summary>
@@ -151,7 +158,7 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
         {
             ["reason"] = request.Reason,
             ["external_reference"] = request.SubscriptionId.ToString(),
-            ["payer_email"] = request.PayerEmail,
+            ["payer_email"] = options.Value.TestPayerEmail is { Length: > 0 } test ? test : request.PayerEmail,
             ["card_token_id"] = request.Card.Token,
             ["back_url"] = request.BackUrl,
             ["status"] = "authorized",

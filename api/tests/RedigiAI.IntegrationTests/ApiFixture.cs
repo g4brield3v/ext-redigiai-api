@@ -426,6 +426,12 @@ public sealed class FakePaymentGateway : IPaymentGateway
             throw Errors.PaymentFailed();
         }
 
+        // Como lá: o back_url precisa ser um endereço público em https (localhost é recusado com 400).
+        if (!Uri.TryCreate(request.BackUrl, UriKind.Absolute, out var backUrl) || backUrl.Scheme != Uri.UriSchemeHttps || backUrl.IsLoopback)
+        {
+            throw Errors.PaymentFailed();
+        }
+
         // Como lá: a assinatura nasce autorizada com o cartão (checkout transparente), e só a mesma chave de
         // idempotência devolve a mesma; outra chave cria outra.
         var id = _byCreationKey.GetOrAdd(request.IdempotencyKey, _ =>

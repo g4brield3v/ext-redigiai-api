@@ -44,6 +44,14 @@ internal static class ApiHost
         services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         services.Configure<RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions>(
             builder.Configuration.GetSection(RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions.Section));
+        // O pagador de teste só existe no desenvolvimento; em outro ambiente, a configuração é um erro.
+        services.PostConfigure<RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions>(mercadoPago =>
+        {
+            if (mercadoPago.TestPayerEmail.Length > 0 && !builder.Environment.IsDevelopment())
+            {
+                throw new InvalidOperationException("MercadoPago__TestPayerEmail is only allowed in Development.");
+            }
+        });
         // Aceita também o nome padrão da Anthropic para a chave.
         services.PostConfigure<AnthropicOptions>(anthropic =>
         {
