@@ -39,7 +39,7 @@ Chaves UUID v7, datas `timestamptz`.
 | `prompt_blocks` | id, prompt_id, position, kind, data (jsonb) | `position` inteiro ≥ 0, único por proposta. Conteúdo em `data` (seção A3). |
 | `prompt_grading_notes` | id, prompt_id, expected_focus, tangent_signals, off_topic_signals, key_data (jsonb), extra | **Abordagens esperadas do tema** (nome na tela). Uma por proposta; obrigatórias para publicar. Não confundir com o perfil de correção (seção A6). |
 | `assets` | (existente) + `scope` (`essay_photo`, `prompt_image`) | Imagens de proposta ficam numa pasta pública do Cloudinary, com URL estável. Fotos de redação continuam privadas. |
-| `users.role` | `student` (padrão) ou `admin` | Ver seção A5. `created_by` e `published_by` apontam para `users.id`. |
+| `users.is_admin` | `false` (padrão) ou `true` | Ver seção A5. `created_by` e `published_by` apontam para `users.id`. |
 
 Em `essays`: sai `theme_id`; entra `prompt_id` (a versão exata); `essay_type_id` é **copiado da proposta** no envio, nunca vem do navegador.
 
@@ -81,7 +81,7 @@ Num rascunho, o salvamento aceita conteúdo incompleto e devolve a lista de pend
 ## A5. Acesso de administrador, API e telas
 
 **Quem é administrador**
-- Flag `users.is_admin` (padrão `false`), ligada só direto no banco: `UPDATE users SET is_admin = true WHERE email = '<e-mail>';`. Nem o e-mail, nem o token, nem o navegador fazem alguém administrador.
+- Flag `users.is_admin` (padrão `false`), ligada só direto no banco, pelo `clerk_user_id` conferido no painel do Clerk (o e-mail não é único): `BEGIN; UPDATE users SET is_admin = true WHERE clerk_user_id = '<user_… do painel do Clerk>'; -- confira "UPDATE 1"; senão ROLLBACK; COMMIT;`. Nem o e-mail, nem o token, nem o navegador fazem alguém administrador.
 - Toda rota `/v1/admin/*` exige token válido e a flag, lida no banco a cada requisição: desligar a flag corta o acesso na requisição seguinte. Para os demais usuários: `404`.
 - O perfil (`GET /v1/me`) traz `isAdmin`; o front usa só para mostrar o menu e a área `/admin`.
 
@@ -102,7 +102,7 @@ Num rascunho, o salvamento aceita conteúdo incompleto e devolve a lista de pend
 | `DELETE /v1/admin/prompts/{id}` | Apaga **só rascunho** que nunca foi publicado. |
 
 **Telas** (referências `11-admin-propostas` e `11b-admin-editar-proposta`)
-- `/admin/*` só renderiza para `role = admin`; para os demais, a página de "não encontrado". O link "Admin" aparece no menu do avatar só para administradores.
+- `/admin/*` só renderiza para quem tem `isAdmin`; para os demais, a página de "não encontrado". O link "Admin" aparece no menu do avatar só para administradores.
 - **`/admin/propostas`:** filtros por status, busca, tabela (proposta, tipo, versão, status, atualizada, ação), "Importar JSON" e "Nova proposta".
 - **`/admin/propostas/:id`:**
   - **Barra fixa:** voltar, status e versão, "Salvo às hh:mm", "Exportar JSON", "Validar" e "Publicar" (com confirmação).

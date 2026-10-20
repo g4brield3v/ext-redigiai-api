@@ -10,15 +10,14 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // A flag nasce com quem já era administrador; só depois o papel antigo sai.
+            // A flag nasce desligada para todos: o papel antigo só valia junto com a lista de e-mails, e uma conta que saiu da
+            // lista podia manter role = admin. Quem é administrador recebe a flag à mão (docs/decisoes.md, 20/10/2026).
             migrationBuilder.AddColumn<bool>(
                 name: "is_admin",
                 table: "users",
                 type: "boolean",
                 nullable: false,
                 defaultValue: false);
-
-            migrationBuilder.Sql("UPDATE users SET is_admin = true WHERE role = 'admin';");
 
             migrationBuilder.DropColumn(
                 name: "role",

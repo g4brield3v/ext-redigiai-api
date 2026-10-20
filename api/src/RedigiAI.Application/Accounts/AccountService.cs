@@ -70,12 +70,14 @@ internal sealed class AccountService(
         return await ReadProfileAsync(user, ct);
     }
 
-    public async Task<ProfileDto> AcceptTermsAsync(string clerkUserId, CancellationToken ct)
+    public async Task<ProfileDto> AcceptTermsAsync(string clerkUserId, RequestOrigin origin, CancellationToken ct)
     {
         var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
         if (user.AcceptTerms(legal.Value.TermsVersion, time.GetUtcNow()))
         {
             audit.Record($"user:{user.Id}", "user.terms_accepted", "user", user.Id, new { version = legal.Value.TermsVersion });
+            // Prova do aceite, como no cadastro: de onde veio. Sem a sessão, que já pode ter o seu registro de acesso.
+            accessLog.Record(user.Id, origin with { SessionId = null });
             await unitOfWork.SaveChangesAsync(ct);
         }
 

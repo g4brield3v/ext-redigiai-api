@@ -118,7 +118,7 @@ internal static class ApiHost
         if (app.Environment.IsDevelopment())
         {
             // Documentação navegável em /swagger, só em desenvolvimento.
-            app.MapOpenApi().DisableRateLimiting();
+            app.MapOpenApi().AllowAnonymous().DisableRateLimiting();
             app.UseSwaggerUI(swagger =>
             {
                 swagger.SwaggerEndpoint("/openapi/v1.json", "RedigiAI API v1");

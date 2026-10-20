@@ -141,7 +141,7 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 
 | Tabela | Campos principais | Regras |
 |---|---|---|
-| `users` | id, clerk_user_id (único), email, name, birth_date, role (`student`, `admin`), last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. `role` é `student` por padrão e vem da configuração (`docs/07-propostas-de-redacao.md`, A5). |
+| `users` | id, clerk_user_id (único), email, name, birth_date, is_admin (padrão `false`), last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. `is_admin` é ligada só à mão no banco (`docs/07-propostas-de-redacao.md`, A5). |
 | `essays` | id, user_id, batch_id, prompt_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, failed_at, failure_details (jsonb), grading_profile_id, created_at | `prompt_id` é a versão exata da proposta; `essay_type_id` é copiado da proposta no envio. `parent_essay_id` liga a reescrita à versão anterior. Status `failed` ou `cancelled` exige `failure_code` e `failed_at` (restrição `ck_essays_failure_code`). |
 | `transcriptions` | id, essay_id, lines (jsonb: número + texto), illegible_count, model, created_at | Texto fiel, nunca editado. |
 | `illegible_words` | id, transcription_id, line_number, char_start, char_end, student_value, filled_at | O que o aluno digitou fica separado da transcrição. |

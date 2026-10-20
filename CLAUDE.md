@@ -73,7 +73,8 @@ dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevA
 # Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
 # carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova | admin).
 # O usuário admin de teste já vem com a flag is_admin. Fora do DevAuth, administrador é quem tem a flag no banco:
-#   UPDATE users SET is_admin = true WHERE email = '<e-mail>';   (e false para tirar; vale na requisição seguinte)
+#   BEGIN; UPDATE users SET is_admin = true WHERE clerk_user_id = '<user_… do painel do Clerk>'; -- confira "UPDATE 1"; senão ROLLBACK; COMMIT;
+#   Pelo clerk_user_id (o e-mail não é único). false para tirar; vale na requisição seguinte.
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 ```
 

@@ -66,7 +66,7 @@ public sealed class AccountController(IAccountService accounts, ILogger<AccountC
     [ProducesResponseType<ProfileDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AcceptTerms(CancellationToken ct) =>
-        Ok(await accounts.AcceptTermsAsync(User.GetClerkIdentity().UserId, ct));
+        Ok(await accounts.AcceptTermsAsync(User.GetClerkIdentity().UserId, HttpContext.GetRequestOrigin(), ct));
 
     /// <summary>Altera o nome e as preferências de e-mail.</summary>
     [HttpPatch(Name = "updateMe")]
