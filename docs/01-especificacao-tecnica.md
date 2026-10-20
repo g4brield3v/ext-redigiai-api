@@ -431,7 +431,7 @@ O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados 
 
 **Correção avulsa (Pix ou cartão)**
 
-1. `POST /v1/checkout/single` cria o pagamento de R$ 16 × quantidade. Pix devolve QR code e copia-e-cola, com validade de 30 min.
+1. `POST /v1/checkout/single` cria o pagamento de R$ 16 × quantidade como uma **order** da API de Orders do Mercado Pago (`POST /v1/orders`, `type: online`, `processing_mode: automatic`, um pagamento só), com o id da compra como `external_reference` e `X-Idempotency-Key`. Pix (`bank_transfer`) devolve QR code e copia-e-cola, com validade de 30 min (`expiration_time`). Cartão: o token do Card Payment Brick, uma parcela, `credit_card` ou `debit_card` (ids `deb…`). A recusa vem como 402 com a order em `data` e vira compra `rejected`. O id da compra lá é o da order (`ORD…`); consulta em `GET /v1/orders/{id}` e reembolso parcial em `POST /v1/orders/{id}/refund`, na transação da order. As cobranças do plano mensal continuam pagamentos da API de assinaturas (`/v1/payments`, id numérico).
 2. Pagamento aprovado → cria um bucket `single` sem vencimento com a quantidade comprada.
 3. A tela de pagamento consulta o status a cada 3 s enquanto aberta, para liberar o envio sem recarregar.
 
@@ -439,7 +439,7 @@ O Mercado Pago processa os pagamentos; o RedigiAI nunca recebe nem guarda dados 
 
 - Valida o cabeçalho `x-signature` com o segredo do Mercado Pago; inválido → 401 e nada é gravado.
 - Grava em `webhook_events` com `external_id` único (reentrega não duplica) e responde 200 em seguida; o processamento é o job `process_payment`.
-- O job busca o recurso na API do Mercado Pago e age pelo status de lá, não pelo corpo do webhook.
+- O job busca o recurso na API do Mercado Pago e age pelo status de lá, não pelo corpo do webhook. Os tópicos `order` (compra avulsa) e `payment` (cobrança do plano) vão para o `process_payment`. Situações da order: `processed/accredited` e `processed/partially_refunded` = aprovada (o valor estornado vem de `refunded_amount`); `processed/refunded` e `refunded` = estornada; `failed` = recusada; `canceled` = cancelada; `charged_back` = contestada; `created`, `action_required` e `processing` = pendente.
 - Estornos e chargebacks: removem do saldo os créditos ainda não usados daquele pagamento e registram no `audit_log`. Estorno parcial (o pagamento continua aprovado lá, com `transaction_amount_refunded`): saem as correções inteiras que o valor estornado cobre, sem arredondar (R$ 16 por correção avulsa, R$ 3,33 por correção do plano), contando os estornos anteriores (`payments.refunded_cents`); a sobra que não fecha uma correção fica no `audit_log` para conferência.
 
 **Saldo e consumo**
