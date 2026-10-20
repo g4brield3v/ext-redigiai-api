@@ -3991,6 +3991,13 @@
           },
           "status": {
             "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "firstChargeAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },

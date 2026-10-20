@@ -168,13 +168,7 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             ["card_token_id"] = request.Card.Token,
             ["back_url"] = request.BackUrl,
             ["status"] = "authorized",
-            ["auto_recurring"] = new JsonObject
-            {
-                ["frequency"] = 1,
-                ["frequency_type"] = "months",
-                ["transaction_amount"] = request.AmountCents / 100m,
-                ["currency_id"] = "BRL",
-            },
+            ["auto_recurring"] = Recurring(request),
         });
         var (status, created) = await SendAsync(message, ct);
         if (created is null)
@@ -185,6 +179,24 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
         }
 
         return new CreatedSubscription(Id(created));
+    }
+
+    private static JsonObject Recurring(SubscriptionRequest request)
+    {
+        var recurring = new JsonObject
+        {
+            ["frequency"] = 1,
+            ["frequency_type"] = "months",
+            ["transaction_amount"] = request.AmountCents / 100m,
+            ["currency_id"] = "BRL",
+        };
+        if (request.FirstChargeAt is { } start)
+        {
+            // A primeira cobrança no fim do ciclo pago, com o fuso de Brasília, como o Mercado Pago pede as datas.
+            recurring["start_date"] = TimeZoneInfo.ConvertTime(start, Brasilia).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
+        }
+
+        return recurring;
     }
 
     public async Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct)

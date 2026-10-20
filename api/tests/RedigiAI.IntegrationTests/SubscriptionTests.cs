@@ -49,6 +49,44 @@ public class SubscriptionTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Subscribing_again_within_the_paid_cycle_keeps_the_corrections_and_charges_only_at_its_end()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var cycleEnd = DateTimeOffset.UtcNow.AddDays(20);
+        var first = await student.SubscribeAsync(nextChargeAt: cycleEnd);
+        await student.ChargeAsync(first, PaymentStatus.Approved);
+        // Usou 5 das 12, e cancelou.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id && b.Source == CreditSource.Plan)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.Remaining, 7)));
+        (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+
+        var again = await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
+
+        // A nova assinatura só cobra no fim do ciclo pago, e as 7 seguem valendo até lá.
+        var subscriptionId = again.GetProperty("subscriptionId").GetGuid();
+        var firstChargeAt = again.GetProperty("firstChargeAt").GetDateTimeOffset();
+        Assert.Equal(cycleEnd, firstChargeAt, TimeSpan.FromMilliseconds(1));
+        Assert.Equal(firstChargeAt, api.Payments.FirstChargeAts[subscriptionId]!.Value);
+        Assert.Equal(8, await student.CreditsAsync()); // 7 do plano + o teste grátis
+
+        // A primeira cobrança da nova chega como uma renovação: o saldo do plano volta a 12.
+        await RunAsync(JobTypes.ProcessSubscription);
+        await student.ChargeAsync(api.Payments.PreapprovalIdOf(subscriptionId)!, PaymentStatus.Approved);
+        Assert.Equal(13, await student.CreditsAsync());
+    }
+
+    [Fact]
+    public async Task A_first_subscription_is_charged_now()
+    {
+        var student = await Subscriber.CreateAsync(api);
+
+        var checkout = await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(JsonValueKind.Null, checkout.GetProperty("firstChargeAt").ValueKind);
+        Assert.Null(api.Payments.FirstChargeAts[checkout.GetProperty("subscriptionId").GetGuid()]);
+    }
+
+    [Fact]
     public async Task Subscribing_again_after_cancelling_shows_the_new_subscription_not_the_cancelled_one()
     {
         var student = await Subscriber.CreateAsync(api);

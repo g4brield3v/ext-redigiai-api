@@ -188,6 +188,24 @@ public sealed class MercadoPagoGatewayTests : IDisposable
         Assert.Equal((TransactionId, "16.00"), (refund["id"]!.GetValue<string>(), refund["amount"]!.GetValue<string>()));
     }
 
+    [Fact]
+    public async Task A_subscription_charged_later_sends_the_start_date_in_brasilia_time()
+    {
+        _server.Reply("POST /preapproval", 201, """{"id":"pre-1","status":"authorized"}""");
+        var firstChargeAt = new DateTimeOffset(2026, 11, 20, 14, 30, 0, TimeSpan.Zero);
+
+        await _gateway.CreateSubscriptionAsync(
+            new SubscriptionRequest(Guid.NewGuid(), "key", 3990, "plano", "aluna@example.com", new CardToken("tok", "master", null, null, null), "https://redigiai.com.br/perfil", firstChargeAt),
+            CancellationToken.None);
+        await _gateway.CreateSubscriptionAsync(
+            new SubscriptionRequest(Guid.NewGuid(), "key-2", 3990, "plano", "aluna@example.com", new CardToken("tok", "master", null, null, null), "https://redigiai.com.br/perfil"),
+            CancellationToken.None);
+
+        var bodies = _server.Requests.Select(r => JsonNode.Parse(r.Body)!["auto_recurring"]!).ToList();
+        Assert.Equal("2026-11-20T11:30:00.000-03:00", bodies[0]["start_date"]!.GetValue<string>());
+        Assert.Null(bodies[1]["start_date"]);
+    }
+
     private static ChargeRequest Charge() => new(Guid.NewGuid(), 1600, "RedigiAI: 1 correção avulsa", "aluna@example.com");
 
     private static string Order(
