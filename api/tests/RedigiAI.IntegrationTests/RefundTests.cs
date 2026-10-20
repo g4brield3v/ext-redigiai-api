@@ -50,6 +50,49 @@ public class RefundTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task The_refund_is_not_made_when_mercado_pago_shows_the_purchase_disputed()
+    {
+        var student = await Student.CreateAsync(api);
+        var paymentId = await student.BuyApprovedAsync(quantity: 2);
+        var refund = await (await student.RequestRefundAsync(paymentId)).Content.ReadFromJsonAsync<JsonElement>();
+        var refundId = refund.GetProperty("id").GetGuid();
+
+        // Antes de o job rodar, o aluno contestou a compra no banco do cartão.
+        api.Payments.Set(api.Payments.ProviderIdOf(paymentId)!, PaymentStatus.ChargedBack);
+        await RunAsync(JobTypes.ProcessRefund);
+
+        Assert.False(api.Payments.Refunds.ContainsKey(refundId));
+        Assert.Equal(RefundStatus.Requested, await api.QueryAsync(db => db.RefundRequests.Where(r => r.Id == refundId).Select(r => r.Status).SingleAsync()));
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.Action == "refund.blocked" && a.EntityId == refundId)));
+    }
+
+    [Fact]
+    public async Task A_previous_partial_refund_lowers_what_is_returned()
+    {
+        var student = await Student.CreateAsync(api);
+        var paymentId = await student.BuyApprovedAsync(quantity: 5);
+        // R$ 70 já estornados pelo painel: 4 correções saem, e R$ 6 sobram sem fechar uma quinta.
+        await api.QueryAsync(db => db.Payments.Where(p => p.Id == paymentId).ExecuteUpdateAsync(p => p.SetProperty(x => x.RefundedCents, 7000)));
+
+        var refund = await (await student.RequestRefundAsync(paymentId)).Content.ReadFromJsonAsync<JsonElement>();
+
+        // As 5 sem uso valeriam R$ 80, mas da compra de R$ 80 só restam R$ 10 para devolver.
+        Assert.Equal(1000, refund.GetProperty("amountCents").GetInt64());
+    }
+
+    [Fact]
+    public async Task The_reason_refuses_invisible_formatting_characters()
+    {
+        var student = await Student.CreateAsync(api);
+        var paymentId = await student.BuyApprovedAsync(quantity: 1);
+
+        var response = await student.RequestRefundAsync(paymentId, reason: "texto\u202Einvertido");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(2, await student.CreditsAsync());
+    }
+
+    [Fact]
     public async Task Simultaneous_requests_make_one_refund()
     {
         var student = await Student.CreateAsync(api);

@@ -34,18 +34,16 @@ public sealed class RefundRequest
 
     /// <summary>
     /// Quanto devolver por <paramref name="unused"/> correções não usadas da compra: R$ 16 cada na avulsa; no plano,
-    /// R$ 39,90 menos R$ 3,33 por correção usada ou em andamento (decisão de 18/10/2026), nunca abaixo de zero.
+    /// R$ 39,90 menos R$ 3,33 por correção usada ou em andamento (decisão de 18/10/2026), nunca abaixo de zero. Nunca
+    /// mais do que ainda não foi estornado da compra.
     /// </summary>
     public static long AmountFor(Payment payment, int unused)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(unused);
-        if (payment.Kind == PaymentKind.Single)
-        {
-            return unused * Payment.SinglePriceCents;
-        }
-
-        var used = Math.Max(0, payment.Quantity - unused);
-        return Math.Max(0, payment.AmountCents - (used * Payment.PlanCreditCents));
+        var amount = payment.Kind == PaymentKind.Single
+            ? unused * Payment.SinglePriceCents
+            : payment.AmountCents - (Math.Max(0, payment.Quantity - unused) * Payment.PlanCreditCents);
+        return Math.Clamp(amount, 0, Math.Max(0, payment.AmountCents - payment.RefundedCents));
     }
 
     public static RefundRequest Create(Payment payment, int creditsRemoved, long amountCents, string? reason, DateTimeOffset now)

@@ -44,7 +44,8 @@ internal sealed class RefundService(
             throw Errors.NotFound();
         }
 
-        if (reason is { Length: > RefundRequest.MaxReasonLength } || (reason?.Any(c => char.IsControl(c) && c is not '\n' and not '\r') ?? false))
+        if (reason is { Length: > RefundRequest.MaxReasonLength } || (reason?.Any(c => (char.IsControl(c) && c is not '\n' and not '\r')
+                || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format) ?? false))
         {
             throw Errors.Validation($"Escreva o motivo em até {RefundRequest.MaxReasonLength} caracteres.");
         }
@@ -120,6 +121,15 @@ internal sealed class RefundService(
         }
         catch (Exception ex) when (ex is UniqueConflictException || ex is AppError { Code: "NOTHING_TO_REFUND" })
         {
+            if (subscription is { Status: SubscriptionStatus.Active or SubscriptionStatus.Paused }
+                && await refunds.FindByPaymentAsync(payment.Id, ct) is null)
+            {
+                // A assinatura foi cancelada lá, mas o pedido não ficou: para conferência (o aviso do cancelamento a
+                // cancela aqui também).
+                audit.Record($"user:{user.Id}", "subscription.cancelled_without_refund", "subscription", subscription.Id);
+                await unitOfWork.SaveChangesAsync(ct);
+            }
+
             // Outro pedido da mesma compra chegou primeiro (e revogou o bucket enquanto este esperava a trava): vale o
             // dele. Sem pedido nenhum, era mesmo nada a devolver.
             return await refunds.FindByPaymentAsync(payment.Id, ct) is { } winner ? ToDto(winner) : throw Errors.NothingToRefund();
@@ -157,6 +167,22 @@ internal sealed class ProcessRefundHandler(
         if (await refunds.FindAsync(job.RefundRequestId, ct) is not { Status: RefundStatus.Requested } request
             || await payments.FindAsync(request.PaymentId, ct) is not { MpPaymentId: { } mpPaymentId })
         {
+            return;
+        }
+
+        // Antes de devolver, a compra como o Mercado Pago a vê: aprovada e com valor para devolver. Em mediação,
+        // estornada ou contestada lá (e ainda não processada aqui), ou com um reembolso já feito, não devolve: revisão
+        // manual, para nunca devolver duas vezes.
+        var remote = await gateway.GetPaymentAsync(mpPaymentId, ct);
+        if (remote is null || remote.Status != PaymentStatus.Approved || remote.AmountCents - remote.RefundedCents < request.AmountCents)
+        {
+            audit.Record(
+                "system",
+                "refund.blocked",
+                "refund_request",
+                request.Id,
+                new { remoteStatus = remote?.Status.ToString(), refundedCents = remote?.RefundedCents, amountCents = request.AmountCents });
+            await unitOfWork.SaveChangesAsync(ct);
             return;
         }
 
