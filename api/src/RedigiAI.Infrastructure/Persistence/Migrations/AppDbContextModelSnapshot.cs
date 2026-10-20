@@ -533,6 +533,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("creating_until");
 
+                    b.Property<DateTimeOffset?>("FirstChargeAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_charge_at");
+
                     b.Property<DateTimeOffset?>("GuardianAuthorizedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("guardian_authorized_at");

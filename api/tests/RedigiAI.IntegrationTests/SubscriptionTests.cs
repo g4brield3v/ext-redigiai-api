@@ -82,6 +82,44 @@ public class SubscriptionTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Repeating_the_same_key_returns_the_first_charge_date_sent_even_if_the_cycle_changed()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var cycleEnd = DateTimeOffset.UtcNow.AddDays(10);
+        var first = await student.SubscribeAsync(nextChargeAt: cycleEnd);
+        await student.ChargeAsync(first, PaymentStatus.Approved);
+        (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+        var key = Guid.NewGuid().ToString();
+
+        var sent = (await (await student.CheckoutAsync(key: key)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("firstChargeAt").GetDateTimeOffset();
+        // O ciclo antigo acaba (por exemplo, estornado) antes de a tela repetir o pedido.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id && b.Source == CreditSource.Plan)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.ExpiresAt, DateTimeOffset.UtcNow.AddMinutes(-1))));
+        var again = (await (await student.CheckoutAsync(key: key)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("firstChargeAt").GetDateTimeOffset();
+
+        Assert.Equal(sent, again, TimeSpan.FromMilliseconds(1));
+    }
+
+    [Fact]
+    public async Task A_cycle_ending_in_less_than_a_day_is_charged_now()
+    {
+        // O Mercado Pago só adia para outro dia; no mesmo dia, ele cobraria na criação.
+        var student = await Subscriber.CreateAsync(api);
+        var first = await student.SubscribeAsync();
+        await student.ChargeAsync(first, PaymentStatus.Approved);
+        // O ciclo pago termina daqui a 10 h.
+        await api.QueryAsync(db => db.CreditBuckets.Where(b => b.UserId == student.Id && b.Source == CreditSource.Plan)
+            .ExecuteUpdateAsync(b => b.SetProperty(x => x.ExpiresAt, DateTimeOffset.UtcNow.AddHours(10))));
+        (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+
+        Assert.Equal(JsonValueKind.Null, (await student.ProfileAsync()).GetProperty("planResumesAt").ValueKind);
+        var checkout = await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(JsonValueKind.Null, checkout.GetProperty("firstChargeAt").ValueKind);
+        Assert.Null(api.Payments.FirstChargeAts[checkout.GetProperty("subscriptionId").GetGuid()]);
+    }
+
+    [Fact]
     public async Task A_first_subscription_is_charged_now()
     {
         var student = await Subscriber.CreateAsync(api);

@@ -152,7 +152,7 @@ internal sealed class SubscriptionService(
         }
 
         return subscription.MpPreapprovalId is not null
-            ? new PlanCheckoutDto(subscription.Id, subscription.Status, await planResume.FirstChargeAtAsync(user.Id, ct))
+            ? new PlanCheckoutDto(subscription.Id, subscription.Status, subscription.FirstChargeAt)
             : await CreateThereAsync(subscription, user, card, ct);
     }
 
@@ -212,7 +212,7 @@ internal sealed class SubscriptionService(
         var attached = await unitOfWork.InTransactionAsync(
             async () =>
             {
-                if (!await subscriptions.TryAttachProviderAsync(subscription.Id, created.ProviderId, now, ct))
+                if (!await subscriptions.TryAttachProviderAsync(subscription.Id, created.ProviderId, now, ct, firstChargeAt))
                 {
                     return false;
                 }
@@ -236,7 +236,8 @@ internal sealed class SubscriptionService(
         audit.Record("system", "subscription.orphan", "subscription", subscription.Id, new { mpPreapprovalId = created.ProviderId });
         await unitOfWork.SaveChangesAsync(ct);
         await gateway.CancelSubscriptionAsync(created.ProviderId, ct);
-        return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending, firstChargeAt);
+        var winner = await subscriptions.FindAsync(subscription.Id, ct);
+        return new PlanCheckoutDto(subscription.Id, SubscriptionStatus.Pending, winner?.FirstChargeAt);
     }
 
     /// <summary>

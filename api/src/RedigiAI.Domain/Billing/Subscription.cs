@@ -45,6 +45,12 @@ public sealed class Subscription
     /// <summary>Quando o assinante de 16 ou 17 anos declarou a autorização do responsável.</summary>
     public DateTimeOffset? GuardianAuthorizedAt { get; private set; }
     public DateTimeOffset? NextBillingAt { get; private set; }
+
+    /// <summary>
+    /// A primeira cobrança pedida ao Mercado Pago quando não era na hora (assinou de novo com o ciclo pago valendo); a
+    /// repetição do mesmo pedido devolve esta, e não uma conta nova.
+    /// </summary>
+    public DateTimeOffset? FirstChargeAt { get; private set; }
     public string? CardLast4 { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
