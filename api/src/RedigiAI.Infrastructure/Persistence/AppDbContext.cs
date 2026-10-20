@@ -48,7 +48,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<PromptStatus>().HaveConversion<SnakeCaseEnumConverter<PromptStatus>>();
         configuration.Properties<PromptBlockKind>().HaveConversion<SnakeCaseEnumConverter<PromptBlockKind>>();
         configuration.Properties<AssetScope>().HaveConversion<SnakeCaseEnumConverter<AssetScope>>();
-        configuration.Properties<UserRole>().HaveConversion<SnakeCaseEnumConverter<UserRole>>();
         configuration.Properties<CreditSource>().HaveConversion<SnakeCaseEnumConverter<CreditSource>>();
         configuration.Properties<SubscriptionStatus>().HaveConversion<SnakeCaseEnumConverter<SubscriptionStatus>>();
         configuration.Properties<PaymentKind>().HaveConversion<SnakeCaseEnumConverter<PaymentKind>>();

@@ -15,8 +15,6 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddOptions<LegalOptions>();
 
-        services.AddOptions<AdminOptions>();
-        services.AddScoped<AdminRole>();
         services.AddScoped<IAdminAccessService, AdminAccessService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IClerkWebhookService, ClerkWebhookService>();

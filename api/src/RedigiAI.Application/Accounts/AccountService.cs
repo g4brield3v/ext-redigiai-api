@@ -15,7 +15,6 @@ internal sealed class AccountService(
     IAccessLog accessLog,
     IUnitOfWork unitOfWork,
     IOptions<LegalOptions> legal,
-    AdminRole adminRole,
     TimeProvider time) : IAccountService
 {
     public async Task<RegisterUserResult> RegisterAsync(RegisterUserCommand command, CancellationToken ct)
@@ -23,7 +22,6 @@ internal sealed class AccountService(
         var existing = await users.FindByClerkIdAsync(command.ClerkUserId, ct);
         if (existing is not null)
         {
-            await adminRole.EnsureCheckedAsync(existing, command.Origin.SessionId, ct);
             return new RegisterUserResult(await ReadProfileAsync(existing, ct), Created: false);
         }
 
@@ -40,19 +38,11 @@ internal sealed class AccountService(
         var now = time.GetUtcNow();
         var user = User.Register(
             command.ClerkUserId, command.Email, command.Name, birthDate, legal.Value.TermsVersion, now);
-        // Sem resposta do provedor, a conta nasce como aluno e o papel é conferido de novo no próximo acesso.
-        var role = await adminRole.ResolveAsync(user, ct);
-        user.ConfirmRole(role ?? UserRole.Student, role is null ? null : command.Origin.SessionId);
         var bucket = CreditBucket.GrantTrial(user.Id, now);
 
         users.Add(user);
         credits.AddGrant(bucket, CreditLedgerEntry.ForGrant(bucket, now));
         audit.Record($"user:{user.Id}", "user.registered", "user", user.Id);
-        if (user.Role == UserRole.Admin)
-        {
-            audit.Record("system", "user.role_changed", "user", user.Id, new { role = "admin" });
-        }
-
         audit.Record("system", "credit.granted", "credit_bucket", bucket.Id, new { source = "trial", delta = bucket.Granted });
         accessLog.Record(user.Id, command.Origin);
 
@@ -76,7 +66,20 @@ internal sealed class AccountService(
 
         await users.TouchAsync(user.Id, time.GetUtcNow(), ct);
         await accessLog.RecordSessionOnceAsync(user.Id, origin, ct);
-        await adminRole.EnsureCheckedAsync(user, origin.SessionId, ct);
+
+        return await ReadProfileAsync(user, ct);
+    }
+
+    public async Task<ProfileDto> AcceptTermsAsync(string clerkUserId, RequestOrigin origin, CancellationToken ct)
+    {
+        var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
+        if (user.AcceptTerms(legal.Value.TermsVersion, time.GetUtcNow()))
+        {
+            audit.Record($"user:{user.Id}", "user.terms_accepted", "user", user.Id, new { version = legal.Value.TermsVersion });
+            // Prova do aceite, como no cadastro: de onde veio. Sem a sessão, que já pode ter o seu registro de acesso.
+            accessLog.Record(user.Id, origin with { SessionId = null });
+            await unitOfWork.SaveChangesAsync(ct);
+        }
 
         return await ReadProfileAsync(user, ct);
     }
@@ -113,10 +116,6 @@ internal sealed class AccountService(
 
         user.ChangeEmail(email);
         audit.Record("clerk", "user.email_changed", "user", user.Id);
-        if (!adminRole.IsListed(email) && user.ConfirmRole(UserRole.Student, sessionId: null))
-        {
-            audit.Record("clerk", "user.role_changed", "user", user.Id, new { role = "student" });
-        }
 
         await unitOfWork.SaveChangesAsync(ct);
     }
@@ -134,7 +133,7 @@ internal sealed class AccountService(
             user.Id,
             user.Email,
             user.Name,
-            user.Role,
+            user.IsAdmin,
             TermsAcceptanceRequired: user.TermsVersion != legal.Value.TermsVersion,
             AiNoticeAccepted: user.AiNoticeAcceptedAt is not null,
             new EmailPreferencesDto(

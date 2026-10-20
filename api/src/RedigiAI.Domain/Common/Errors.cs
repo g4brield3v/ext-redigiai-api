@@ -54,8 +54,6 @@ public static class Errors
     public static AppError ValidationFailed(IReadOnlyList<ValidationIssue> details) =>
         new("VALIDATION_FAILED", 422, "Há pendências na proposta.", details: details);
 
-    public static AppError AdminSecondFactorRequired() =>
-        new("ADMIN_2FA_REQUIRED", 403, "Ative a verificação em duas etapas para acessar a administração.");
 
     public static AppError PaymentFailed() =>
         new("PAYMENT_FAILED", 402, "O pagamento não foi aprovado. Tente outro meio de pagamento.", retryable: true);
@@ -71,6 +69,9 @@ public static class Errors
 
     public static AppError CheckoutInProgress() =>
         new("CHECKOUT_IN_PROGRESS", 409, "Já estamos processando a sua assinatura. Aguarde alguns segundos e tente de novo.", retryable: true);
+
+    public static AppError TermsAcceptanceRequired() =>
+        new("TERMS_ACCEPTANCE_REQUIRED", 409, "Aceite os Termos de uso e a Política de privacidade para continuar.");
 
     public static AppError PlanAlreadyActive() =>
         new("PLAN_ALREADY_ACTIVE", 409, "Você já tem um plano mensal ativo.");

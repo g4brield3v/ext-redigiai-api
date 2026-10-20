@@ -62,6 +62,7 @@ internal sealed class EssayService(
     IAccessLog accessLog,
     IUnitOfWork unitOfWork,
     EssayOutcomes outcomes,
+    Microsoft.Extensions.Options.IOptions<LegalOptions> legal,
     TimeProvider time) : IEssayService
 {
     private const int PageSize = 20;
@@ -77,6 +78,12 @@ internal sealed class EssayService(
     public async Task<BatchEssayResponseDto> SubmitBatchAsync(SubmitEssaysCommand command, CancellationToken ct)
     {
         var user = await users.FindByClerkIdAsync(command.ClerkUserId, ct) ?? throw Errors.ProfileNotFound();
+
+        // Termos mudaram desde o aceite: nenhum envio antes do novo aceite (especificação, users.terms_version).
+        if (user.TermsVersion != legal.Value.TermsVersion)
+        {
+            throw Errors.TermsAcceptanceRequired();
+        }
 
         var key = command.IdempotencyKey?.Trim();
         if (string.IsNullOrEmpty(key) || key.Length > EssayBatch.MaxKeyLength || key.Any(char.IsControl))

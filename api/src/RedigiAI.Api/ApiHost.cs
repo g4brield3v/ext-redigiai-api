@@ -37,7 +37,6 @@ internal static class ApiHost
         services.AddApplication();
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
-        services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.Section));
         services.Configure<SeedOptions>(seed =>
             seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
@@ -72,7 +71,6 @@ internal static class ApiHost
         if (devAccess)
         {
             services.AddSingleton<DevUsers>();
-            services.AddSingleton<ITestIdentities>(provider => provider.GetRequiredService<DevUsers>());
             services.AddHostedService<DevEnvironmentSetup>();
             services.AddHostedService<JobWorker>();
             services.AddHostedService<ReviewDeadlineSweeper>();
@@ -120,7 +118,7 @@ internal static class ApiHost
         if (app.Environment.IsDevelopment())
         {
             // Documentação navegável em /swagger, só em desenvolvimento.
-            app.MapOpenApi().DisableRateLimiting();
+            app.MapOpenApi().AllowAnonymous().DisableRateLimiting();
             app.UseSwaggerUI(swagger =>
             {
                 swagger.SwaggerEndpoint("/openapi/v1.json", "RedigiAI API v1");

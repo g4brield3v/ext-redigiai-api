@@ -11,7 +11,7 @@ public sealed record ProfileDto(
     Guid Id,
     string Email,
     string? Name,
-    UserRole Role,
+    bool IsAdmin,
     bool TermsAcceptanceRequired,
     bool AiNoticeAccepted,
     EmailPreferencesDto EmailPreferences,

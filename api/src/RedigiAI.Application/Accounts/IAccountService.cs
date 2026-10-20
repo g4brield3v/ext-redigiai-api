@@ -30,6 +30,9 @@ public interface IAccountService
 
     Task<ProfileDto> UpdateProfileAsync(UpdateProfileCommand command, CancellationToken ct);
 
+    /// <summary>Grava o aceite da versão vigente dos Termos e da Política (quando o perfil traz <c>termsAcceptanceRequired</c>).</summary>
+    Task<ProfileDto> AcceptTermsAsync(string clerkUserId, RequestOrigin origin, CancellationToken ct);
+
     /// <summary>Reflete no usuário local o e-mail alterado no Clerk.</summary>
     Task SyncEmailAsync(string clerkUserId, string email, CancellationToken ct);
 }

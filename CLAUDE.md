@@ -10,7 +10,7 @@ Este repositório tem a API, o worker e a especificação do produto. O front-en
 |---|---|
 | `docs/01-especificacao-tecnica.md` | **Fonte da verdade:** regras de negócio, estados, modelo de dados, API, fila, IA, pagamentos, e-mails, segurança, erros |
 | `docs/03-plano-de-implementacao.md` | Etapas, critérios de aceite e checklist de segurança |
-| `docs/07-propostas-de-redacao.md` | Propostas de redação: modelo em blocos ordenados, um tipo por proposta, área de administração (`/admin`, papel admin por e-mail verificado e segundo fator) e guia de cadastro. Substitui o modelo de temas da especificação |
+| `docs/07-propostas-de-redacao.md` | Propostas de redação: modelo em blocos ordenados, um tipo por proposta, área de administração (`/admin`, flag `users.is_admin` ligada no banco) e guia de cadastro. Substitui o modelo de temas da especificação |
 
 Se algo na tarefa contradiz a especificação, **pare e pergunte**. Não invente regra de negócio. Se a especificação não cobre um caso, proponha a solução mais simples, implemente só depois de aprovada e registre a decisão em `docs/decisoes.md` (data, contexto, decisão).
 
@@ -72,7 +72,9 @@ dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevA
 # nada é enviado. Os botões apontam para App__BaseUrl (padrão http://localhost:5173).
 # Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
 # carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova | admin).
-# O usuário admin só existe com Admin__Emails preenchido: usa o primeiro e-mail da lista e simula o segundo fator.
+# O usuário admin de teste já vem com a flag is_admin. Fora do DevAuth, administrador é quem tem a flag no banco:
+#   BEGIN; UPDATE users SET is_admin = true WHERE clerk_user_id = '<user_… do painel do Clerk>'; -- confira "UPDATE 1"; senão ROLLBACK; COMMIT;
+#   Pelo clerk_user_id (o e-mail não é único). false para tirar; vale na requisição seguinte.
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations
 ```
 

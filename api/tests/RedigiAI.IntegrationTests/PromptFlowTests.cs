@@ -360,9 +360,9 @@ public class PromptFlowTests(ApiFixture api)
     private async Task<HttpClient> AdminAsync()
     {
         var userId = ApiFixture.NewClerkUserId();
-        api.Directory.Accounts[userId] = new PrimaryEmail(ApiFixture.AdminEmail, Verified: true);
-        var client = api.CreateClient(api.CreateToken(userId, email: ApiFixture.AdminEmail, secondFactor: true));
+        var client = api.CreateClient(api.CreateToken(userId, email: ApiFixture.AdminEmail));
         (await client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true })).EnsureSuccessStatusCode();
+        await api.MakeAdminAsync(userId);
         return client;
     }
 

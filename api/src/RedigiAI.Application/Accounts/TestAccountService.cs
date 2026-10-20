@@ -1,12 +1,14 @@
 using RedigiAI.Application.Abstractions;
 using RedigiAI.Application.Billing;
+using RedigiAI.Domain.Accounts;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Common;
 
 namespace RedigiAI.Application.Accounts;
 
 /// <param name="ExtraCredits">Correções avulsas além do teste grátis.</param>
-public sealed record TestAccount(string ClerkUserId, string Email, string Name, int Age, int ExtraCredits);
+/// <param name="IsAdmin">O administrador de teste: a flag é ligada aqui, só no desenvolvimento.</param>
+public sealed record TestAccount(string ClerkUserId, string Email, string Name, int Age, int ExtraCredits, bool IsAdmin = false);
 
 /// <summary>Alunos de teste do ambiente de desenvolvimento. Nunca é chamado fora dele.</summary>
 public interface ITestAccountService
@@ -15,7 +17,8 @@ public interface ITestAccountService
     Task EnsureAsync(TestAccount account, CancellationToken ct);
 }
 
-internal sealed class TestAccountService(IAccountService accounts, ICreditService credits, TimeProvider time)
+internal sealed class TestAccountService(
+    IAccountService accounts, ICreditService credits, IUserRepository users, IAuditLog audit, IUnitOfWork unitOfWork, TimeProvider time)
     : ITestAccountService
 {
     private const string Actor = "dev-setup";
@@ -34,6 +37,12 @@ internal sealed class TestAccountService(IAccountService accounts, ICreditServic
         {
             await credits.GrantAsync(
                 new GrantCreditsCommand(result.Profile.Id, CreditSource.Single, account.ExtraCredits, ExpiresAt: null, Actor), ct);
+        }
+
+        if (account.IsAdmin && await users.FindByClerkIdAsync(account.ClerkUserId, ct) is { } user && user.MakeAdmin())
+        {
+            audit.Record(Actor, "user.admin_granted", "user", user.Id);
+            await unitOfWork.SaveChangesAsync(ct);
         }
     }
 }

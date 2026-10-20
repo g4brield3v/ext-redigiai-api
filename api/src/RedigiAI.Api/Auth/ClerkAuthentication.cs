@@ -39,7 +39,9 @@ internal static class ClerkAuthentication
                         : JwtBearerDefaults.AuthenticationScheme);
         }
 
-        services.AddAuthorization();
+        // Toda rota exige login, salvo as marcadas com [AllowAnonymous]: um controller novo sem atributo nasce fechado.
+        services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<IOptions<ClerkOptions>, IConfiguration>((jwt, clerkOptions, config) =>

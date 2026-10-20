@@ -141,7 +141,7 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 
 | Tabela | Campos principais | Regras |
 |---|---|---|
-| `users` | id, clerk_user_id (único), email, name, birth_date, role (`student`, `admin`), last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. `role` é `student` por padrão e vem da configuração (`docs/07-propostas-de-redacao.md`, A5). |
+| `users` | id, clerk_user_id (único), email, name, birth_date, is_admin (padrão `false`), last_active_at, deletion_warned_at, deleted_at | Tabela própria ligada ao Clerk. `is_admin` é ligada só à mão no banco (`docs/07-propostas-de-redacao.md`, A5). |
 | `essays` | id, user_id, batch_id, prompt_id, essay_type_id, rubric_version_id, status, photo_asset_id, version (1, 2…), parent_essay_id, review_deadline_at, failure_code, failed_at, failure_details (jsonb), grading_profile_id, created_at | `prompt_id` é a versão exata da proposta; `essay_type_id` é copiado da proposta no envio. `parent_essay_id` liga a reescrita à versão anterior. Status `failed` ou `cancelled` exige `failure_code` e `failed_at` (restrição `ck_essays_failure_code`). |
 | `transcriptions` | id, essay_id, lines (jsonb: número + texto), illegible_count, model, created_at | Texto fiel, nunca editado. |
 | `illegible_words` | id, transcription_id, line_number, char_start, char_end, student_value, filled_at | O que o aluno digitou fica separado da transcrição. |
@@ -483,7 +483,7 @@ O público inclui adolescentes de 16 e 17 anos e as fotos podem conter caligrafi
 - Webhooks do Mercado Pago e do Clerk só aceitos com assinatura válida.
 - CORS restrito a `redigiai.com.br`; HTTPS em tudo; cabeçalhos de segurança (CSP, HSTS) na Vercel.
 - Prompt injection: texto do aluno delimitado como dado, saída validada (seção 8).
-- Administração: o papel `admin` vale só para o e-mail da lista `Admin__Emails`, com o e-mail principal verificado no Clerk (consultado na Backend API do Clerk, não no token) e o segundo fator na sessão (`Admin__Require2fa`). Para os demais, `/v1/admin/*` responde 404. Não existe chave de API de administração. Imagens de proposta ficam em pasta pública do Cloudinary; fotos de redação continuam privadas.
+- Administração: administrador é quem tem a flag `users.is_admin`, ligada só direto no banco (nunca pelo navegador, pelo token ou pelo e-mail), lida a cada requisição. Para os demais, `/v1/admin/*` responde 404; sem token, 401. O perfil (`GET /v1/me`) traz `isAdmin`, que o front usa só para mostrar o menu. Não existe chave de API de administração. Imagens de proposta ficam em pasta pública do Cloudinary; fotos de redação continuam privadas.
 
 **Segredos e infraestrutura**
 
@@ -508,7 +508,6 @@ Toda exceção conhecida é lançada como `AppError(code, httpStatus, userMessag
 | `AGE_BELOW_MINIMUM` | 422 | Não | A plataforma é destinada a pessoas com 16 anos ou mais. |
 | `QUOTA_EXCEEDED` | 402 | Não | Você não tem correções suficientes para este envio. |
 | `PROMPT_NOT_AVAILABLE` | 404 | Não | Essa proposta não está disponível. Escolha outra. |
-| `ADMIN_2FA_REQUIRED` | 403 | Não | Ative a verificação em duas etapas para acessar a administração. |
 | `PROMPT_NOT_DRAFT` | 409 | Não | Esta proposta já foi publicada. Crie uma nova versão para alterar. |
 | `PROMPT_CHANGED` | 409 | Não | A proposta foi alterada em outro lugar. Recarregue para continuar. |
 | `VALIDATION_FAILED` | 422 | Não | Há pendências na proposta. (Só nas rotas de administração; traz `details: [{ path, message }]`.) |

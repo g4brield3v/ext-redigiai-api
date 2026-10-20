@@ -36,6 +36,10 @@ public sealed class ApiFixture : IAsyncLifetime
     public const string WebOrigin = "http://localhost:5173";
     public const string AdminEmail = "admin@redigiai.test";
 
+    /// <summary>Liga a flag de administrador direto no banco, como em produção.</summary>
+    public Task<int> MakeAdminAsync(string clerkUserId, bool isAdmin = true) =>
+        QueryAsync(db => db.Users.Where(u => u.ClerkUserId == clerkUserId).ExecuteUpdateAsync(u => u.SetProperty(x => x.IsAdmin, isAdmin)));
+
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:16-alpine").Build();
     private readonly RsaSecurityKey _signingKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
@@ -99,8 +103,6 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("Clerk:WebhookSecret", "whsec_" + Convert.ToBase64String(WebhookKey));
             builder.UseSetting("Cors:AllowedOrigins", WebOrigin);
             builder.UseSetting("Legal:TermsVersion", "1");
-            builder.UseSetting("Admin:Emails", AdminEmail);
-            builder.UseSetting("Admin:Require2fa", "true");
             builder.UseSetting("RateLimit:PerUserPerMinute", "10000");
             builder.UseSetting("RateLimit:PerIpPerMinute", "10000");
             builder.UseSetting("RateLimit:EssayBatchPerHour", "10000");
@@ -160,8 +162,7 @@ public sealed class ApiFixture : IAsyncLifetime
         string issuer = Issuer,
         string? authorizedParty = WebOrigin,
         DateTime? expires = null,
-        SecurityKey? signingKey = null,
-        bool secondFactor = false)
+        SecurityKey? signingKey = null)
     {
         var claims = new Dictionary<string, object>
         {
@@ -169,8 +170,6 @@ public sealed class ApiFixture : IAsyncLifetime
             ["email"] = email ?? $"{clerkUserId}@example.com",
             ["sid"] = sessionId ?? $"sess_{Guid.NewGuid():N}",
         };
-        // Como no token do Clerk: minutos desde o primeiro e desde o segundo fator (-1 = sem segundo fator).
-        claims["fva"] = new[] { 3, secondFactor ? 2 : -1 };
         if (name is not null)
         {
             claims["name"] = name;

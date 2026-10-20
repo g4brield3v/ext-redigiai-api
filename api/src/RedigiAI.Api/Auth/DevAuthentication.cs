@@ -39,33 +39,22 @@ internal static class DevAuthentication
 }
 
 /// <summary>
-/// Usuário de teste. Sem <c>Age</c>, a conta fica sem cadastro, para testar o primeiro acesso. Com
-/// <c>SecondFactor</c>, a sessão simula a verificação em duas etapas (só o administrador de teste).
+/// Usuário de teste. Sem <c>Age</c>, a conta fica sem cadastro, para testar o primeiro acesso. Com <c>IsAdmin</c>, a
+/// flag de administrador é ligada na conta (só aqui, no desenvolvimento).
 /// </summary>
 internal sealed record DevUser(
-    string Key, string ClerkUserId, string Email, string Name, int? Age, int ExtraCredits, bool SecondFactor = false)
+    string Key, string ClerkUserId, string Email, string Name, int? Age, int ExtraCredits, bool IsAdmin = false);
+
+/// <summary>Os usuários de teste: três alunos e o administrador. Só é registrado com o acesso de desenvolvimento.</summary>
+internal sealed class DevUsers
 {
-    public static readonly DevUser[] Students =
+    public IReadOnlyList<DevUser> All { get; } =
     [
         new("ana", "dev_ana", "ana.souza@example.com", "Ana Souza", 26, 5),
         new("bruno", "dev_bruno", "bruno.lima@example.com", "Bruno Lima", 16, 0),
         new("nova", "dev_nova", "conta.nova@example.com", "Conta Nova", null, 0),
+        new("admin", "dev_admin", "admin@example.com", "Administração", 30, 0, IsAdmin: true),
     ];
-}
-
-/// <summary>
-/// Os usuários de teste: os alunos e, quando <c>Admin__Emails</c> está configurado, o administrador <c>admin</c>,
-/// com o primeiro e-mail da lista e o segundo fator simulado. Só é registrado com o acesso de desenvolvimento.
-/// </summary>
-internal sealed class DevUsers(IOptions<AdminOptions> admin) : ITestIdentities
-{
-    public IReadOnlyList<DevUser> All { get; } = admin.Value.EmailList is [var email, ..]
-        ? [.. DevUser.Students, new DevUser("admin", "dev_admin", email, "Administração", 30, 0, SecondFactor: true)]
-        : DevUser.Students;
-
-    /// <summary>Os usuários de teste não existem no Clerk: aqui o e-mail deles vale como verificado.</summary>
-    public PrimaryEmail? FindPrimaryEmail(string clerkUserId) =>
-        All.FirstOrDefault(user => user.ClerkUserId == clerkUserId) is { } user ? new PrimaryEmail(user.Email, Verified: true) : null;
 }
 
 internal sealed class DevAuthHandler(
@@ -91,13 +80,6 @@ internal sealed class DevAuthHandler(
             DevAuthentication.Scheme,
             nameType: "sub",
             roleType: null);
-
-        if (user.SecondFactor)
-        {
-            // Como no token do Clerk: minutos desde o primeiro e desde o segundo fator.
-            identity.AddClaim(new Claim("fva", "0"));
-            identity.AddClaim(new Claim("fva", "0"));
-        }
 
         return Task.FromResult(AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), DevAuthentication.Scheme)));
@@ -126,7 +108,7 @@ internal sealed class DevEnvironmentSetup(IServiceScopeFactory scopes, ILogger<D
         {
             if (user.Age is { } age)
             {
-                await accounts.EnsureAsync(new TestAccount(user.ClerkUserId, user.Email, user.Name, age, user.ExtraCredits), ct);
+                await accounts.EnsureAsync(new TestAccount(user.ClerkUserId, user.Email, user.Name, age, user.ExtraCredits, user.IsAdmin), ct);
             }
         }
 

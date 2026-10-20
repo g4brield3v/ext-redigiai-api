@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using RedigiAI.Domain.Billing;
 using RedigiAI.Domain.Common;
@@ -144,6 +145,52 @@ public class AccountTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         Assert.Equal(1, (await second.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("credits").GetProperty("total").GetInt32());
         await AssertSingleTrialCreditAsync(userId);
+    }
+
+    [Fact]
+    public async Task New_terms_block_submissions_until_the_student_accepts_them()
+    {
+        var userId = ApiFixture.NewClerkUserId();
+        var client = api.CreateClient(api.CreateToken(userId));
+        (await client.PostAsJsonAsync("/v1/me", Adult)).EnsureSuccessStatusCode();
+        // A versão vigente muda depois do aceite.
+        await using var factory = api.CreateFactory(builder => builder.UseSetting("Legal:TermsVersion", "2"));
+        var updated = ApiFixture.CreateClient(factory, api.CreateToken(userId));
+
+        Assert.True((await updated.GetFromJsonAsync<JsonElement>("/v1/me")).GetProperty("termsAcceptanceRequired").GetBoolean());
+        var blocked = await updated.PostAsJsonAsync("/v1/essays/batch", new { items = Array.Empty<object>() });
+        await AssertErrorAsync(blocked, HttpStatusCode.Conflict, "TERMS_ACCEPTANCE_REQUIRED");
+
+        var accepted = await updated.PostAsync("/v1/me/terms", null);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.False((await accepted.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("termsAcceptanceRequired").GetBoolean());
+        Assert.NotEqual(HttpStatusCode.Conflict, (await updated.PostAsJsonAsync("/v1/essays/batch", new { items = Array.Empty<object>() })).StatusCode);
+    }
+
+    [Fact]
+    public void Every_route_declares_whether_it_needs_login()
+    {
+        // A política padrão já fecha o que não declara nada; o teste mantém a intenção explícita em cada controller.
+        var endpoints = api.Factory.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints
+            .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+            .Where(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>() is not null)
+            .ToList();
+
+        Assert.NotEmpty(endpoints);
+        Assert.All(endpoints, e => Assert.True(
+            e.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null
+                || e.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(),
+            e.RoutePattern.RawText));
+    }
+
+    [Theory]
+    [InlineData("/v1/me")]
+    [InlineData("/v1/essays")]
+    [InlineData("/v1/payments")]
+    [InlineData("/v1/admin/prompts")]
+    public async Task Logged_routes_without_a_token_answer_401(string path)
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized, (await api.CreateClient().GetAsync(path)).StatusCode);
     }
 
     [Fact]
