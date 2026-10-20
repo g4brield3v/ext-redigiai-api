@@ -70,6 +70,9 @@ public static class Errors
     public static AppError CheckoutInProgress() =>
         new("CHECKOUT_IN_PROGRESS", 409, "Já estamos processando a sua assinatura. Aguarde alguns segundos e tente de novo.", retryable: true);
 
+    public static AppError TermsAcceptanceRequired() =>
+        new("TERMS_ACCEPTANCE_REQUIRED", 409, "Aceite os Termos de uso e a Política de privacidade para continuar.");
+
     public static AppError PlanAlreadyActive() =>
         new("PLAN_ALREADY_ACTIVE", 409, "Você já tem um plano mensal ativo.");
 

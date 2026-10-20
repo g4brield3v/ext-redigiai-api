@@ -79,6 +79,19 @@ public sealed class User
 
     public void ChangeEmailPreferences(EmailPreferences preferences) => EmailPreferences = preferences;
 
+    /// <summary>Aceite de uma nova versão dos Termos e da Política. Devolve se mudou.</summary>
+    public bool AcceptTerms(string termsVersion, DateTimeOffset now)
+    {
+        if (TermsVersion == termsVersion)
+        {
+            return false;
+        }
+
+        TermsVersion = termsVersion;
+        TermsAcceptedAt = now;
+        return true;
+    }
+
     /// <summary>Liga a flag de administrador. Só o ambiente de desenvolvimento usa: em produção, ela é ligada no banco.</summary>
     /// <returns>Se mudou.</returns>
     public bool MakeAdmin()

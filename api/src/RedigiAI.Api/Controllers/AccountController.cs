@@ -58,6 +58,16 @@ public sealed class AccountController(IAccountService accounts, ILogger<AccountC
     public async Task<IActionResult> Get(CancellationToken ct) =>
         Ok(await accounts.GetProfileAsync(User.GetClerkIdentity().UserId, HttpContext.GetRequestOrigin(), ct));
 
+    /// <summary>
+    /// Aceita a versão vigente dos Termos de uso e da Política de privacidade. Enquanto o perfil traz
+    /// <c>termsAcceptanceRequired</c>, o envio de redação responde <c>TERMS_ACCEPTANCE_REQUIRED</c> (409).
+    /// </summary>
+    [HttpPost("terms", Name = "acceptTerms")]
+    [ProducesResponseType<ProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AcceptTerms(CancellationToken ct) =>
+        Ok(await accounts.AcceptTermsAsync(User.GetClerkIdentity().UserId, ct));
+
     /// <summary>Altera o nome e as preferências de e-mail.</summary>
     [HttpPatch(Name = "updateMe")]
     [ProducesResponseType<ProfileDto>(StatusCodes.Status200OK)]

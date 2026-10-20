@@ -70,6 +70,18 @@ internal sealed class AccountService(
         return await ReadProfileAsync(user, ct);
     }
 
+    public async Task<ProfileDto> AcceptTermsAsync(string clerkUserId, CancellationToken ct)
+    {
+        var user = await users.FindByClerkIdAsync(clerkUserId, ct) ?? throw Errors.ProfileNotFound();
+        if (user.AcceptTerms(legal.Value.TermsVersion, time.GetUtcNow()))
+        {
+            audit.Record($"user:{user.Id}", "user.terms_accepted", "user", user.Id, new { version = legal.Value.TermsVersion });
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        return await ReadProfileAsync(user, ct);
+    }
+
     public async Task<ProfileDto> UpdateProfileAsync(UpdateProfileCommand command, CancellationToken ct)
     {
         var user = await users.FindByClerkIdAsync(command.ClerkUserId, ct) ?? throw Errors.ProfileNotFound();
