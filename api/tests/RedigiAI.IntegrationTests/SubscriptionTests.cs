@@ -35,9 +35,9 @@ public class SubscriptionTests(ApiFixture api)
         Assert.NotNull(api.Payments.PreapprovalIdOf(subscriptionId));
         Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
 
-        // Antes da consulta ao Mercado Pago, o perfil não mostra plano nem correções do plano.
+        // Antes da consulta ao Mercado Pago, o perfil mostra o plano aguardando confirmação, sem correções do plano.
         var profile = await student.ProfileAsync();
-        Assert.Equal(JsonValueKind.Null, profile.GetProperty("subscription").ValueKind);
+        Assert.Equal("pending", profile.GetProperty("subscription").GetProperty("status").GetString());
         Assert.False(profile.GetProperty("needsGuardianAuthorization").GetBoolean());
 
         // A consulta já está na fila: sem esperar o aviso, o plano fica ativo; as correções só vêm com a cobrança.
@@ -46,6 +46,21 @@ public class SubscriptionTests(ApiFixture api)
         Assert.Equal("active", profile.GetProperty("subscription").GetProperty("status").GetString());
         Assert.Equal("4242", profile.GetProperty("subscription").GetProperty("cardLast4").GetString());
         Assert.Equal(1, profile.GetProperty("credits").GetProperty("total").GetInt32());
+    }
+
+    [Fact]
+    public async Task Subscribing_again_after_cancelling_shows_the_new_subscription_not_the_cancelled_one()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        await student.SubscribeAsync();
+        (await student.Client.PostAsync("/v1/subscription/cancel", null)).EnsureSuccessStatusCode();
+
+        (await student.CheckoutAsync()).EnsureSuccessStatusCode();
+
+        // Enquanto a nova é confirmada, o perfil mostra ela (pendente), e não a cancelada: a tela não confunde com recusa.
+        Assert.Equal("pending", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
+        await RunAsync(JobTypes.ProcessSubscription);
+        Assert.Equal("active", (await student.ProfileAsync()).GetProperty("subscription").GetProperty("status").GetString());
     }
 
     [Fact]

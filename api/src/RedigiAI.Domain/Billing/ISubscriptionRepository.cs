@@ -17,8 +17,9 @@ public interface ISubscriptionRepository
     Task<Subscription?> FindOpenAsync(Guid userId, CancellationToken ct);
 
     /// <summary>
-    /// A assinatura mais recente do aluno que chegou a ser autorizada (ativa, pausada ou cancelada); <c>null</c> se ele
-    /// nunca assinou. Um checkout abandonado (pendente) não conta.
+    /// A assinatura mais recente do aluno: ativa, pausada, cancelada ou pendente já criada no Mercado Pago (aguardando a
+    /// consulta que a ativa); <c>null</c> se ele nunca assinou. Uma pendente sem id lá (cartão recusado, criação que não
+    /// chegou lá) não conta. Assim, uma assinatura antiga cancelada não aparece enquanto a nova é confirmada.
     /// </summary>
     Task<Subscription?> FindLatestAsync(Guid userId, CancellationToken ct);
 
