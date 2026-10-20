@@ -11,7 +11,15 @@ public sealed record CheckoutSingleRequest(int? Quantity, PaymentMethod? Method,
 /// <summary>O token do cartão gerado no navegador. O número do cartão nunca chega à API.</summary>
 /// <param name="IdentificationType">CPF ou CNPJ do titular, pedido pelo formulário; não é guardado.</param>
 public sealed record CardPaymentRequest(
-    string? Token, string? PaymentMethodId, string? IssuerId, string? IdentificationType, string? IdentificationNumber);
+    string? Token, string? PaymentMethodId, string? IssuerId, string? IdentificationType, string? IdentificationNumber)
+{
+    // O token e o documento nunca aparecem num log ou numa exceção que imprima o record, nem nos que o contêm (regra 20).
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        builder.Append("PaymentMethodId = ").Append(PaymentMethodId);
+        return true;
+    }
+}
 
 public sealed record CheckoutSingleCommand(
     string ClerkUserId,

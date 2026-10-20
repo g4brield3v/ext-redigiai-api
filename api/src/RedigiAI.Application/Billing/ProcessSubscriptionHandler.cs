@@ -76,6 +76,20 @@ internal sealed class ProcessSubscriptionHandler(
             return;
         }
 
+        if (subscription.MpPreapprovalId is { } recorded && recorded != providerId)
+        {
+            // Outro preapproval com a nossa referência: uma criação cuja resposta se perdeu. Cancelado lá, para não
+            // cobrar o aluno todo mês por uma assinatura que não existe aqui.
+            if (remote.Status != SubscriptionStatus.Cancelled)
+            {
+                await gateway.CancelSubscriptionAsync(providerId, ct);
+            }
+
+            audit.Record("system", "subscription.orphan_cancelled", "subscription", subscription.Id, new { mpPreapprovalId = providerId });
+            await unitOfWork.SaveChangesAsync(ct);
+            return;
+        }
+
         var now = time.GetUtcNow();
         if (remote.Status == SubscriptionStatus.Active && subscription.Status == SubscriptionStatus.Pending
             && await subscriptions.FindOpenAsync(subscription.UserId, ct) is { } open && open.Id != subscription.Id)
@@ -91,7 +105,7 @@ internal sealed class ProcessSubscriptionHandler(
                 {
                     if (subscription.MpPreapprovalId != providerId
                         && (subscription.MpPreapprovalId is not null
-                            || !await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, subscription.CheckoutUrl ?? "", now, ct)))
+                            || !await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, now, ct)))
                     {
                         audit.Record("system", "subscription.provider_mismatch", "subscription", subscription.Id, new { mpPreapprovalId = providerId });
                         return false;
@@ -141,7 +155,7 @@ internal sealed class ProcessSubscriptionHandler(
             {
                 if (subscription.MpPreapprovalId is null)
                 {
-                    await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, subscription.CheckoutUrl ?? "", now, ct);
+                    await subscriptions.TryAttachProviderAsync(subscription.Id, providerId, now, ct);
                 }
 
                 if (await subscriptions.TryTransitionAsync(subscription.Id, SubscriptionStatus.Cancelled, now, ct))
@@ -156,10 +170,22 @@ internal sealed class ProcessSubscriptionHandler(
 
     private async Task RecordChargeAsync(string chargeId, CancellationToken ct)
     {
-        if (await gateway.GetSubscriptionChargeAsync(chargeId, ct) is not { PaymentId: { } paymentId } charge
-            || await subscriptions.FindByProviderIdAsync(charge.PreapprovalId, ct) is not { } subscription)
+        if (await gateway.GetSubscriptionChargeAsync(chargeId, ct) is not { PaymentId: { } paymentId } charge)
         {
-            // Cobrança agendada, ainda sem pagamento, ou de uma assinatura que não é daqui.
+            // Cobrança agendada, ainda sem pagamento.
+            return;
+        }
+
+        if (await subscriptions.FindByProviderIdAsync(charge.PreapprovalId, ct) is not { } subscription)
+        {
+            // De um preapproval que não ficou gravado aqui (criação duplicada lá): não renova nada; para estorno manual.
+            if (await gateway.GetSubscriptionAsync(charge.PreapprovalId, ct) is { ExternalReference: { } reference }
+                && Guid.TryParse(reference, out var orphanOf) && await subscriptions.FindAsync(orphanOf, ct) is not null)
+            {
+                audit.Record("system", "payment.orphan_subscription_charge", "subscription", orphanOf, new { mpPaymentId = paymentId });
+                await unitOfWork.SaveChangesAsync(ct);
+            }
+
             return;
         }
 

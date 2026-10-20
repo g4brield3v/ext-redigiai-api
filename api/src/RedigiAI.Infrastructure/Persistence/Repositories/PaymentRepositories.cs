@@ -118,15 +118,31 @@ internal sealed class SubscriptionRepository(AppDbContext db) : ISubscriptionRep
             .FirstOrDefaultAsync(ct);
 
     public async Task<bool> TryAttachProviderAsync(
-        Guid subscriptionId, string mpPreapprovalId, string checkoutUrl, DateTimeOffset now, CancellationToken ct) =>
+        Guid subscriptionId, string mpPreapprovalId, DateTimeOffset now, CancellationToken ct) =>
         await db.Subscriptions
             .Where(s => s.Id == subscriptionId && (s.MpPreapprovalId == null || s.MpPreapprovalId == mpPreapprovalId))
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(x => x.MpPreapprovalId, mpPreapprovalId)
-                    .SetProperty(x => x.CheckoutUrl, x => checkoutUrl.Length > 0 ? checkoutUrl : x.CheckoutUrl)
+                    .SetProperty(x => x.CreatingUntil, (DateTimeOffset?)null)
                     .SetProperty(x => x.UpdatedAt, now),
                 ct) == 1;
+
+    public async Task<DateTimeOffset?> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct)
+    {
+        var until = now + Subscription.CreationLock;
+        var locked = await db.Subscriptions
+            .Where(s => s.Id == subscriptionId && s.Status == SubscriptionStatus.Pending && s.MpPreapprovalId == null
+                && (s.CreatingUntil == null || s.CreatingUntil <= now))
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatingUntil, until), ct) == 1;
+        // O valor como o banco o guarda (microssegundos), para conferir o dono ao soltar.
+        return locked ? await db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.CreatingUntil).SingleAsync(ct) : null;
+    }
+
+    public Task EndCreationAsync(Guid subscriptionId, DateTimeOffset lockedUntil, CancellationToken ct) =>
+        db.Subscriptions
+            .Where(s => s.Id == subscriptionId && s.CreatingUntil == lockedUntil)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatingUntil, (DateTimeOffset?)null), ct);
 
     public async Task<bool> TryTransitionAsync(Guid subscriptionId, SubscriptionStatus to, DateTimeOffset now, CancellationToken ct)
     {

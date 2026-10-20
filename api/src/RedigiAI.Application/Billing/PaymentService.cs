@@ -38,9 +38,7 @@ internal sealed class PaymentService(
     IUnitOfWork unitOfWork,
     TimeProvider time) : IPaymentService
 {
-    private const int AdultAge = 18;
     private const int ListLimit = 50;
-    private const int MaxCardFieldLength = 100;
     private const int RechecksPerSweep = 200;
     private static readonly TimeSpan RecheckAfter = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan RecheckFor = TimeSpan.FromDays(3);
@@ -72,12 +70,12 @@ internal sealed class PaymentService(
 
         if (method == PaymentMethod.Card)
         {
-            _ = CardTokenFrom(command.Card);
+            _ = CardInput.From(command.Card);
         }
 
         var now = time.GetUtcNow();
         // Compras de 16 e 17 anos exigem a declaração de autorização do responsável (regra 9).
-        var minor = user.BirthDate.AgeOn(BrasiliaTime.DateOf(now)) < AdultAge;
+        var minor = user.BirthDate.IsMinorOn(BrasiliaTime.DateOf(now));
         if (minor && !command.GuardianAuthorized)
         {
             throw Errors.GuardianAuthorizationRequired();
@@ -166,7 +164,7 @@ internal sealed class PaymentService(
         var request = new ChargeRequest(payment.Id, payment.AmountCents, description, user.Email);
         var created = payment.Method == PaymentMethod.Pix
             ? await gateway.CreatePixAsync(request, time.GetUtcNow() + Payment.PixValidity, ct)
-            : await gateway.CreateCardAsync(request, CardTokenFrom(card), ct);
+            : await gateway.CreateCardAsync(request, CardInput.From(card), ct);
 
         var now = time.GetUtcNow();
         await unitOfWork.InTransactionAsync(
@@ -198,26 +196,6 @@ internal sealed class PaymentService(
         var current = await payments.FindAsync(payment.Id, ct) ?? throw Errors.Internal();
         return current.Status == PaymentStatus.Rejected ? throw Errors.PaymentFailed() : ToDto(current);
     }
-
-    private static CardToken CardTokenFrom(CardPaymentRequest? card)
-    {
-        if (card is null
-            || !IsField(card.Token, required: true)
-            || !IsField(card.PaymentMethodId, required: true)
-            || !IsField(card.IssuerId, required: false)
-            || !IsField(card.IdentificationType, required: false)
-            || !IsField(card.IdentificationNumber, required: false))
-        {
-            throw Errors.Validation("Confira os dados do cartão e tente de novo.");
-        }
-
-        return new CardToken(card.Token!, card.PaymentMethodId!, card.IssuerId, card.IdentificationType, card.IdentificationNumber);
-    }
-
-    private static bool IsField(string? value, bool required) =>
-        value is null
-            ? !required
-            : value.Length is > 0 and <= MaxCardFieldLength && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
     /// <param name="hasRefundRequest">Com pedido de arrependimento feito, a compra não é mais "desistível".</param>
     private PaymentDto ToDto(Payment payment, bool hasRefundRequest = false) =>

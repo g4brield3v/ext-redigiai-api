@@ -12,14 +12,14 @@ using RedigiAI.Domain.Jobs;
 namespace RedigiAI.IntegrationTests;
 
 /// <summary>
-/// Plano mensal no Mercado Pago (etapa 4c): checkout da assinatura, autorização, cobranças mensais com 12 correções que
+/// Plano mensal no Mercado Pago (etapa 4c): checkout transparente da assinatura (cartão tokenizado na nossa página), cobranças mensais com 12 correções que
 /// não acumulam, cobrança recusada e cancelamento. O Mercado Pago é o simulado da fixture.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public class SubscriptionTests(ApiFixture api)
 {
     [Fact]
-    public async Task The_plan_checkout_returns_the_mercado_pago_page_and_the_same_key_returns_it_again()
+    public async Task The_plan_checkout_creates_the_subscription_there_with_the_card_and_the_query_activates_it()
     {
         var student = await Subscriber.CreateAsync(api);
         var key = Guid.NewGuid().ToString();
@@ -30,15 +30,130 @@ public class SubscriptionTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var checkout = await first.Content.ReadFromJsonAsync<JsonElement>();
         var subscriptionId = checkout.GetProperty("subscriptionId").GetGuid();
-        Assert.StartsWith("https://www.mercadopago.com.br/", checkout.GetProperty("checkoutUrl").GetString());
-        Assert.Equal(checkout.GetProperty("checkoutUrl").GetString(), (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("checkoutUrl").GetString());
+        Assert.Equal("pending", checkout.GetProperty("status").GetString());
+        Assert.Equal(subscriptionId, (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid());
         Assert.NotNull(api.Payments.PreapprovalIdOf(subscriptionId));
         Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
 
-        // Antes de o cartão ser autorizado, o perfil não mostra plano nem correções do plano.
+        // Antes da consulta ao Mercado Pago, o perfil não mostra plano nem correções do plano.
         var profile = await student.ProfileAsync();
         Assert.Equal(JsonValueKind.Null, profile.GetProperty("subscription").ValueKind);
+        Assert.False(profile.GetProperty("needsGuardianAuthorization").GetBoolean());
+
+        // A consulta já está na fila: sem esperar o aviso, o plano fica ativo; as correções só vêm com a cobrança.
+        await RunAsync(JobTypes.ProcessSubscription);
+        profile = await student.ProfileAsync();
+        Assert.Equal("active", profile.GetProperty("subscription").GetProperty("status").GetString());
+        Assert.Equal("4242", profile.GetProperty("subscription").GetProperty("cardLast4").GetString());
         Assert.Equal(1, profile.GetProperty("credits").GetProperty("total").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_declined_card_creates_nothing_there_and_another_card_with_the_same_key_subscribes()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+
+        var declined = await student.CheckoutAsync(key: key, cardToken: FakePaymentGateway.DeclinedCardToken);
+        var other = await student.CheckoutAsync(key: key);
+
+        Assert.Equal(HttpStatusCode.PaymentRequired, declined.StatusCode);
+        Assert.Equal("PAYMENT_FAILED", (await declined.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.OK, other.StatusCode);
+        var subscriptionId = (await other.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
+        Assert.NotNull(api.Payments.PreapprovalIdOf(subscriptionId));
+        Assert.Equal(1, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
+    }
+
+    [Fact]
+    public async Task Simultaneous_checkouts_with_different_card_tokens_create_one_subscription_there()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+
+        // Duplo clique e outra aba: cada envio do formulário traz um token novo.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(i => student.CheckoutAsync(key: i < 3 ? key : null)));
+
+        // Quem chega no meio da criação recebe um erro que dá para repetir; nenhum cria uma segunda lá.
+        Assert.All(responses, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
+        foreach (var conflict in responses.Where(r => r.StatusCode == HttpStatusCode.Conflict))
+        {
+            Assert.Equal("CHECKOUT_IN_PROGRESS", (await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        }
+
+        var subscriptionId = await api.QueryAsync(db => db.Subscriptions.Where(s => s.UserId == student.Id).Select(s => s.Id).SingleAsync());
+        Assert.Single(api.Payments.SubscriptionsFor(subscriptionId));
+        Assert.Null(await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.CreatingUntil).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task A_creation_accepted_there_without_the_answer_is_reused_by_the_next_attempt()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var key = Guid.NewGuid().ToString();
+        api.Payments.LoseNextSubscriptionResponse = true;
+
+        var lost = await student.CheckoutAsync(key: key);
+        var retry = await student.CheckoutAsync(key: key);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, lost.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        var subscriptionId = (await retry.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
+        var there = Assert.Single(api.Payments.SubscriptionsFor(subscriptionId));
+        Assert.Equal(there.ProviderId, await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId).Select(s => s.MpPreapprovalId).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task An_extra_subscription_there_with_our_reference_is_cancelled_and_its_charge_renews_nothing()
+    {
+        var student = await Subscriber.CreateAsync(api);
+        var preapprovalId = await student.SubscribeAsync();
+        await student.ChargeAsync(preapprovalId, PaymentStatus.Approved);
+        var subscriptionId = await api.QueryAsync(db => db.Subscriptions.Where(s => s.MpPreapprovalId == preapprovalId).Select(s => s.Id).SingleAsync());
+
+        // Uma segunda criação lá, com a mesma referência, cuja resposta nunca chegou.
+        var orphan = await api.Payments.CreateSubscriptionAsync(
+            new SubscriptionRequest(
+                subscriptionId, Guid.NewGuid().ToString(), 3990, "plano", "aluna@exemplo.com", new CardToken("tok", "master", null, null, null), "https://redigiai.test/perfil"),
+            CancellationToken.None);
+        var charged = api.Payments.Charge(orphan.ProviderId, PaymentStatus.Approved);
+        await student.NotifyAsync("payment", charged.PaymentId);
+        await RunAsync(JobTypes.ProcessPayment);
+        await student.NotifyAsync("subscription_preapproval", orphan.ProviderId);
+        await RunAsync(JobTypes.ProcessSubscription);
+
+        Assert.Equal(SubscriptionStatus.Cancelled, api.Payments.SubscriptionThere(orphan.ProviderId).Status);
+        Assert.Equal(SubscriptionStatus.Active, api.Payments.SubscriptionThere(preapprovalId).Status);
+        Assert.Equal(13, await student.CreditsAsync());
+        Assert.Empty(await api.QueryAsync(db => db.Payments.Where(p => p.MpPaymentId == charged.PaymentId).ToListAsync()));
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.Action == "payment.orphan_subscription_charge" && a.EntityId == subscriptionId)));
+        Assert.True(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.Action == "subscription.orphan_cancelled" && a.EntityId == subscriptionId)));
+    }
+
+    [Fact]
+    public void The_card_token_never_appears_when_the_record_is_printed()
+    {
+        var card = new CardToken("tok-secreto", "master", "25", "CPF", "12345678909");
+        var request = new CheckoutPlanCommand("user", "key", false, new CardPaymentRequest("tok-secreto", "master", "25", "CPF", "12345678909"));
+
+        Assert.DoesNotContain("tok-secreto", card.ToString());
+        Assert.DoesNotContain("12345678909", card.ToString());
+        Assert.DoesNotContain("tok-secreto", request.ToString());
+        Assert.DoesNotContain("12345678909", request.ToString());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("tok en")]
+    public async Task The_plan_checkout_requires_the_card_token(string? token)
+    {
+        var student = await Subscriber.CreateAsync(api);
+
+        var response = await student.CheckoutAsync(cardToken: token, sendCard: token is not null);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(0, await api.QueryAsync(db => db.Subscriptions.CountAsync(s => s.UserId == student.Id)));
     }
 
     [Fact]
@@ -85,7 +200,9 @@ public class SubscriptionTests(ApiFixture api)
             return await db.SaveChangesAsync();
         });
         var created = await api.Payments.CreateSubscriptionAsync(
-            new SubscriptionRequest(duplicate.Id, 3990, "plano", "aluna@exemplo.com", "https://redigiai.test/perfil"), CancellationToken.None);
+            new SubscriptionRequest(
+                duplicate.Id, Guid.NewGuid().ToString(), 3990, "plano", "aluna@exemplo.com", new CardToken("tok", "master", null, null, null), "https://redigiai.test/perfil"),
+            CancellationToken.None);
         await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == duplicate.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.MpPreapprovalId, created.ProviderId)));
         api.Payments.SetSubscription(created.ProviderId, SubscriptionStatus.Active, DateTimeOffset.UtcNow.AddMonths(1));
@@ -158,6 +275,8 @@ public class SubscriptionTests(ApiFixture api)
     public async Task Buyers_aged_16_or_17_must_declare_the_guardian_authorization_for_the_plan()
     {
         var minor = await Subscriber.CreateAsync(api, birthDate: DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-16).AddDays(-10));
+        // O perfil avisa a tela de compra; a idade é sempre calculada aqui.
+        Assert.True((await minor.ProfileAsync()).GetProperty("needsGuardianAuthorization").GetBoolean());
 
         var refused = await minor.CheckoutAsync();
         var accepted = await minor.CheckoutAsync(guardianAuthorized: true);
@@ -277,7 +396,10 @@ public class SubscriptionTests(ApiFixture api)
         var student = await Subscriber.CreateAsync(api);
         var subscriptionId = (await (await student.CheckoutAsync()).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("subscriptionId").GetGuid();
         var preapprovalId = api.Payments.PreapprovalIdOf(subscriptionId)!;
-        api.Payments.SetSubscription(preapprovalId, SubscriptionStatus.Active, nextChargeAt: DateTimeOffset.UtcNow.AddMonths(1));
+        // A consulta posta na criação se perdeu, e o aviso nunca chegou.
+        var lost = (await api.QueryAsync(db => db.Jobs.Where(j => j.Type == JobTypes.ProcessSubscription).ToListAsync()))
+            .Where(j => j.Payload.Contains(preapprovalId)).Select(j => j.Id).ToList();
+        await api.QueryAsync(db => db.Jobs.Where(j => lost.Contains(j.Id)).ExecuteDeleteAsync());
         await api.QueryAsync(db => db.Subscriptions.Where(s => s.Id == subscriptionId)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatedAt, x => x.CreatedAt.AddMinutes(-5))));
 
@@ -334,14 +456,17 @@ public class SubscriptionTests(ApiFixture api)
             return new Subscriber(api, client, (await profile.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
         }
 
-        public Task<HttpResponseMessage> CheckoutAsync(string? key = null, bool guardianAuthorized = false)
+        /// <param name="cardToken">O token que o formulário do Mercado Pago gera no navegador; um novo a cada envio.</param>
+        public Task<HttpResponseMessage> CheckoutAsync(
+            string? key = null, bool guardianAuthorized = false, string? cardToken = null, bool sendCard = true)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/checkout/plan") { Content = JsonContent.Create(new { guardianAuthorized }) };
+            var card = sendCard ? new { token = cardToken ?? $"tok{Guid.NewGuid():N}", paymentMethodId = "master" } : null;
+            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/checkout/plan") { Content = JsonContent.Create(new { guardianAuthorized, card }) };
             request.Headers.Add("Idempotency-Key", key ?? Guid.NewGuid().ToString());
             return Client.SendAsync(request);
         }
 
-        /// <summary>Assina, o aluno autoriza o cartão lá e o aviso chega.</summary>
+        /// <summary>Assina com o cartão, e o aviso da assinatura autorizada lá chega.</summary>
         /// <returns>O id da assinatura no Mercado Pago.</returns>
         public async Task<string> SubscribeAsync(DateTimeOffset? nextChargeAt = null, string? cardLast4 = null)
         {

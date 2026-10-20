@@ -368,6 +368,7 @@ public sealed class FakePaymentGateway : IPaymentGateway
     private readonly ConcurrentDictionary<Guid, string> _byPayment = new();
     private readonly ConcurrentDictionary<string, ProviderPayment> _remote = new();
     private readonly ConcurrentDictionary<Guid, string> _bySubscription = new();
+    private readonly ConcurrentDictionary<string, string> _byCreationKey = new();
     private readonly ConcurrentDictionary<string, ProviderSubscription> _subscriptions = new();
     private readonly ConcurrentDictionary<string, ProviderSubscriptionCharge> _charges = new();
     private int _subscriptionCreates;
@@ -378,6 +379,13 @@ public sealed class FakePaymentGateway : IPaymentGateway
     public string? PreapprovalIdOf(Guid subscriptionId) => _bySubscription.TryGetValue(subscriptionId, out var id) ? id : null;
 
     public ProviderSubscription SubscriptionThere(string preapprovalId) => _subscriptions[preapprovalId];
+
+    /// <summary>As assinaturas "lá" com a referência desta assinatura daqui, canceladas ou não.</summary>
+    public IReadOnlyList<ProviderSubscription> SubscriptionsFor(Guid subscriptionId) =>
+        _subscriptions.Values.Where(s => s.ExternalReference == subscriptionId.ToString()).ToList();
+
+    /// <summary>A próxima criação de assinatura é aceita lá, mas a resposta não chega (tempo esgotado).</summary>
+    public bool LoseNextSubscriptionResponse { get; set; }
 
     /// <summary>Muda a assinatura "lá", como o aluno autorizando o cartão ou o Mercado Pago pausando.</summary>
     public void SetSubscription(string preapprovalId, SubscriptionStatus status, DateTimeOffset? nextChargeAt = null, string? cardLast4 = null)
@@ -397,10 +405,14 @@ public sealed class FakePaymentGateway : IPaymentGateway
     {
         var paymentId = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var chargeId = Random.Shared.NextInt64(1_000_000_000, 9_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        _remote[paymentId] = new ProviderPayment(paymentId, status, _subscriptions[preapprovalId].ExternalReference, amountCents, "BRL");
+        _remote[paymentId] = new ProviderPayment(
+            paymentId, status, _subscriptions[preapprovalId].ExternalReference, amountCents, "BRL", PreapprovalId: preapprovalId);
         _charges[chargeId] = new ProviderSubscriptionCharge(chargeId, preapprovalId, paymentId);
         return (chargeId, paymentId);
     }
+
+    /// <summary>Um token de cartão que o simulado recusa, como um cartão sem limite.</summary>
+    public const string DeclinedCardToken = "declined";
 
     public Task<CreatedSubscription> CreateSubscriptionAsync(SubscriptionRequest request, CancellationToken ct)
     {
@@ -409,16 +421,33 @@ public sealed class FakePaymentGateway : IPaymentGateway
             throw failure;
         }
 
-        var id = _bySubscription.GetOrAdd(request.SubscriptionId, _ =>
+        if (request.Card.Token == DeclinedCardToken)
+        {
+            throw Errors.PaymentFailed();
+        }
+
+        // Como lá: a assinatura nasce autorizada com o cartão (checkout transparente), e só a mesma chave de
+        // idempotência devolve a mesma; outra chave cria outra.
+        var id = _byCreationKey.GetOrAdd(request.IdempotencyKey, _ =>
         {
             Interlocked.Increment(ref _subscriptionCreates);
             var preapprovalId = $"pre{Guid.NewGuid():N}";
             _subscriptions[preapprovalId] = new ProviderSubscription(
-                preapprovalId, SubscriptionStatus.Pending, request.SubscriptionId.ToString(), null, null);
+                preapprovalId, SubscriptionStatus.Active, request.SubscriptionId.ToString(), DateTimeOffset.UtcNow.AddMonths(1), "4242");
+            _bySubscription.TryAdd(request.SubscriptionId, preapprovalId);
             return preapprovalId;
         });
-        return Task.FromResult(new CreatedSubscription(id, $"https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id={id}"));
+        if (LoseNextSubscriptionResponse)
+        {
+            LoseNextSubscriptionResponse = false;
+            throw Errors.PaymentUnavailable();
+        }
+
+        return Task.FromResult(new CreatedSubscription(id));
     }
+
+    public Task<ProviderSubscription?> FindSubscriptionByReferenceAsync(Guid subscriptionId, CancellationToken ct) =>
+        Task.FromResult(SubscriptionsFor(subscriptionId).FirstOrDefault(s => s.Status != SubscriptionStatus.Cancelled));
 
     public Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct) =>
         Task.FromResult(_subscriptions.TryGetValue(providerId, out var subscription) ? subscription : null);

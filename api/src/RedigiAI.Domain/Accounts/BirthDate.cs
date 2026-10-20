@@ -35,5 +35,8 @@ public readonly record struct BirthDate
         return birthday > today ? age - 1 : age;
     }
 
+    /// <summary>16 ou 17 anos: compras exigem a declaração de autorização do responsável (regra 9).</summary>
+    public bool IsMinorOn(DateOnly today) => AgeOn(today) < 18;
+
     public bool MeetsMinimumAgeOn(DateOnly today) => AgeOn(today) >= MinimumAge;
 }

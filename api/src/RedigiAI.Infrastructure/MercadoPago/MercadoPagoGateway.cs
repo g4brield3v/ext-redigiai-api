@@ -98,7 +98,8 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             payment["external_reference"]?.GetValue<string>(),
             Cents(payment["transaction_amount"]),
             payment["currency_id"]?.GetValue<string>() ?? "",
-            Math.Max(0, Cents(payment["transaction_amount_refunded"])));
+            Math.Max(0, Cents(payment["transaction_amount_refunded"])),
+            Text(payment["metadata"]?["preapproval_id"]));
     }
 
     // Assinaturas (preapproval). Os nomes dos campos seguem a API de assinaturas do Mercado Pago e precisam ser
@@ -107,14 +108,17 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
     public async Task<CreatedSubscription> CreateSubscriptionAsync(SubscriptionRequest request, CancellationToken ct)
     {
         using var message = Request(HttpMethod.Post, "/preapproval");
-        message.Headers.Add("X-Idempotency-Key", request.SubscriptionId.ToString());
+        message.Headers.Add("X-Idempotency-Key", request.IdempotencyKey);
+        // Checkout transparente: o cartão vem tokenizado do formulário do Mercado Pago na nossa página, e a assinatura
+        // nasce autorizada, sem levar o aluno para fora da plataforma.
         message.Content = JsonContent.Create(new JsonObject
         {
             ["reason"] = request.Reason,
             ["external_reference"] = request.SubscriptionId.ToString(),
             ["payer_email"] = request.PayerEmail,
+            ["card_token_id"] = request.Card.Token,
             ["back_url"] = request.BackUrl,
-            ["status"] = "pending",
+            ["status"] = "authorized",
             ["auto_recurring"] = new JsonObject
             {
                 ["frequency"] = 1,
@@ -131,16 +135,7 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
                 : Errors.PaymentUnavailable();
         }
 
-        var checkoutUrl = created["init_point"]?.GetValue<string>();
-        // O navegador vai para essa URL: só um endereço do Mercado Pago, em https.
-        if (checkoutUrl is null || !Uri.TryCreate(checkoutUrl, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps
-            || !IsMercadoPagoHost(url.Host))
-        {
-            logger.LogError("Mercado Pago created a subscription without a valid checkout URL");
-            throw Errors.PaymentUnavailable();
-        }
-
-        return new CreatedSubscription(Id(created), checkoutUrl);
+        return new CreatedSubscription(Id(created));
     }
 
     public async Task<ProviderSubscription?> GetSubscriptionAsync(string providerId, CancellationToken ct)
@@ -152,12 +147,26 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             return null;
         }
 
-        if (subscription is null)
+        return subscription is null ? throw Errors.PaymentUnavailable() : SubscriptionFrom(subscription);
+    }
+
+    public async Task<ProviderSubscription?> FindSubscriptionByReferenceAsync(Guid subscriptionId, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, $"/preapproval/search?external_reference={subscriptionId}");
+        var (_, found) = await SendAsync(message, ct);
+        if (found?["results"] is not JsonArray results)
         {
             throw Errors.PaymentUnavailable();
         }
 
-        return new ProviderSubscription(
+        return results
+            .OfType<JsonObject>()
+            .Select(SubscriptionFrom)
+            .FirstOrDefault(s => s.ExternalReference == subscriptionId.ToString() && s.Status != SubscriptionStatus.Cancelled);
+    }
+
+    private static ProviderSubscription SubscriptionFrom(JsonObject subscription) =>
+        new(
             Id(subscription),
             subscription["status"]?.GetValue<string>() switch
             {
@@ -169,7 +178,6 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             subscription["external_reference"]?.GetValue<string>(),
             Date(subscription["next_payment_date"]),
             Subscription.CardLast4From(subscription["last_four_digits"]?.GetValue<string>()));
-    }
 
     public async Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct)
     {
@@ -216,11 +224,6 @@ internal sealed class MercadoPagoGateway(IOptions<MercadoPagoOptions> options, I
             throw Errors.PaymentUnavailable();
         }
     }
-
-    private static bool IsMercadoPagoHost(string host) =>
-        host is "mercadopago.com.br" or "mercadopago.com"
-        || host.EndsWith(".mercadopago.com.br", StringComparison.OrdinalIgnoreCase)
-        || host.EndsWith(".mercadopago.com", StringComparison.OrdinalIgnoreCase);
 
     private static DateTimeOffset? Date(JsonNode? value) =>
         value is JsonValue node && node.TryGetValue<string>(out var text)

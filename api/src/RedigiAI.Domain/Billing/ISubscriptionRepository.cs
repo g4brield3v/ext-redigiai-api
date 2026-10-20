@@ -26,7 +26,18 @@ public interface ISubscriptionRepository
     /// Grava o que o Mercado Pago devolveu na criação: o id e a URL do checkout. Só vale enquanto a assinatura não tem id
     /// ou tem este mesmo.
     /// </summary>
-    Task<bool> TryAttachProviderAsync(Guid subscriptionId, string mpPreapprovalId, string checkoutUrl, DateTimeOffset now, CancellationToken ct);
+    Task<bool> TryAttachProviderAsync(Guid subscriptionId, string mpPreapprovalId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>
+    /// Trava a criação lá: <c>UPDATE … SET creating_until = @now + trava WHERE id = @id AND status = 'pending' AND
+    /// mp_preapproval_id IS NULL AND (creating_until IS NULL OR creating_until &lt;= @now)</c>. Devolve o valor gravado,
+    /// que identifica o dono da trava; nulo se outra requisição está criando, ou já criou. No sucesso, quem solta a trava
+    /// é <see cref="TryAttachProviderAsync"/>, junto com o id de lá.
+    /// </summary>
+    Task<DateTimeOffset?> TryBeginCreationAsync(Guid subscriptionId, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Solta a trava depois de uma criação que falhou, só se ainda for a desta requisição.</summary>
+    Task EndCreationAsync(Guid subscriptionId, DateTimeOffset lockedUntil, CancellationToken ct);
 
     /// <summary>
     /// Muda a situação com <c>UPDATE … WHERE status IN (…)</c> (regra 10), na transação aberta. Zero linhas: outro

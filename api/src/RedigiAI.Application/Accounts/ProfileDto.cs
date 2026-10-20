@@ -12,7 +12,8 @@ public sealed record ProfileDto(
     bool AiNoticeAccepted,
     EmailPreferencesDto EmailPreferences,
     CreditBalanceDto Credits,
-    SubscriptionDto? Subscription);
+    SubscriptionDto? Subscription,
+    bool NeedsGuardianAuthorization);
 
 public sealed record EmailPreferencesDto(bool CorrectionReady, bool IllegibleReminder, bool NewThemes);
 

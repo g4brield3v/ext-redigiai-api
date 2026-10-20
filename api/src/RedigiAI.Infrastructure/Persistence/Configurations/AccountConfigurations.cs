@@ -66,7 +66,6 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
         });
         builder.Property(s => s.MpPreapprovalId).HasMaxLength(100);
         builder.Property(s => s.IdempotencyKey).HasMaxLength(Subscription.MaxKeyLength);
-        builder.Property(s => s.CheckoutUrl).HasMaxLength(1000);
         builder.Property(s => s.Status).HasMaxLength(20);
         builder.Property(s => s.CardLast4).HasMaxLength(4);
         builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
@@ -80,6 +79,11 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
             .HasDatabaseName("ux_subscriptions_open_per_user")
             .IsUnique()
             .HasFilter("status IN ('active', 'paused')");
+        // Uma assinatura pendente por aluno: duas abas ao mesmo tempo, com chaves diferentes, não criam duas lá.
+        builder.HasIndex(s => s.UserId, "ux_subscriptions_pending_per_user")
+            .HasDatabaseName("ux_subscriptions_pending_per_user")
+            .IsUnique()
+            .HasFilter("status = 'pending'");
     }
 }
 

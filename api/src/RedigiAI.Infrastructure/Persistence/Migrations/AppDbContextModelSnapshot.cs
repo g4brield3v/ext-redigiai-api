@@ -525,14 +525,13 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(4)")
                         .HasColumnName("card_last4");
 
-                    b.Property<string>("CheckoutUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("checkout_url");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("CreatingUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("creating_until");
 
                     b.Property<DateTimeOffset?>("GuardianAuthorizedAt")
                         .HasColumnType("timestamp with time zone")
@@ -589,6 +588,11 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_subscriptions_open_per_user")
                         .HasFilter("status IN ('active', 'paused')");
+
+                    b.HasIndex(new[] { "UserId" }, "ux_subscriptions_pending_per_user")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscriptions_pending_per_user")
+                        .HasFilter("status = 'pending'");
 
                     b.ToTable("subscriptions", null, t =>
                         {

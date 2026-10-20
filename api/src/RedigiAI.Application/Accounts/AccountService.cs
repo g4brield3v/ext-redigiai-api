@@ -143,6 +143,8 @@ internal sealed class AccountService(
             new CreditBalanceDto(bySource.Sum(b => b.Remaining), bySource),
             subscription is null
                 ? null
-                : new SubscriptionDto(subscription.Status, subscription.NextBillingAt, subscription.CardLast4));
+                : new SubscriptionDto(subscription.Status, subscription.NextBillingAt, subscription.CardLast4),
+            // A tela de compra pede a declaração do responsável; o backend a exige de novo na compra.
+            NeedsGuardianAuthorization: user.BirthDate.IsMinorOn(BrasiliaTime.DateOf(time.GetUtcNow())));
     }
 }
