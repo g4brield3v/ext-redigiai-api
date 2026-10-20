@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="RedigiAI.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RedigiAI.Application\RedigiAI.Application.csproj" />
     <ProjectReference Include="..\RedigiAI.Infrastructure\RedigiAI.Infrastructure.csproj" />
   </ItemGroup>
