@@ -426,6 +426,15 @@ public sealed class FakePaymentGateway : IPaymentGateway
     public Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct) =>
         Task.FromResult(_charges.TryGetValue(providerId, out var charge) ? charge : null);
 
+    /// <summary>Os reembolsos feitos "lá", pela chave de idempotência: a mesma chave conta uma vez só.</summary>
+    public ConcurrentDictionary<Guid, (string PaymentId, long AmountCents)> Refunds { get; } = new();
+
+    public Task<string> RefundAsync(string paymentProviderId, long amountCents, Guid idempotencyKey, CancellationToken ct)
+    {
+        Refunds.TryAdd(idempotencyKey, (paymentProviderId, amountCents));
+        return Task.FromResult($"refund-{idempotencyKey:N}");
+    }
+
     public Task CancelSubscriptionAsync(string providerId, CancellationToken ct)
     {
         SetSubscription(providerId, SubscriptionStatus.Cancelled);

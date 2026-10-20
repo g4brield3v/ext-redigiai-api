@@ -90,6 +90,29 @@ public class PaymentTests
         Assert.Equal($"payment:{payment.Id}", bucket.GrantKey);
     }
 
+    [Theory]
+    [InlineData(3, 4800)]
+    [InlineData(1, 1600)]
+    [InlineData(0, 0)]
+    public void A_single_purchase_returns_16_reais_per_unused_correction(int unused, long amountCents)
+    {
+        var payment = Payment.StartSingle(Guid.NewGuid(), PaymentMethod.Pix, 3, "key", null, Now);
+
+        Assert.Equal(amountCents, RefundRequest.AmountFor(payment, unused));
+    }
+
+    [Theory]
+    [InlineData(12, 3990)] // nenhuma usada: o valor inteiro
+    [InlineData(10, 3324)] // 2 usadas: 39,90 − 2 × 3,33
+    [InlineData(1, 327)]
+    [InlineData(0, 0)] // todas usadas: 39,90 − 12 × 3,33 ficaria negativo
+    public void A_plan_charge_returns_39_90_minus_3_33_per_used_correction(int unused, long amountCents)
+    {
+        var payment = Payment.StartPlanCharge(Subscription.Request(Guid.NewGuid(), "key", null, Now), "123", Now);
+
+        Assert.Equal(amountCents, RefundRequest.AmountFor(payment, unused));
+    }
+
     [Fact]
     public void A_pending_purchase_is_not_refundable()
     {

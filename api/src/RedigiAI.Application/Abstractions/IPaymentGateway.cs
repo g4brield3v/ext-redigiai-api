@@ -66,6 +66,14 @@ public interface IPaymentGateway
     /// <returns><c>null</c> se o provedor não conhece o id.</returns>
     Task<ProviderSubscriptionCharge?> GetSubscriptionChargeAsync(string providerId, CancellationToken ct);
 
+    /// <summary>
+    /// Devolve <paramref name="amountCents"/> do pagamento ao comprador. <paramref name="idempotencyKey"/> faz a mesma
+    /// devolução, repetida, acontecer uma vez só lá.
+    /// </summary>
+    /// <returns>O id do reembolso lá.</returns>
+    /// <inheritdoc cref="CreatePixAsync" path="/exception" />
+    Task<string> RefundAsync(string paymentProviderId, long amountCents, Guid idempotencyKey, CancellationToken ct);
+
     /// <summary>Cancela a assinatura lá: não há mais cobranças.</summary>
     Task CancelSubscriptionAsync(string providerId, CancellationToken ct);
 }

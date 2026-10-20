@@ -166,3 +166,22 @@ internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webho
         builder.HasIndex(e => new { e.Provider, e.ExternalId }).IsUnique();
     }
 }
+
+internal sealed class RefundRequestConfiguration : IEntityTypeConfiguration<RefundRequest>
+{
+    public void Configure(EntityTypeBuilder<RefundRequest> builder)
+    {
+        builder.ToTable("refund_requests", table =>
+        {
+            table.HasCheckConstraint("ck_refund_requests_amount", "amount_cents > 0 AND credits_removed >= 0");
+        });
+        builder.Property(r => r.Status).HasMaxLength(20);
+        builder.Property(r => r.Reason).HasMaxLength(RefundRequest.MaxReasonLength);
+        builder.Property(r => r.MpRefundId).HasMaxLength(64);
+        builder.HasOne<User>().WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Restrict);
+        // Um pedido por compra, garantido pelo banco.
+        builder.HasOne<Payment>().WithMany().HasForeignKey(r => r.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => r.PaymentId).IsUnique();
+        builder.HasIndex(r => r.UserId);
+    }
+}

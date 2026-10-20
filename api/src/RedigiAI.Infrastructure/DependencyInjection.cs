@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
+        services.AddScoped<IRefundRequestRepository, RefundRequestRepository>();
         services.AddScoped<IExamRepository, ExamRepository>();
         services.AddScoped<IEssayTypeRepository, EssayTypeRepository>();
         services.AddScoped<IRubricRepository, RubricRepository>();
