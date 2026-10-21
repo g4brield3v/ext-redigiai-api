@@ -33,7 +33,7 @@ internal static class WorkerHost
         builder.Services.AddInfrastructure();
         builder.Services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         builder.Services.Configure<SeedOptions>(seed =>
-            seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
+            seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         builder.Services.Configure<RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions>(
@@ -96,5 +96,42 @@ internal static class DatabaseCommands
         scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.PromptImages")
             .LogInformation("Prompt images made private: {Changed} of {Total}", changed, total);
         return 0;
+    }
+
+    /// <summary>
+    /// Publica as propostas que vêm com o programa e ainda não existem neste ambiente:
+    /// <c>import-prompts --admin user_…</c>, com o <c>clerk_user_id</c> de um administrador. Pode rodar de novo.
+    /// </summary>
+    public static async Task<int> ImportPromptsAsync(string[] args)
+    {
+        var at = Array.IndexOf(args, "--admin");
+        var admin = at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
+        var rest = at >= 0 ? [.. args[..at], .. args[Math.Min(at + 2, args.Length)..]] : args;
+
+        using var host = WorkerHost.CreateBuilder(rest).Build();
+        var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.PromptImport");
+        if (string.IsNullOrWhiteSpace(admin))
+        {
+            logger.LogError("Usage: import-prompts --admin <clerk_user_id of an administrator>");
+            return 2;
+        }
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var results = await scope.ServiceProvider.GetRequiredService<IPromptImportService>()
+            .ImportAsync(admin, BundledPrompts.Packages(), CancellationToken.None);
+        foreach (var result in results)
+        {
+            if (result.Outcome == PromptImportOutcome.Failed)
+            {
+                logger.LogError(
+                    "Prompt {Package} not imported: {Problems}", result.Package, string.Join(" | ", result.Problems));
+            }
+            else
+            {
+                logger.LogInformation("Prompt {Package} ({Slug}): {Outcome}", result.Package, result.Slug, result.Outcome);
+            }
+        }
+
+        return results.Any(result => result.Outcome == PromptImportOutcome.Failed) ? 1 : 0;
     }
 }

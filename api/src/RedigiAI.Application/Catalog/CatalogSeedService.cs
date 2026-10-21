@@ -6,8 +6,8 @@ using RedigiAI.Domain.Catalog;
 namespace RedigiAI.Application.Catalog;
 
 /// <summary>
-/// Carga inicial do catálogo e da base de conhecimento da correção. As propostas de redação são cadastradas pela
-/// área de administração; só em desenvolvimento entra uma proposta de exemplo, em banco novo.
+/// Carga inicial do catálogo e da base de conhecimento da correção. As propostas de redação vêm da área de
+/// administração e do comando <c>import-prompts</c>; só os testes criam uma proposta de exemplo, em banco novo.
 /// </summary>
 public interface ICatalogSeedService
 {
@@ -20,8 +20,8 @@ public interface ICatalogSeedService
 public sealed class SeedOptions
 {
     /// <summary>
-    /// Cria a proposta de exemplo, com textos entre colchetes. Quem liga é o programa, e só no ambiente
-    /// <c>Development</c>: não é lido de configuração. Em staging e produção as propostas vêm só do admin.
+    /// Cria a proposta de exemplo, com textos entre colchetes. Só os testes ligam: não é lido de configuração. Nos
+    /// ambientes, as propostas vêm do admin e do comando <c>import-prompts</c> (decisão de 21/10/2026).
     /// </summary>
     public bool ExamplePrompt { get; set; }
 

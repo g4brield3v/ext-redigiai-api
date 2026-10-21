@@ -38,7 +38,7 @@ internal static class ApiHost
         services.AddInfrastructure();
         services.Configure<LegalOptions>(builder.Configuration.GetSection(LegalOptions.Section));
         services.Configure<SeedOptions>(seed =>
-            seed.ExamplePrompt = seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
+            seed.ReplaceOutdatedInstructions = builder.Environment.IsDevelopment());
         services.Configure<CloudinaryOptions>(builder.Configuration.GetSection(CloudinaryOptions.Section));
         services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.Section));
         services.Configure<RedigiAI.Infrastructure.MercadoPago.MercadoPagoOptions>(

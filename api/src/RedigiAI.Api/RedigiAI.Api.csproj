@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- As propostas que o comando import-prompts publica: um prompt.json e as imagens por pasta. -->
+    <EmbeddedResource Include="Content\Prompts\**\*" LogicalName="prompts/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RedigiAI.Application\RedigiAI.Application.csproj" />
     <ProjectReference Include="..\RedigiAI.Infrastructure\RedigiAI.Infrastructure.csproj" />
   </ItemGroup>

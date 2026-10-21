@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<Abstractions.IJobHandler, ProcessPaymentHandler>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IPromptAdminService, PromptAdminService>();
+        services.AddScoped<IPromptImportService, PromptImportService>();
         services.AddOptions<SeedOptions>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
         services.AddScoped<GradingSeedService>();
