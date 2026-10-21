@@ -85,4 +85,16 @@ internal static class DatabaseCommands
             .LogInformation(seeded ? "Catalog seeded" : "Catalog already present; nothing to do");
         return 0;
     }
+
+    /// <summary>Torna privadas as imagens de proposta enviadas como públicas antes de 20/10/2026.</summary>
+    public static async Task<int> MakePromptImagesPrivateAsync(string[] args)
+    {
+        using var host = WorkerHost.CreateBuilder(args).Build();
+        await using var scope = host.Services.CreateAsyncScope();
+        var (changed, total) = await scope.ServiceProvider.GetRequiredService<RedigiAI.Application.Catalog.IPromptImageMaintenance>()
+            .MakeAllPrivateAsync(CancellationToken.None);
+        scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.PromptImages")
+            .LogInformation("Prompt images made private: {Changed} of {Total}", changed, total);
+        return 0;
+    }
 }

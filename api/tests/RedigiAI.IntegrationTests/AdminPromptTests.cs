@@ -329,7 +329,8 @@ public class AdminPromptTests(ApiFixture api)
         var asset = await api.QueryAsync(db => db.Assets.SingleAsync(a => a.Id == assetId));
         Assert.Equal((AssetScope.PromptImage, "image/png", $"prompts/{assetId:N}"), (asset.Scope, asset.Mime, asset.PublicId));
         Assert.Equal("image/png", api.PromptImages.Uploaded[asset.PublicId].ContentType);
-        Assert.Equal($"https://res.cloudinary.com/test/image/upload/prompts/{assetId:N}", uploaded.GetProperty("url").GetString());
+        // Privada: só um endereço assinado de download, nunca a entrega pública.
+        Assert.Equal($"https://api.cloudinary.test/image/download?public_id=prompts/{assetId:N}&type=authenticated", uploaded.GetProperty("url").GetString());
     }
 
     [Fact]

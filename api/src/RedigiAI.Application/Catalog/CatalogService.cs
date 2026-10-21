@@ -30,7 +30,8 @@ internal sealed class CatalogService(
     IPromptRepository prompts,
     IAssetRepository assets,
     IPromptImageStorage images,
-    IRubricRepository rubrics) : ICatalogService
+    IRubricRepository rubrics,
+    TimeProvider time) : ICatalogService
 {
     private const int MaxSearchLength = 80;
 
@@ -156,7 +157,7 @@ internal sealed class CatalogService(
     }
 
     private string? ImageUrl(Guid? assetId, IReadOnlyDictionary<Guid, string> imageIds) =>
-        assetId is { } id && imageIds.TryGetValue(id, out var publicId) ? images.PublicUrl(publicId) : null;
+        assetId is { } id && imageIds.TryGetValue(id, out var publicId) ? images.ViewUrl(publicId, time.GetUtcNow()) : null;
 
     private static EssayTypeDto ToDto(EssayType essayType) => new(essayType.Slug, essayType.Name);
 

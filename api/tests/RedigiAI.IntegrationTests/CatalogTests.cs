@@ -10,7 +10,7 @@ namespace RedigiAI.IntegrationTests;
 public class CatalogTests(ApiFixture api)
 {
     // O catálogo é só para quem está logado.
-    private readonly HttpClient _client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
+    private readonly HttpClient _client = api.RegisteredClient();
 
     [Fact]
     public async Task Exams_list_fuvest_as_active_and_the_others_as_coming_soon()

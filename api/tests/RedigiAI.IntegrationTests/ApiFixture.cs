@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -142,6 +143,15 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public HttpClient CreateClient(string? token = null) => CreateClient(Factory, token);
 
+    /// <summary>Um aluno com conta na plataforma (o catálogo exige o cadastro concluído, não só a sessão do Clerk).</summary>
+    public HttpClient RegisteredClient(WebApplicationFactory<Program>? factory = null)
+    {
+        var token = CreateToken(NewClerkUserId());
+        var client = factory is null ? CreateClient(token) : CreateClient(factory, token);
+        client.PostAsJsonAsync("/v1/me", new { birthDate = "2000-05-17", termsAccepted = true }).GetAwaiter().GetResult().EnsureSuccessStatusCode();
+        return client;
+    }
+
     public static HttpClient CreateClient(WebApplicationFactory<Program> factory, string? token = null)
     {
         var client = factory.CreateClient();
@@ -273,7 +283,16 @@ public sealed class FakePromptImageStorage : IPromptImageStorage
         return Task.FromResult(new StoredImage(content.Length, 800, 240));
     }
 
-    public string PublicUrl(string publicId) => $"https://res.cloudinary.com/test/image/upload/{publicId}";
+    /// <summary>As que eram públicas e foram tornadas privadas.</summary>
+    public ConcurrentBag<string> MadePrivate { get; } = new();
+
+    public string ViewUrl(string publicId, DateTimeOffset now) => $"https://api.cloudinary.test/image/download?public_id={publicId}&type=authenticated";
+
+    public Task<bool> MakePrivateAsync(string publicId, CancellationToken ct)
+    {
+        MadePrivate.Add(publicId);
+        return Task.FromResult(true);
+    }
 }
 
 public sealed class FakePhotoStorage : IPhotoStorage

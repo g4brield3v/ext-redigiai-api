@@ -62,6 +62,7 @@ dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
 dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
 dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
 dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
+dotnet run --project api/src/RedigiAI.Api -- private-prompt-images  # torna privadas as imagens de proposta antigas (uma vez por ambiente)
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)
 dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (em Development, a própria API já roda a fila)
 # Em desenvolvimento a IA fica desligada (Ai__Enabled=false): os jobs transcribe e grade esperam na fila e nada é

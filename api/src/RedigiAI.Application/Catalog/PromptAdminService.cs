@@ -354,7 +354,7 @@ internal sealed class PromptAdminService(
         audit.Record(Actor(adminId), "asset.uploaded", "asset", id, new { scope = "prompt_image", stored.Bytes });
         await unitOfWork.SaveChangesAsync(ct);
 
-        return new PromptImageDto(id, images.PublicUrl(publicId), stored.Width, stored.Height);
+        return new PromptImageDto(id, images.ViewUrl(publicId, time.GetUtcNow()), stored.Width, stored.Height);
     }
 
     public async Task<IReadOnlyList<EssayTypeOptionDto>> ListEssayTypesAsync(string examSlug, CancellationToken ct)
@@ -559,7 +559,7 @@ internal sealed class PromptAdminService(
     }
 
     private string? ImageUrl(Guid? assetId, IReadOnlyDictionary<Guid, string> imageIds) =>
-        assetId is { } id && imageIds.TryGetValue(id, out var publicId) ? images.PublicUrl(publicId) : null;
+        assetId is { } id && imageIds.TryGetValue(id, out var publicId) ? images.ViewUrl(publicId, time.GetUtcNow()) : null;
 
     private Task<IReadOnlyDictionary<Guid, string>> ImageIdsAsync(Prompt prompt, CancellationToken ct) =>
         assets.PromptImagePublicIdsAsync([.. prompt.Blocks.SelectMany(block => block.Data.AssetIds()).Distinct()], ct);

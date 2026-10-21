@@ -187,15 +187,26 @@ public class AccountTests(ApiFixture api)
     public void Only_health_and_signed_webhooks_open_without_login()
     {
         // Nada do conteúdo da plataforma abre sem login: só a saúde da API e os avisos assinados do Mercado Pago e do Clerk.
+        // Todas as rotas, inclusive as declaradas fora dos controllers; a de fallback responde 404 e fica de fora.
         var anonymous = api.Factory.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints
             .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
-            .Where(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>() is not null
-                && e.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null)
+            .Where(e => e.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null
+                && e.RoutePattern.RawText != "{*path:nonfile}" && !e.RoutePattern.RawText!.Contains("{**"))
             .Select(e => e.RoutePattern.RawText!.TrimStart('/'))
             .Order()
             .ToList();
 
         Assert.Equal(["health", "ready", "v1/webhooks/clerk", "v1/webhooks/mercadopago"], anonymous);
+    }
+
+    [Fact]
+    public async Task A_clerk_session_without_a_platform_account_does_not_read_the_catalog()
+    {
+        // Conta no Clerk sem o cadastro na plataforma (nunca concluiu, ou foi recusada pela idade).
+        var client = api.CreateClient(api.CreateToken(ApiFixture.NewClerkUserId()));
+
+        await AssertErrorAsync(await client.GetAsync("/v1/exams"), HttpStatusCode.NotFound, "PROFILE_NOT_FOUND");
+        await AssertErrorAsync(await client.GetAsync("/v1/prompts/algoritmos-e-o-debate-publico"), HttpStatusCode.NotFound, "PROFILE_NOT_FOUND");
     }
 
     [Theory]
