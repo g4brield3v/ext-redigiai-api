@@ -7,7 +7,7 @@ namespace RedigiAI.Application.Catalog;
 public sealed record ExamDto(string Slug, string Name, ExamStatus Status, int SheetLines, Guid? CurrentRubricVersionId);
 
 /// <summary>Categoria de correção: o nome é o tipo de redação que o aluno vê e o que entra no título da redação.</summary>
-/// <param name="Slug"><c>dissertacao-em-prosa</c> ou <c>narrativa</c>.</param>
+/// <param name="Slug"><c>dissertacao-em-prosa</c>, <c>dissertacao</c> ou <c>narrativa</c>.</param>
 /// <param name="Name">"Dissertação em prosa".</param>
 public sealed record EssayTypeDto(string Slug, string Name);
 

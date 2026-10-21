@@ -102,7 +102,7 @@ public class AdminPromptTests(ApiFixture api)
 
         // A primeira é a dissertação em prosa; não existe mais a categoria "dissertacao".
         Assert.Equal(
-            [("dissertacao-em-prosa", "Dissertação em prosa", true), ("narrativa", "Narrativa", true)],
+            [("dissertacao", "Dissertação", true), ("dissertacao-em-prosa", "Dissertação em prosa", true), ("narrativa", "Narrativa", true)],
             types.Select(t => (t.GetProperty("slug").GetString(), t.GetProperty("name").GetString(), t.GetProperty("hasActiveProfile").GetBoolean())));
         try
         {

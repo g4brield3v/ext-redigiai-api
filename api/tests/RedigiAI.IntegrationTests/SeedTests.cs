@@ -28,7 +28,7 @@ public class SeedTests(ApiFixture api)
         Assert.Equal(0, await CountAsync(factory, db => db.Prompts.CountAsync()));
         Assert.Equal(["fuvest", "unicamp", "enem"], await CountAsync(factory, db => db.Exams.OrderBy(e => e.Position).Select(e => e.Slug).ToListAsync()));
         Assert.Equal(1, await CountAsync(factory, db => db.RubricVersions.CountAsync()));
-        Assert.Equal(2, await CountAsync(factory, db => db.GradingProfiles.CountAsync(p => p.Status == GradingProfileStatus.Active)));
+        Assert.Equal(3, await CountAsync(factory, db => db.GradingProfiles.CountAsync(p => p.Status == GradingProfileStatus.Active)));
         Assert.Empty((await api.RegisteredClient(factory).GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts")).EnumerateArray());
 
         // Rodar de novo continua sem criar proposta.
@@ -73,10 +73,10 @@ public class SeedTests(ApiFixture api)
         Assert.Equal([1, 2], templates.Select(t => t.Version));
         Assert.Equal("instruções antigas com redacao", templates[0].UserText);
         Assert.Contains("<abordagens_esperadas>", templates[1].UserText);
-        Assert.Equal(2, active.Count);
+        Assert.Equal(3, active.Count);
         Assert.All(active, profile => Assert.Equal((2, templates[1].Id), (profile.Version, profile.GradingPromptId)));
         Assert.Empty(active.Select(p => p.Id).Intersect(before));
-        Assert.Equal(2, await CountAsync(factory, db => db.GradingProfiles.CountAsync(p => p.Status == GradingProfileStatus.Retired && before.Contains(p.Id))));
+        Assert.Equal(3, await CountAsync(factory, db => db.GradingProfiles.CountAsync(p => p.Status == GradingProfileStatus.Retired && before.Contains(p.Id))));
 
         // Com as instruções em dia, rodar de novo não cria outra versão.
         Assert.False(await SeedAsync(factory));
@@ -101,7 +101,7 @@ public class SeedTests(ApiFixture api)
         Assert.DoesNotContain("60 palavras", manuals[1].GeneralRules);
         Assert.Equal(manuals[0].Criteria.Count, manuals[1].Criteria.Count);
         var active = await CountAsync(factory, db => db.GradingProfiles.Where(p => p.Status == GradingProfileStatus.Active).ToListAsync());
-        Assert.Equal(2, active.Count);
+        Assert.Equal(3, active.Count);
         Assert.All(active, profile => Assert.Equal((2, manuals[1].Id), (profile.Version, profile.GuidelinesVersionId)));
         Assert.Equal(before.Select(p => p.GradingPromptId).Order(), active.Select(p => p.GradingPromptId).Order());
         Assert.Equal(1, await CountAsync(factory, db => db.PromptTemplates.CountAsync(t => t.Kind == PromptKind.Grading)));
@@ -109,6 +109,39 @@ public class SeedTests(ApiFixture api)
         // Com o manual em dia, rodar de novo não cria outra versão.
         Assert.False(await SeedAsync(factory));
         Assert.Equal(2, await CountAsync(factory, db => db.GuidelinesVersions.CountAsync()));
+    }
+
+    /// <summary>
+    /// "Dissertação" (o que a prova de 2025 pede) entra também em banco que já existe, com um perfil ativo igual ao de
+    /// "Dissertação em prosa" (decisão de 21/10/2026).
+    /// </summary>
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    public async Task Existing_database_gets_the_dissertation_category_with_a_copy_of_the_prose_profile(string environment)
+    {
+        await using var factory = await SeededAsync(environment);
+
+        // Um banco de antes da categoria nova: só "Dissertação em prosa" e "Narrativa".
+        await CountAsync(factory, db => db.GradingProfiles.Where(p => db.EssayTypes.Any(t => t.Id == p.EssayTypeId && t.Slug == "dissertacao")).ExecuteDeleteAsync());
+        await CountAsync(factory, db => db.EssayTypes.Where(t => t.Slug == "dissertacao").ExecuteDeleteAsync());
+
+        Assert.True(await SeedAsync(factory));
+
+        var types = await CountAsync(factory, db => db.EssayTypes.ToDictionaryAsync(t => t.Slug));
+        Assert.Equal("Dissertação", types["dissertacao"].Name);
+        var active = await CountAsync(factory, db => db.GradingProfiles.Where(p => p.Status == GradingProfileStatus.Active).ToListAsync());
+        var prose = active.Single(p => p.EssayTypeId == types["dissertacao-em-prosa"].Id);
+        var copy = active.Single(p => p.EssayTypeId == types["dissertacao"].Id);
+        Assert.Equal(
+            (prose.TranscriptionPromptId, prose.GradingPromptId, prose.RubricVersionId, prose.GuidelinesVersionId, prose.WritingRulesVersionId, prose.TranscriptionModel, prose.GradingModel),
+            (copy.TranscriptionPromptId, copy.GradingPromptId, copy.RubricVersionId, copy.GuidelinesVersionId, copy.WritingRulesVersionId, copy.TranscriptionModel, copy.GradingModel));
+        Assert.NotEqual(prose.Id, copy.Id);
+
+        // Rodar de novo não cria outra categoria nem outro perfil.
+        Assert.False(await SeedAsync(factory));
+        Assert.Equal(3, await CountAsync(factory, db => db.EssayTypes.CountAsync()));
+        Assert.Equal(3, await CountAsync(factory, db => db.GradingProfiles.CountAsync()));
     }
 
     /// <summary>A aplicação nesse ambiente, sobre um banco novo, já migrado e com a carga inicial.</summary>

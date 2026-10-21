@@ -16,11 +16,11 @@ Referência usada no desenho: proposta de redação da Fuvest ("o papel da ciên
 ## A1. Decisões
 
 1. **O tipo é definido pelo administrador, não pelo aluno.** Cada proposta tem um único tipo, cadastrado na seção **Instruções**. O aluno não escolhe tipo em nenhum momento: lê a proposta, escreve e envia.
-2. **Tipo definido pela categoria de correção.** No cartão Instruções, o administrador escolhe a **categoria de correção** numa lista (`essayType`). A primeira categoria é **"Dissertação em prosa"**; "Narrativa" continua disponível.
+2. **Tipo definido pela categoria de correção.** No cartão Instruções, o administrador escolhe a **categoria de correção** numa lista (`essayType`). A primeira categoria é **"Dissertação em prosa"**; "Narrativa" continua disponível, e "Dissertação" (sem "em prosa") serve às provas que pedem só isso, como a de 2025.
    - O nome da categoria é o tipo mostrado ao aluno (primeiro item das Instruções), enviado à IA e usado no título da redação.
    - A categoria escolhe o perfil de correção: continua **um perfil ativo por vestibular e categoria**.
    - Não há campo de texto livre para o tipo.
-   - As categorias ficam na tabela `essay_types` (`slug`, `name`). A carga inicial cria `dissertacao-em-prosa` ("Dissertação em prosa") e `narrativa` ("Narrativa"), e os perfis atuais de dissertação passam a apontar para `dissertacao-em-prosa`. Categorias novas entram pelo banco, junto com o perfil de correção delas.
+   - As categorias ficam na tabela `essay_types` (`slug`, `name`). A carga inicial cria `dissertacao-em-prosa` ("Dissertação em prosa") e `narrativa` ("Narrativa"), e os perfis atuais de dissertação passam a apontar para `dissertacao-em-prosa`. Categorias novas entram pelo banco, junto com o perfil de correção delas. Em 21/10/2026 entrou `dissertacao` ("Dissertação"): a carga inicial a cria também em banco que já existe, com um perfil ativo copiado do perfil ativo de `dissertacao-em-prosa`.
 3. **Sem campos de linhas e título.** Mínimo e máximo de linhas e título obrigatório saem do cadastro. Essas regras ficam escritas nos itens das Instruções, que a IA lê. O backend continua informando à IA quantas linhas a redação tem e se a primeira linha parece um título; o limite físico é o da folha do vestibular (30 na Fuvest).
 4. **Conteúdo em blocos ordenados.** Tudo o que aparece na página da proposta é um bloco com `position` explícita, definida pelo administrador. A tela e a IA usam a mesma ordem.
 5. **Cada texto da coletânea pode ser texto, verso ou imagem.** "Texto 1", "Texto 2", "Texto 3"… são todos o mesmo tipo de bloco (`collection_item`), e o administrador escolhe o formato de cada um: prosa, verso em colunas ou imagem.
@@ -230,7 +230,7 @@ O critério 2 (modalidade) é avaliado contra o nome da categoria e o comando.
 | `title` | sim | `"O papel da ciência no mundo contemporâneo"` | Título da proposta (tema) |
 | `summary` | não | `"Coletânea com tirinha, poema e três textos."` | Linha de apoio no cartão da lista |
 | `sourceLabel` | não | `"Fuvest (prova anterior)"` | Origem, para controle interno |
-| `essayType` | sim | `"dissertacao-em-prosa"` | Categoria de correção: `dissertacao-em-prosa` ("Dissertação em prosa") ou `narrativa` |
+| `essayType` | sim | `"dissertacao-em-prosa"` | Categoria de correção: `dissertacao-em-prosa` ("Dissertação em prosa"), `dissertacao` ("Dissertação") ou `narrativa` |
 | `blocks[].position` | sim | `10` | Ordem na tela, de cima para baixo |
 | `blocks[].kind` | sim | `"collection_item"` | Tipo do bloco (seção A3) |
 | `gradingNotes.expectedFocus` | sim | ver exemplo | Recorte que a banca espera |

@@ -52,6 +52,13 @@ internal sealed class CatalogSeedService(
             await unitOfWork.SaveChangesAsync(ct);
         }
 
+        // Também em banco que já existe: categoria nova entra antes da base de conhecimento, que lhe dá o perfil.
+        if (await EnsureEssayTypesAsync(ct))
+        {
+            await unitOfWork.SaveChangesAsync(ct);
+            catalogCreated = true;
+        }
+
         var gradingCreated = await grading.EnsureAsync(ct);
         if (gradingCreated)
         {
@@ -87,16 +94,40 @@ internal sealed class CatalogSeedService(
         exams.Add(Exam.Create("unicamp", "Unicamp", ExamStatus.ComingSoon, sheetLines: 30, position: 2));
         exams.Add(Exam.Create("enem", "Enem", ExamStatus.ComingSoon, sheetLines: 30, position: 3));
 
-        // As categorias de correção: o nome é o tipo de redação que o aluno vê e o que entra no título da redação.
-        var dissertacao = EssayType.Create(fuvest.Id, "dissertacao-em-prosa", "Dissertação em prosa", "Texto dissertativo-argumentativo");
-        var narrativa = EssayType.Create(fuvest.Id, "narrativa", "Narrativa", "Texto narrativo com reflexão");
-        essayTypes.Add(dissertacao);
-        essayTypes.Add(narrativa);
-
         var rubric = GradingSeedService.PublishRubric(fuvest.Id, version: 1, now);
         rubrics.Add(rubric);
 
         return true;
+    }
+
+    /// <summary>
+    /// As categorias de correção da Fuvest: o nome é o tipo de redação que o aluno vê e o que entra no título da
+    /// redação. "Dissertação" (sem "em prosa") é o que a prova de 2025 pede (decisão de 21/10/2026).
+    /// </summary>
+    internal static readonly (string Slug, string Name, string Description)[] FuvestEssayTypes =
+    [
+        ("dissertacao-em-prosa", "Dissertação em prosa", "Texto dissertativo-argumentativo"),
+        ("narrativa", "Narrativa", "Texto narrativo com reflexão"),
+        ("dissertacao", "Dissertação", "Texto dissertativo-argumentativo"),
+    ];
+
+    /// <summary>Cria as categorias que faltam; as que já existem ficam como estão.</summary>
+    private async Task<bool> EnsureEssayTypesAsync(CancellationToken ct)
+    {
+        if (await exams.FindBySlugAsync("fuvest", ct) is not { } fuvest)
+        {
+            return false;
+        }
+
+        var existing = (await essayTypes.ListByExamAsync(fuvest.Id, ct)).Select(type => type.Slug).ToHashSet(StringComparer.Ordinal);
+        var created = false;
+        foreach (var (slug, name, description) in FuvestEssayTypes.Where(type => !existing.Contains(type.Slug)))
+        {
+            essayTypes.Add(EssayType.Create(fuvest.Id, slug, name, description));
+            created = true;
+        }
+
+        return created;
     }
 
     /// <summary>Uma proposta publicada de exemplo, só em desenvolvimento e quando o vestibular ainda não tem nenhuma.</summary>

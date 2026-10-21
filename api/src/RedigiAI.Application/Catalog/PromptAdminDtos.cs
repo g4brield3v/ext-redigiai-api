@@ -10,7 +10,7 @@ namespace RedigiAI.Application.Catalog;
 /// <param name="Exam">Endereço do vestibular (<c>fuvest</c>).</param>
 /// <param name="EssayType">
 /// Categoria de correção, escolhida na lista de <c>GET /v1/admin/exams/{slug}/essay-types</c>
-/// (<c>dissertacao-em-prosa</c> ou <c>narrativa</c>). O nome dela é o tipo de redação.
+/// (<c>dissertacao-em-prosa</c>, <c>dissertacao</c> ou <c>narrativa</c>). O nome dela é o tipo de redação.
 /// </param>
 /// <param name="ExpectedUpdatedAt">
 /// Só no salvamento: o <c>updatedAt</c> que o editor tem. Se a proposta mudou depois disso, <c>PROMPT_CHANGED</c>.
