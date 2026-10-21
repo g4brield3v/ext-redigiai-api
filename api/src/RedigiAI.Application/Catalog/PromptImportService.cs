@@ -81,6 +81,11 @@ internal sealed class PromptImportService(
                     : [error.UserMessage];
                 results.Add(new PromptImportResult(package.Name, null, PromptImportOutcome.Failed, problems));
             }
+            catch (Exception error) when (error is HttpRequestException or InvalidOperationException or JsonException or UniqueConflictException)
+            {
+                // Falha do Cloudinary, JSON com tipo errado ou corrida no registro da imagem: os outros pacotes seguem.
+                results.Add(new PromptImportResult(package.Name, null, PromptImportOutcome.Failed, [$"{error.GetType().Name}: {error.Message}"]));
+            }
         }
 
         return results;
@@ -107,6 +112,12 @@ internal sealed class PromptImportService(
         if (string.IsNullOrEmpty(slug))
         {
             throw Errors.ValidationFailed([new ValidationIssue("slug", "Informe o endereço da proposta.")]);
+        }
+
+        // Antes de qualquer envio: o endereço entra no identificador das imagens no Cloudinary.
+        if (slug.Length > PromptRules.MaxSlugLength || !PromptRules.IsValidSlug(slug))
+        {
+            throw Errors.ValidationFailed([new ValidationIssue("slug", "Endereço: só letras minúsculas, números e hífen.")]);
         }
 
         if (await prompts.MaxVersionAsync(slug, ct) > 0)

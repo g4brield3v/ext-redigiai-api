@@ -148,6 +148,23 @@ public class PromptImportTests(ApiFixture api)
         Assert.False(await api.QueryAsync(db => db.Prompts.AnyAsync(p => p.Slug == missing)));
     }
 
+    [Theory]
+    [InlineData("\"../fora\"")]
+    [InlineData("\"Com Espaco\"")]
+    [InlineData("42")]
+    public async Task Invalid_slug_fails_before_any_image_is_sent(string slug)
+    {
+        var admin = await AdminAsync();
+        var uploads = api.PromptImages.Uploaded.Count;
+        var package = new PromptPackage("ruim", Document("x").Replace("\"slug\": \"x\"", $"\"slug\": {slug}"), new Dictionary<string, byte[]> { ["grafico.png"] = Png });
+
+        var results = await ImportAsync(admin, package, Package(Slug(), "seguinte"));
+
+        Assert.Equal(PromptImportOutcome.Failed, results.Single(result => result.Package == "ruim").Outcome);
+        Assert.Equal(PromptImportOutcome.Created, results.Single(result => result.Package == "seguinte").Outcome);
+        Assert.Equal(uploads + 1, api.PromptImages.Uploaded.Count); // só a imagem do pacote seguinte
+    }
+
     [Fact]
     public async Task Only_an_administrator_imports()
     {

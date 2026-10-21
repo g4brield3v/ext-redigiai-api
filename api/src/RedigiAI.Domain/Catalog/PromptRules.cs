@@ -359,6 +359,9 @@ public static partial class PromptRules
         }
     }
 
+    /// <summary>Endereço só com letras minúsculas, números e hífen (o que a publicação exige).</summary>
+    public static bool IsValidSlug(string slug) => SlugPattern().IsMatch(slug);
+
     /// <summary>Número com ponto de milhar, como se escreve em português, em qualquer configuração do servidor.</summary>
     private static string Thousands(int value) => value.ToString("#,0", PtBr);
 
