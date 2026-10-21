@@ -1,0 +1,109 @@
+{
+  "exam": "fuvest",
+  "slug": "educacao-basica-e-formacao-profissional",
+  "title": "Educação básica e formação profissional: entre a multitarefa e a reflexão",
+  "summary": "Inspirada no tema da Fuvest 2024. Coletânea com ensaio, crônica, reportagem, esquema ilustrado e poema.",
+  "sourceLabel": "Inspirada na Fuvest 2024 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "prose",
+        "body": "Chamamos de multitarefa o que, quase sempre, é apenas alternância rápida: a atenção salta de uma janela a outra, e cada salto cobra um pedágio. Pesquisas de psicologia cognitiva indicam há décadas que trocar de tarefa custa tempo e aumenta os erros, ainda que a sensação seja a de render mais. O problema não está em responder a várias demandas — a vida sempre exigiu isso —, mas em transformar a pressa em método. Uma escola que só treina respostas rápidas forma bons operadores de urgências e maus leitores de problemas. Pensar devagar, voltar ao texto, sustentar uma dúvida por uma semana: essas também são competências, e nenhuma delas cabe numa notificação.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "prose",
+        "body": "Meu avô, marceneiro, dizia que a madeira ensina a esperar: cola mal seca não segura gaveta nenhuma. Lembro dele quando vejo meu irmão, aos quinze anos, com a agenda mais cheia que a de um executivo — curso de inglês, programação, reforço de matemática, um estágio de fim de semana \"para o currículo\". Ninguém lhe ensinou a ficar à toa, e ele tem vergonha quando fica. Talvez a escola precise ensinar, além de ofícios, o uso do tempo livre: escolher um livro, aguentar o silêncio, conversar sem olhar o relógio. Quem nunca aprendeu a descansar trabalha cansado a vida inteira.",
+        "source": "Crônica elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "prose",
+        "width": "half",
+        "body": "A legislação brasileira permite que escolas do campo e escolas indígenas organizem calendário e conteúdos de acordo com a vida da comunidade. Em muitas delas, o ano letivo acompanha o plantio e a colheita, e aprender a reconhecer sementes, contar a história da aldeia na própria língua ou consertar um motor de barco conta como aula. Para os educadores que defendem esse modelo, a separação rígida entre \"escola\" e \"trabalho\" é uma invenção recente: durante a maior parte da história, aprendeu-se fazendo ao lado de quem já sabia fazer, sem pressa e sem sinal tocando a cada cinquenta minutos.",
+        "source": "Reportagem elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "image",
+        "width": "half",
+        "imageFile": "texto-4-esquema.png",
+        "alt": "Esquema com duas réguas para medir o sucesso: uma só com salário e cargo; outra com seis medidas.",
+        "aiDescription": "Esquema ilustrado em duas partes, como uma página de caderno. Na parte de cima, o título \"A régua que nos ensinaram\" e um círculo dividido em duas metades: \"salário\" e \"cargo\". Na parte de baixo, o título \"Outra régua possível\" e um círculo dividido em seis fatias: \"renda\", \"aprendizado\", \"convivência\", \"saúde\", \"tempo livre\" e \"sentido\". A mensagem é que o sucesso profissional pode ser medido por mais critérios do que dinheiro e posição.",
+        "source": "Esquema criado pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "verse",
+        "columns": [
+          [
+            "O sinal tocou: matemática.",
+            "O sinal tocou: geografia.",
+            "Entre um sinal e outro",
+            "a pergunta que eu queria",
+            "ficou no corredor."
+          ],
+          [
+            "Me pedem foco,",
+            "me dão quarenta abas;",
+            "me pedem calma,",
+            "me cobram o futuro",
+            "até sexta-feira."
+          ]
+        ],
+        "source": "Poema elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **Educação básica e formação profissional: entre a multitarefa e a reflexão.**"
+      }
+    },
+    {
+      "position": 70,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível, e não ultrapasse a quantidade de linhas disponíveis na folha de redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista sobre o que a educação básica deve priorizar na preparação para o trabalho: a lógica da multitarefa, da velocidade e do acúmulo de habilidades (Textos 1, 2 e 5) ou o tempo da reflexão, do ócio e da aprendizagem integrada à vida (Textos 2 e 3), e o que se entende por sucesso profissional (Texto 4). Espera-se discussão da relação entre escola e mundo do trabalho, com posicionamento sobre como equilibrar produtividade e pensamento crítico.",
+    "tangentSignals": "Fala só de tecnologia na escola ou do uso de celular, sem relacionar com formação profissional; discute apenas mercado de trabalho ou desemprego, sem a educação básica; trata só de saúde mental ou ansiedade dos jovens, sem o eixo multitarefa × reflexão; defende o ensino técnico ou o ensino integral de forma genérica, sem discutir o tipo de atenção e de tempo que a escola cultiva.",
+    "offTopicSignals": "Não trata de educação nem de formação para o trabalho.",
+    "keyData": [
+      "Texto 1: multitarefa é alternância que custa tempo e gera erros; escola que só treina rapidez forma maus leitores de problemas.",
+      "Texto 2: agenda lotada de jovens; a escola deveria ensinar também o uso do tempo livre e o descanso.",
+      "Texto 3: escolas do campo e indígenas com calendário próprio; aprender fazendo, integrado à vida comunitária.",
+      "Texto 4: esquema — a régua do sucesso só com salário e cargo × uma régua com renda, aprendizado, convivência, saúde, tempo livre e sentido.",
+      "Texto 5: poema — a fragmentação do tempo escolar e a pressão pelo futuro."
+    ]
+  }
+}

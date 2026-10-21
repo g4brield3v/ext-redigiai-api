@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="560" viewBox="0 0 420 560">
+  <!-- Ampulheta: a areia que cai forma, embaixo, uma cidade. -->
+  <rect width="420" height="560" fill="#F7F3EA"/>
+
+  <!-- Vidro -->
+  <path d="M90,60 L330,60 C330,170 230,230 222,280 C230,330 330,390 330,500 L90,500 C90,390 190,330 198,280 C190,230 90,170 90,60 Z" fill="#E6F0F5" stroke="#9FB4C2" stroke-width="4"/>
+
+  <!-- Areia de cima -->
+  <path d="M118,150 L302,150 C292,200 230,236 214,270 L206,270 C190,236 128,200 118,150 Z" fill="#E3C27A"/>
+  <!-- Fio de areia -->
+  <rect x="207" y="268" width="6" height="150" fill="#E3C27A"/>
+
+  <!-- Cidade na areia de baixo: casas antigas na base, prédios por cima -->
+  <clipPath id="vidroBaixo">
+    <path d="M90,500 C90,390 190,330 198,280 L222,280 C230,330 330,390 330,500 Z"/>
+  </clipPath>
+  <g clip-path="url(#vidroBaixo)">
+    <rect x="80" y="440" width="260" height="70" fill="#E3C27A"/>
+    <g fill="#C9A35C">
+      <rect x="112" y="418" width="34" height="30"/><polygon points="108,420 129,402 150,420"/>
+      <rect x="160" y="414" width="40" height="34"/><polygon points="156,416 180,396 204,416"/>
+      <rect x="216" y="418" width="34" height="30"/><polygon points="212,420 233,402 254,420"/>
+      <rect x="264" y="414" width="40" height="34"/><polygon points="260,416 284,396 308,416"/>
+    </g>
+    <g fill="#B48A43">
+      <rect x="132" y="372" width="28" height="48"/>
+      <rect x="168" y="340" width="32" height="76"/>
+      <rect x="206" y="420" width="10" height="2"/>
+      <rect x="224" y="352" width="30" height="66"/>
+      <rect x="262" y="380" width="26" height="38"/>
+    </g>
+    <g fill="#F7F3EA" opacity="0.8">
+      <rect x="174" y="350" width="6" height="8"/><rect x="188" y="350" width="6" height="8"/>
+      <rect x="174" y="366" width="6" height="8"/><rect x="188" y="366" width="6" height="8"/>
+      <rect x="230" y="362" width="6" height="8"/><rect x="242" y="362" width="6" height="8"/>
+      <rect x="138" y="382" width="6" height="8"/><rect x="148" y="382" width="6" height="8"/>
+    </g>
+  </g>
+
+  <!-- Moldura de madeira -->
+  <rect x="64" y="34" width="292" height="28" rx="6" fill="#8B5E3C"/>
+  <rect x="64" y="498" width="292" height="28" rx="6" fill="#8B5E3C"/>
+  <rect x="74" y="62" width="14" height="436" fill="#A47148"/>
+  <rect x="332" y="62" width="14" height="436" fill="#A47148"/>
+</svg>

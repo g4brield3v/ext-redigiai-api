@@ -1,0 +1,120 @@
+{
+  "exam": "fuvest",
+  "slug": "de-que-maneira-o-passado-contribui-para-a-compreensao-do-presente",
+  "title": "De que maneira o passado contribui para a compreensão do presente?",
+  "summary": "Inspirada no tema da Fuvest 2019. Coletânea sem numeração, com reflexão, poema, ilustração, texto sobre o incêndio do Museu Nacional e aforismo.",
+  "sourceLabel": "Inspirada na Fuvest 2019 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 5,
+      "kind": "paragraph",
+      "data": { "body": "Leia os textos para fazer sua redação." }
+    },
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "Mudar não é o mesmo que progredir. Quem troca tudo a cada estação não acumula nada: perde o ponto de partida e, com ele, a medida de quanto avançou. O progresso exige memória — saber o que já foi tentado, o que deu errado e por quê. Uma sociedade que esquece a própria experiência está condenada a uma infância perpétua, recomeçando sempre do zero e tropeçando nas mesmas pedras.",
+        "source": "Reflexão elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "hideLabel": true,
+        "format": "verse",
+        "width": "half",
+        "columns": [
+          [
+            "O arquivista",
+            "",
+            "Abre as gavetas que ninguém quer abrir:",
+            "a certidão rasurada,",
+            "o mapa da fazenda que já não há,",
+            "o nome da mulher que lavou a roupa",
+            "e não entrou no retrato.",
+            "É incômodo, ele sabe.",
+            "Sopra a poeira devagar,",
+            "como quem acorda um morto",
+            "para lhe fazer uma pergunta",
+            "que só os vivos podem responder."
+          ]
+        ],
+        "source": "Poema elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "hideLabel": true,
+        "format": "image",
+        "width": "half",
+        "imageFile": "texto-3-ampulheta.png",
+        "alt": "Ilustração: ampulheta em que a areia que cai forma, embaixo, os prédios de uma cidade.",
+        "aiDescription": "Ilustração de uma ampulheta de madeira sobre fundo claro. Na parte de cima, a areia é amarelada e lisa; um fio de areia cai pelo gargalo. Na parte de baixo, a areia acumulada não forma um monte comum: forma a silhueta de uma cidade, com casas antigas na base e prédios altos por cima, como se o presente fosse construído sobre camadas do passado.",
+        "source": "Ilustração criada pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "Em setembro de 2018, um incêndio destruiu boa parte do acervo do Museu Nacional, no Rio de Janeiro, a mais antiga instituição científica do país, criada em 1818. Perderam-se coleções de zoologia, de etnologia, de línguas indígenas registradas em gravações únicas. Depois da tragédia, discutiu-se o que fazer com o prédio: reconstruí-lo como era, erguer algo novo ou preservar parte das ruínas como lembrança do descaso. Por trás da escolha arquitetônica havia outra pergunta: o que um país quer lembrar sobre si mesmo?",
+        "source": "Texto elaborado pela equipe RedigiAI com base em informações públicas."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "Ninguém conhece o passado \"como ele de fato foi\". Nós o lemos com as perguntas de hoje — e, muitas vezes, é no momento de perigo que uma lembrança antiga acende e passa a fazer sentido.",
+        "source": "Aforismo elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **De que maneira o passado contribui para a compreensão do presente?**"
+      }
+    },
+    {
+      "position": 70,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível e não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Resposta argumentada à pergunta do tema: como o conhecimento do passado ajuda a entender o presente. A coletânea trata da memória como condição do progresso (Texto 1), do trabalho incômodo de revisitar o que se quis esquecer (Texto 2), do presente construído sobre camadas do passado (Texto 3), da preservação ou da perda da memória coletiva, com o incêndio do Museu Nacional (Texto 4), e da leitura do passado a partir das questões do presente (Texto 5). Espera-se que o candidato explique de que maneira(s) isso ocorre, e não apenas afirme que o passado é importante.",
+    "tangentSignals": "Afirma genericamente que \"é preciso conhecer a história\" sem explicar como o passado ilumina o presente; narra fatos históricos sem relacioná-los ao presente; trata só de preservação de patrimônio ou só de museus; discute apenas memórias pessoais, sem a dimensão coletiva.",
+    "offTopicSignals": "Não trata da relação entre passado e presente.",
+    "keyData": [
+      "Texto 1: mudar não é progredir; o progresso exige memória; quem esquece recomeça do zero.",
+      "Texto 2: poema — o arquivista reabre o que se quis esquecer, inclusive quem ficou fora do retrato oficial.",
+      "Texto 3: ilustração — a areia da ampulheta forma uma cidade; o presente construído sobre o passado.",
+      "Texto 4: o incêndio do Museu Nacional (2018) e o debate sobre reconstruir ou preservar as ruínas; o que um país quer lembrar.",
+      "Texto 5: o passado é lido com as perguntas de hoje, sobretudo em momentos de perigo."
+    ]
+  }
+}

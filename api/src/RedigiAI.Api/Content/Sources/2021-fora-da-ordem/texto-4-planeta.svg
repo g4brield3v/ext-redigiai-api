@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="460" viewBox="0 0 560 460">
+  <!-- Planeta doente num consultório: curativos, faixa na cabeça e termômetro. -->
+  <rect width="560" height="460" fill="#E8F1F2"/>
+  <rect x="0" y="380" width="560" height="80" fill="#C9D6DF"/>
+
+  <!-- Cadeira -->
+  <rect x="150" y="300" width="220" height="24" rx="8" fill="#8D6E63"/>
+  <rect x="160" y="324" width="16" height="70" fill="#6D4C41"/>
+  <rect x="344" y="324" width="16" height="70" fill="#6D4C41"/>
+  <rect x="150" y="150" width="24" height="170" rx="8" fill="#8D6E63"/>
+
+  <!-- Planeta -->
+  <circle cx="260" cy="210" r="120" fill="#4A90C2"/>
+  <g fill="#6FB66B">
+    <path d="M190,120 C215,105 245,118 238,140 C232,160 205,150 200,170 C195,190 172,180 166,160 C160,140 172,128 190,120 Z"/>
+    <path d="M280,150 C310,140 340,160 335,190 C330,220 300,215 292,240 C285,262 262,250 266,226 C270,205 262,160 280,150 Z"/>
+    <path d="M170,250 C190,240 215,255 210,275 C205,295 180,295 172,282 C165,270 160,258 170,250 Z"/>
+  </g>
+  <!-- Faixa na cabeça -->
+  <path d="M155,150 Q260,80 365,150 L360,170 Q260,102 160,170 Z" fill="#FFFFFF" stroke="#B0BEC5" stroke-width="2"/>
+  <path d="M362,158 L392,140 L388,170 Z" fill="#FFFFFF" stroke="#B0BEC5" stroke-width="2"/>
+  <!-- Rosto cansado -->
+  <g stroke="#1F2A44" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M215,200 Q228,192 241,200"/>
+    <path d="M280,200 Q293,192 306,200"/>
+    <path d="M232,258 Q260,244 288,258"/>
+  </g>
+  <!-- Curativos em cruz -->
+  <g fill="#F4D8B4" stroke="#C9A27A" stroke-width="2">
+    <g transform="rotate(35 330 255)"><rect x="300" y="247" width="60" height="18" rx="6"/><rect x="321" y="226" width="18" height="60" rx="6"/></g>
+    <g transform="rotate(-25 190 225)"><rect x="162" y="217" width="56" height="16" rx="6"/><rect x="182" y="197" width="16" height="56" rx="6"/></g>
+  </g>
+  <!-- Termômetro -->
+  <g transform="rotate(-18 262 256)">
+    <rect x="262" y="249" width="110" height="14" rx="7" fill="#FFFFFF" stroke="#90A4AE" stroke-width="2"/>
+    <rect x="317" y="253" width="50" height="6" rx="3" fill="#E53935"/>
+    <circle cx="372" cy="256" r="11" fill="#E53935"/>
+  </g>
+
+  <!-- Mesinha com remédio -->
+  <rect x="420" y="300" width="100" height="14" rx="4" fill="#8D6E63"/>
+  <rect x="464" y="314" width="12" height="80" fill="#6D4C41"/>
+  <rect x="448" y="246" width="44" height="54" rx="6" fill="#FFFFFF" stroke="#90A4AE" stroke-width="2"/>
+  <rect x="448" y="286" width="44" height="14" rx="4" fill="#E53935" opacity="0.7"/>
+  <rect x="456" y="236" width="28" height="12" rx="3" fill="#90A4AE"/>
+</svg>

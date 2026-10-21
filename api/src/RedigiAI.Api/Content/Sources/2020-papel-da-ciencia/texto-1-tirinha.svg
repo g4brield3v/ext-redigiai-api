@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320">
+  <!-- Tirinha em três quadros: quem nega a ciência usa a ciência para negá-la. -->
+  <rect width="900" height="320" fill="#FFFFFF"/>
+  <g fill="#FFFDF5" stroke="#1F2A44" stroke-width="4">
+    <rect x="10" y="10" width="285" height="300" rx="6"/>
+    <rect x="307" y="10" width="285" height="300" rx="6"/>
+    <rect x="604" y="10" width="285" height="300" rx="6"/>
+  </g>
+
+  <!-- Personagem A (camiseta laranja) -->
+
+  <!-- Quadro 1: A cruza os braços -->
+  <g transform="translate(150 200)">
+    <circle cx="0" cy="0" r="30" fill="#F1C7A1" stroke="#1F2A44" stroke-width="3"/>
+    <path d="M-30,-6 Q-26,-38 0,-36 Q26,-38 30,-6 Q18,-24 0,-22 Q-18,-24 -30,-6 Z" fill="#5C3A26"/>
+    <circle cx="-10" cy="2" r="3.5" fill="#1F2A44"/>
+    <circle cx="10" cy="2" r="3.5" fill="#1F2A44"/>
+    <path d="M-34,40 Q0,28 34,40 L40,110 L-40,110 Z" fill="#E07A5F" stroke="#1F2A44" stroke-width="3"/>
+  </g>
+  <path d="M138,212 L162,212" stroke="#1F2A44" stroke-width="3" stroke-linecap="round"/>
+  <path d="M118,260 L182,252 M118,252 L182,260" stroke="#C8603F" stroke-width="12" stroke-linecap="round"/>
+  <g>
+    <path d="M30,30 L275,30 Q285,30 285,40 L285,100 Q285,110 275,110 L175,110 L160,135 L155,110 L40,110 Q30,110 30,100 L30,40 Q30,30 40,30 Z" fill="#FFFFFF" stroke="#1F2A44" stroke-width="3"/>
+    <text x="157" y="64" text-anchor="middle" font-family="Segoe UI, Arial" font-size="19" fill="#1F2A44">Ciência? Eu não</text>
+    <text x="157" y="90" text-anchor="middle" font-family="Segoe UI, Arial" font-size="19" fill="#1F2A44">acredito nisso.</text>
+  </g>
+
+  <!-- Quadro 2: A digita no celular -->
+  <g transform="translate(450 200)">
+    <circle cx="0" cy="0" r="30" fill="#F1C7A1" stroke="#1F2A44" stroke-width="3"/>
+    <path d="M-30,-6 Q-26,-38 0,-36 Q26,-38 30,-6 Q18,-24 0,-22 Q-18,-24 -30,-6 Z" fill="#5C3A26"/>
+    <circle cx="-10" cy="2" r="3.5" fill="#1F2A44"/>
+    <circle cx="10" cy="2" r="3.5" fill="#1F2A44"/>
+    <path d="M-34,40 Q0,28 34,40 L40,110 L-40,110 Z" fill="#E07A5F" stroke="#1F2A44" stroke-width="3"/>
+  </g>
+  <path d="M438,214 Q450,220 462,214" stroke="#1F2A44" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="482" y="232" width="26" height="44" rx="5" fill="#2B2D42" stroke="#1F2A44" stroke-width="2"/>
+  <rect x="486" y="237" width="18" height="32" rx="2" fill="#7FB3D5"/>
+  <path d="M472,262 L486,252" stroke="#F1C7A1" stroke-width="10" stroke-linecap="round"/>
+  <g>
+    <path d="M327,30 L572,30 Q582,30 582,40 L582,100 Q582,110 572,110 L472,110 L457,135 L452,110 L337,110 Q327,110 327,100 L327,40 Q327,30 337,30 Z" fill="#FFFFFF" stroke="#1F2A44" stroke-width="3"/>
+    <text x="454" y="64" text-anchor="middle" font-family="Segoe UI, Arial" font-size="19" fill="#1F2A44">Vou avisar todo</text>
+    <text x="454" y="90" text-anchor="middle" font-family="Segoe UI, Arial" font-size="19" fill="#1F2A44">mundo pelo grupo.</text>
+  </g>
+
+  <!-- Quadro 3: B, impassível, responde -->
+  <g>
+    <circle cx="700" cy="200" r="30" fill="#8D5A3B" stroke="#1F2A44" stroke-width="3"/>
+    <path d="M672,190 Q676,160 700,162 Q724,160 728,190 Q712,174 700,176 Q688,174 672,190 Z" fill="#1F1A17"/>
+    <path d="M688,200 L696,200 M704,200 L712,200" stroke="#1F2A44" stroke-width="4" stroke-linecap="round"/>
+    <path d="M690,216 L710,216" stroke="#1F2A44" stroke-width="3" stroke-linecap="round"/>
+    <path d="M666,240 Q700,228 734,240 L740,310 L660,310 Z" fill="#81B29A" stroke="#1F2A44" stroke-width="3"/>
+  </g>
+  <g>
+    <path d="M800,200 m-28,0 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0" fill="#F1C7A1" stroke="#1F2A44" stroke-width="3"/>
+    <path d="M772,194 Q776,166 800,168 Q824,166 828,194 Q812,180 800,182 Q788,180 772,194 Z" fill="#5C3A26"/>
+    <circle cx="791" cy="202" r="3" fill="#1F2A44"/>
+    <circle cx="809" cy="202" r="3" fill="#1F2A44"/>
+    <path d="M770,240 Q800,230 830,240 L834,310 L766,310 Z" fill="#E07A5F" stroke="#1F2A44" stroke-width="3"/>
+  </g>
+  <g>
+    <path d="M624,30 L869,30 Q879,30 879,40 L879,100 Q879,110 869,110 L725,110 L705,140 L700,110 L634,110 Q624,110 624,100 L624,40 Q624,30 634,30 Z" fill="#FFFFFF" stroke="#1F2A44" stroke-width="3"/>
+    <text x="751" y="64" text-anchor="middle" font-family="Segoe UI, Arial" font-size="19" fill="#1F2A44">Pelo celular.</text>
+    <text x="751" y="90" text-anchor="middle" font-family="Segoe UI, Arial" font-size="19" fill="#1F2A44">Via satélite.</text>
+  </g>
+</svg>

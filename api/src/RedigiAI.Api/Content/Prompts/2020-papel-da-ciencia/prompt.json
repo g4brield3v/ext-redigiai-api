@@ -1,0 +1,112 @@
+{
+  "exam": "fuvest",
+  "slug": "o-papel-da-ciencia-no-mundo-contemporaneo",
+  "title": "O papel da ciência no mundo contemporâneo",
+  "summary": "Inspirada no tema da Fuvest 2020. Coletânea com tirinha, ensaio, letra de canção em três colunas, artigo de opinião e crônica.",
+  "sourceLabel": "Inspirada na Fuvest 2020 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "image",
+        "imageFile": "texto-1-tirinha.png",
+        "alt": "Tirinha em três quadros: uma pessoa diz não acreditar na ciência e vai avisar todos pelo celular; outra lembra que o celular funciona via satélite.",
+        "aiDescription": "Tirinha em três quadros. Quadro 1: uma pessoa de camiseta laranja, de braços cruzados e expressão séria, diz: \"Ciência? Eu não acredito nisso.\" Quadro 2: a mesma pessoa, sorrindo, segura um celular e diz: \"Vou avisar todo mundo pelo grupo.\" Quadro 3: outra pessoa, de camiseta verde, ao lado da primeira, responde com expressão impassível: \"Pelo celular. Via satélite.\" O humor está em quem nega a ciência usar uma tecnologia que só existe graças a ela.",
+        "source": "Tirinha criada pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "prose",
+        "body": "A ciência não nasce no laboratório; nasce numa sociedade que acha normal fazer perguntas. Onde a curiosidade é tratada como insolência, onde a dúvida é confundida com fraqueza, não há verba que produza descobertas. Por isso a ciência é, antes de tudo, um traço de cultura, como a música ou a culinária de um povo. E é dessa cultura que depende a tecnologia que nos alimenta, nos cura e nos transporta: sem uma população que compreenda e valorize o conhecimento, nenhuma inovação dura muito.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "verse",
+        "columns": [
+          [
+            "Pergunta é semente",
+            "que cai no chão da mente,",
+            "e o chão, se é bom,",
+            "devolve em floresta."
+          ],
+          [
+            "O átomo tem música,",
+            "a célula tem dança,",
+            "a estrela tem idade",
+            "de vó, de criança."
+          ],
+          [
+            "Ciência e poesia,",
+            "irmãs de uma mesma mão:",
+            "uma mede o mistério,",
+            "a outra lhe dá canção."
+          ]
+        ],
+        "source": "Letra de canção elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "prose",
+        "body": "Construímos uma civilização que depende da ciência em quase tudo: na água tratada que sai da torneira, na vacina que chega ao posto de saúde, na previsão do tempo que orienta o plantio, na urna eletrônica que conta os votos. Ao mesmo tempo, poucas pessoas sabem explicar como qualquer uma dessas coisas funciona. Dependência sem compreensão é uma combinação perigosa: quem não entende de onde vem o próprio conforto fica à mercê de quem promete explicações simples — e falsas.",
+        "source": "Artigo de opinião elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "prose",
+        "body": "Meu tio nunca viveu tanto nem tão bem: tomou vacina, operou o coração, trocou o joelho. Passa as noites, porém, compartilhando vídeos que dizem que os cientistas mentem. Ele grava tudo com um celular de última geração, fruto de décadas de física e de química, e envia pela mesma rede que os pesquisadores usam para trocar seus artigos. Vivemos um tempo estranho, em que se usa a ciência para negar a ciência.",
+        "source": "Crônica elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **o papel da ciência no mundo contemporâneo.**"
+      }
+    },
+    {
+      "position": 70,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível e não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista sobre a função da ciência hoje e o paradoxo entre a dependência da sociedade em relação à ciência e a desconfiança ou a ignorância sobre ela (Textos 1, 4 e 5); a ciência como parte da cultura e condição da tecnologia (Texto 2); a aproximação entre ciência, arte e curiosidade (Texto 3). Espera-se posicionamento sobre o lugar da ciência no mundo contemporâneo, e não apenas a defesa genérica do progresso.",
+    "tangentSignals": "Fala de tecnologia ou de inovação em geral sem discutir o papel da ciência; trata só da história da ciência; lista avanços científicos sem posicionamento sobre o mundo contemporâneo; discute apenas notícias falsas, sem relacioná-las à ciência.",
+    "offTopicSignals": "Não menciona ciência nem conhecimento científico.",
+    "keyData": [
+      "Texto 1: tirinha — quem diz não acreditar na ciência usa o celular, que funciona via satélite, para espalhar a ideia.",
+      "Texto 2: a ciência depende de uma cultura que valoriza a curiosidade; dela depende a tecnologia.",
+      "Texto 3: canção — ciência e poesia como irmãs; a pergunta como semente.",
+      "Texto 4: a sociedade depende da ciência em quase tudo, mas quase ninguém a compreende; isso abre espaço para explicações falsas.",
+      "Texto 5: usa-se a ciência para negar a ciência."
+    ]
+  }
+}

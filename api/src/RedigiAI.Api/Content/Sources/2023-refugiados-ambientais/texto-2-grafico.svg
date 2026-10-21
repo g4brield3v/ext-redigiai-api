@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 560 560">
+  <!-- Dados: Banco Mundial, Groundswell parte 2 (2021), cenário pessimista, migrantes climáticos internos até 2050. -->
+  <rect width="560" height="560" fill="#FFFFFF"/>
+  <text x="28" y="48" font-family="Segoe UI, Arial" font-weight="700" font-size="25" fill="#1F2A44">Migrantes climáticos internos</text>
+  <text x="28" y="80" font-family="Segoe UI, Arial" font-weight="700" font-size="25" fill="#1F2A44">projetados até 2050</text>
+  <text x="28" y="112" font-family="Segoe UI, Arial" font-size="17" fill="#5B6577">Até 216 milhões de pessoas em seis regiões,</text>
+  <text x="28" y="134" font-family="Segoe UI, Arial" font-size="17" fill="#5B6577">no cenário mais pessimista</text>
+  <line x1="28" y1="152" x2="532" y2="152" stroke="#D5DBE5" stroke-width="2"/>
+
+  <!-- Escala: 86 milhões = 280 px -->
+  <g font-family="Segoe UI, Arial" font-size="16" fill="#1F2A44">
+    <text x="28" y="192">África Subsaariana</text>
+    <rect x="28" y="200" width="280" height="22" rx="3" fill="#C2452D"/>
+    <text x="318" y="217" font-weight="700">86 milhões</text>
+
+    <text x="28" y="254">Leste Asiático e Pacífico</text>
+    <rect x="28" y="262" width="160" height="22" rx="3" fill="#C2452D"/>
+    <text x="198" y="279" font-weight="700">49 milhões</text>
+
+    <text x="28" y="316">Sul da Ásia</text>
+    <rect x="28" y="324" width="130" height="22" rx="3" fill="#C2452D"/>
+    <text x="168" y="341" font-weight="700">40 milhões</text>
+
+    <text x="28" y="378">Norte da África</text>
+    <rect x="28" y="386" width="62" height="22" rx="3" fill="#C2452D"/>
+    <text x="100" y="403" font-weight="700">19 milhões</text>
+
+    <text x="28" y="440">América Latina</text>
+    <rect x="28" y="448" width="55" height="22" rx="3" fill="#E08A6F"/>
+    <text x="93" y="465" font-weight="700">17 milhões</text>
+
+    <text x="28" y="502">Leste Europeu e Ásia Central</text>
+    <rect x="28" y="510" width="16" height="22" rx="3" fill="#C2452D"/>
+    <text x="54" y="527" font-weight="700">5 milhões</text>
+  </g>
+  <text x="532" y="552" text-anchor="end" font-family="Segoe UI, Arial" font-size="12.5" fill="#5B6577">Fonte: Banco Mundial, Groundswell, parte 2 (2021)</text>
+</svg>
