@@ -84,6 +84,21 @@ public sealed record PromptBlockPublicDataDto
     /// <summary>Os 3 itens do card, empilhados na ordem.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<PromptCardItemPublicDto>? CardItems { get; init; }
+
+    /// <summary>
+    /// Texto da coletânea: <c>half</c> fica lado a lado com o texto vizinho que também é <c>half</c> (no celular, um
+    /// embaixo do outro). Ausente: largura inteira.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Width { get; init; }
+
+    /// <summary>Texto da coletânea: <c>true</c> quando o rótulo não aparece na tela.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HideLabel { get; init; }
+
+    /// <summary>Texto da coletânea: notas de rodapé, mostradas entre o texto e a fonte.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Notes { get; init; }
 }
 
 /// <param name="Kind">

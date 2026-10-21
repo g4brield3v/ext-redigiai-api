@@ -78,6 +78,18 @@ public static class CollectionFormat
     public static bool IsKnown(string? format) => format is Prose or Verse or Image;
 }
 
+/// <summary>Largura de um texto da coletânea na página, como vai gravada em <see cref="PromptBlockData.Width"/>.</summary>
+public static class CollectionWidth
+{
+    /// <summary>A largura inteira (o padrão, gravado como ausente).</summary>
+    public const string Full = "full";
+
+    /// <summary>Metade: fica ao lado do texto vizinho que também é metade; no celular, um embaixo do outro.</summary>
+    public const string Half = "half";
+
+    public static bool IsKnown(string? width) => width is Full or Half;
+}
+
 /// <summary>
 /// Conteúdo de um bloco (<c>data</c>, em jsonb). Cada tipo usa só os seus campos; os textos aceitam um markdown
 /// mínimo (<c>**negrito**</c>, <c>*itálico*</c> e quebra de linha), nunca HTML.
@@ -121,28 +133,30 @@ public sealed record PromptBlockData
     /// <summary>Os itens do card, na ordem em que aparecem.</summary>
     public IReadOnlyList<PromptCardItem>? CardItems { get; init; }
 
+    /// <summary>Texto da coletânea: <c>half</c> para ficar lado a lado com o vizinho; ausente é a largura inteira.</summary>
+    public string? Width { get; init; }
+
+    /// <summary>
+    /// Texto da coletânea sem o rótulo na tela, como nas provas que não numeram os textos. A correção e a verificação
+    /// de cópia continuam usando o rótulo.
+    /// </summary>
+    public bool? HideLabel { get; init; }
+
+    /// <summary>Notas de rodapé do texto da coletânea (glossário, tradução), entre o texto e a fonte.</summary>
+    public IReadOnlyList<string>? Notes { get; init; }
+
     /// <summary>Só os campos do tipo (e, na coletânea, do formato): o que não pertence ao bloco não é guardado.</summary>
     public static PromptBlockData For(PromptBlockKind kind, PromptBlockData data) => kind switch
     {
-        PromptBlockKind.CollectionItem => data.Format switch
+        PromptBlockKind.CollectionItem => CollectionItem(data) with
         {
-            CollectionFormat.Verse => new PromptBlockData
-            {
-                Label = Clean(data.Label),
-                Format = data.Format,
-                Source = Clean(data.Source),
-                Columns = [.. (data.Columns ?? []).Select(column => (IReadOnlyList<string>)[.. (column ?? []).Select(verse => verse ?? "")])],
-            },
-            CollectionFormat.Image => new PromptBlockData
-            {
-                Label = Clean(data.Label),
-                Format = data.Format,
-                Source = Clean(data.Source),
-                AssetId = data.AssetId,
-                Alt = Clean(data.Alt),
-                AiDescription = Clean(data.AiDescription),
-            },
-            _ => new PromptBlockData { Label = Clean(data.Label), Format = data.Format, Source = Clean(data.Source), Body = Clean(data.Body) },
+            Label = Clean(data.Label),
+            Format = data.Format,
+            Source = Clean(data.Source),
+            // A largura inteira é o padrão: gravada como ausente. Uma desconhecida fica, para a validação recusar.
+            Width = Clean(data.Width) is { } width && width != CollectionWidth.Full ? width : null,
+            HideLabel = data.HideLabel == true ? true : null,
+            Notes = (data.Notes ?? []).Select(Clean).OfType<string>().ToList() is { Count: > 0 } notes ? notes : null,
         },
         PromptBlockKind.Command or PromptBlockKind.Paragraph => new PromptBlockData { Body = Clean(data.Body) },
         PromptBlockKind.Instructions => new PromptBlockData
@@ -159,12 +173,29 @@ public sealed record PromptBlockData
         _ => None,
     };
 
+    /// <summary>O conteúdo do formato do texto da coletânea; os campos comuns a todos os formatos vêm de <see cref="For"/>.</summary>
+    private static PromptBlockData CollectionItem(PromptBlockData data) => data.Format switch
+    {
+        CollectionFormat.Verse => new PromptBlockData
+        {
+            Columns = [.. (data.Columns ?? []).Select(column => (IReadOnlyList<string>)[.. (column ?? []).Select(verse => verse ?? "")])],
+        },
+        CollectionFormat.Image => new PromptBlockData
+        {
+            AssetId = data.AssetId,
+            Alt = Clean(data.Alt),
+            AiDescription = Clean(data.AiDescription),
+        },
+        _ => new PromptBlockData { Body = Clean(data.Body) },
+    };
+
     /// <summary>Todos os textos do bloco, para os limites de tamanho e a conferência das marcações.</summary>
     public IEnumerable<string> Texts()
     {
         string?[] single = [Label, Source, Body, Alt, AiDescription, Title, Text];
         return single.OfType<string>()
             .Concat(Items ?? [])
+            .Concat(Notes ?? [])
             .Concat((Columns ?? []).SelectMany(column => column ?? []))
             .Concat((CardItems ?? []).SelectMany(item => item.Texts()))
             .Where(text => text is not null);

@@ -105,6 +105,18 @@ public sealed record PromptBlockDataDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<PromptCardItemDto>? CardItems { get; init; }
 
+    /// <summary>Texto da coletânea: <c>full</c> (padrão) ou <c>half</c>, lado a lado com o vizinho que também é <c>half</c>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Width { get; init; }
+
+    /// <summary>Texto da coletânea: <c>true</c> esconde o rótulo na tela. A correção continua recebendo o rótulo.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HideLabel { get; init; }
+
+    /// <summary>Texto da coletânea: notas de rodapé (até 5), entre o texto e a fonte.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Notes { get; init; }
+
     /// <summary>Só na resposta: endereço público da imagem do bloco. Ignorado quando enviado.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ImageUrl { get; init; }

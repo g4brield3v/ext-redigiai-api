@@ -153,6 +153,9 @@ internal sealed class CatalogService(
                     Alt = item.Alt,
                     Caption = item.Caption,
                 }).ToList(),
+                Width = data.Width,
+                HideLabel = data.HideLabel,
+                Notes = data.Notes,
             });
     }
 
