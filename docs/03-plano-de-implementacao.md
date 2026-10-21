@@ -37,7 +37,7 @@ Especificação: seções 2, 5, 6 (Conta e Catálogo), 11, 12, 13 e 15.
 - Railway (staging) com api, worker e PostgreSQL; Vercel com preview por pull request.
 
 **Aceite**
-- Cadastro com Google e com link por e-mail; menor de 16 recusado com `AGE_BELOW_MINIMUM`.
+- Cadastro com Google e com código por e-mail; menor de 16 recusado com `AGE_BELOW_MINIMUM`.
 - Um aluno recebe exatamente 1 crédito grátis, mesmo com `POST /v1/me` repetido ou simultâneo.
 - Teste automático de acesso cruzado: aluno A recebe 404 ao pedir recurso do aluno B.
 - Início e Temas iguais ao design em 360 px e 1440 px.

@@ -35,7 +35,7 @@ O MVP roda em quatro serviços gerenciados e um backend .NET com dois processos 
 | Frontend | React + Vite + TypeScript na Vercel (Pro) | Telas, upload direto ao Cloudinary, checkout |
 | Backend | ASP.NET Core em Docker no Railway, processos `api` e `worker` | Regras de negócio, fila, integrações |
 | Banco | PostgreSQL no Railway | Dados, fila de jobs, livro-razão de créditos |
-| Login | Clerk | Google e link por e-mail; o backend valida o JWT |
+| Login | Clerk | Google e código por e-mail; o backend valida o JWT |
 | Pagamentos | Mercado Pago | Plano mensal no cartão; avulsa por Pix ou cartão |
 | Arquivos | Cloudinary | Fotos em pasta privada, URLs assinadas |
 | E-mail | SendGrid | Avisos transacionais |
@@ -476,7 +476,7 @@ O público inclui adolescentes de 16 e 17 anos e as fotos podem conter caligrafi
 
 **Aplicação**
 
-- Autenticação pelo Clerk (Google e link por e-mail, sem senha). O backend valida assinatura, emissor, audiência e expiração do JWT em toda requisição.
+- Autenticação pelo Clerk (Google e código por e-mail, sem senha). O backend valida assinatura, emissor, audiência e expiração do JWT em toda requisição.
 - Autorização por recurso: toda consulta filtra por `user_id`; testes automáticos cobrem acesso cruzado entre contas.
 - Fotos em pasta privada do Cloudinary: upload assinado, só JPG, até 10 MB; leitura só por URL assinada de 5 min.
 - Limites de requisição por usuário e por IP; o envio de redações tem limite próprio.
