@@ -80,8 +80,27 @@ internal static class ClerkAuthentication
 
                         return Task.CompletedTask;
                     },
+                    OnAuthenticationFailed = context =>
+                    {
+                        // Por que o token foi recusado (tipo do erro e a mensagem do validador), nunca o token.
+                        context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("RedigiAI.Api.Auth")
+                            .LogWarning(
+                                "Clerk token refused: {Error} {Reason}",
+                                context.Exception.GetType().Name,
+                                context.Exception.Message.Length > 300 ? context.Exception.Message[..300] : context.Exception.Message);
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = async context =>
                     {
+                        if (context.AuthenticateFailure is { } failure && failure is not SecurityTokenException)
+                        {
+                            // Recusas do OnTokenValidated (azp, sub): o motivo, sem o token.
+                            context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("RedigiAI.Api.Auth")
+                                .LogWarning("Clerk token refused: {Reason}", failure.Message);
+                        }
+
                         context.HandleResponse();
                         if (!context.Response.HasStarted)
                         {
