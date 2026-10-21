@@ -36,15 +36,14 @@ public class SeedTests(ApiFixture api)
         Assert.Equal(0, await CountAsync(factory, db => db.Prompts.CountAsync()));
     }
 
+    /// <summary>Nem em desenvolvimento: as propostas vêm do comando import-prompts (decisão de 21/10/2026).</summary>
     [Fact]
-    public async Task In_development_the_seed_creates_the_example_prompt_once()
+    public async Task In_development_the_seed_creates_no_prompt_either()
     {
         await using var factory = await SeededAsync("Development");
 
-        var prompt = await CountAsync(factory, db => db.Prompts.SingleAsync());
-        Assert.Equal(("algoritmos-e-o-debate-publico", PromptStatus.Published), (prompt.Slug, prompt.Status));
-        Assert.False(await SeedAsync(factory));
-        Assert.Equal(1, await CountAsync(factory, db => db.Prompts.CountAsync()));
+        Assert.Equal(0, await CountAsync(factory, db => db.Prompts.CountAsync()));
+        Assert.Equal(["fuvest", "unicamp", "enem"], await CountAsync(factory, db => db.Exams.OrderBy(e => e.Position).Select(e => e.Slug).ToListAsync()));
     }
 
     [Theory]

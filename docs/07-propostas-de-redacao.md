@@ -1,6 +1,6 @@
 # RedigiAI — Propostas de redação: modelo, área de administração e guia de uso
 
-> **Ajustes decididos na implementação (12/10/2026), registrados em `docs/decisoes.md`:** **em 20/10/2026, administrador passou a ser a flag `users.is_admin` no banco (A5 abaixo), sem lista de e-mails nem segundo fator;** `<copia_da_coletanea>` vem depois de `<redacao>`, fora do trecho em cache; com 30% ou mais copiado, qualquer hipótese de nota zero é aceita; a folha pautada (`sheet.pdf`) entra numa branch própria; `GET /v1/prompts/{slug}` aceita `?version=`. **Em 15/10/2026:** as categorias saem de `GET /v1/admin/exams/{slug}/essay-types`; os itens do card vão em `data.cardItems` (e não em `data.items`, que é das Instruções). No resto, vale o que está abaixo.
+> **Ajustes decididos na implementação (12/10/2026), registrados em `docs/decisoes.md`:** **em 20/10/2026, administrador passou a ser a flag `users.is_admin` no banco (A5 abaixo), sem lista de e-mails nem segundo fator;** `<copia_da_coletanea>` vem depois de `<redacao>`, fora do trecho em cache; com 30% ou mais copiado, qualquer hipótese de nota zero é aceita; a folha pautada (`sheet.pdf`) entra numa branch própria; `GET /v1/prompts/{slug}` aceita `?version=`. **Em 15/10/2026:** as categorias saem de `GET /v1/admin/exams/{slug}/essay-types`; os itens do card vão em `data.cardItems` (e não em `data.items`, que é das Instruções). **Em 21/10/2026:** o texto da coletânea ganhou `width`, `hideLabel` e `notes` (A3 e A4), e as propostas das provas de 2016 a 2025 entram pelo comando `import-prompts` (B5). No resto, vale o que está abaixo.
 
 Este documento **substitui** o modelo de temas da especificação (`themes`, `theme_texts`, `theme_essay_types`, `theme_grading_notes`). Ele tem duas partes:
 
@@ -51,7 +51,7 @@ Os textos aceitam um markdown mínimo: `**negrito**`, `*itálico*` e quebra de l
 
 | `kind` | Campos de `data` | Exibição | Para a IA |
 |---|---|---|---|
-| `collection_item` | `label` ("Texto 1"), `format` (`prose`, `verse` ou `image`), `source`, e conforme o formato: **prose** → `body`; **verse** → `columns` (lista de colunas, cada uma uma lista de versos); **image** → `assetId`, `alt`, `aiDescription` | Rótulo em negrito, conteúdo e fonte em itálico alinhada à direita. Verso: colunas lado a lado no computador e em sequência no celular. Imagem: com `alt` | Rótulo, conteúdo (na imagem, o `aiDescription`) e fonte |
+| `collection_item` | `label` ("Texto 1"), `format` (`prose`, `verse` ou `image`), `source`, e conforme o formato: **prose** → `body`; **verse** → `columns` (lista de colunas, cada uma uma lista de versos); **image** → `assetId`, `alt`, `aiDescription`. Opcionais, em qualquer formato: `width` (`full`, o padrão, ou `half`), `hideLabel` (`true` esconde o rótulo na tela) e `notes` (até 5 notas de rodapé) | Rótulo em negrito, conteúdo, notas em letra menor e fonte em itálico alinhada à direita. Verso: colunas lado a lado no computador e em sequência no celular. Imagem: com `alt`. Dois textos `half` seguidos ficam lado a lado (no celular, um embaixo do outro); um `half` sem par ocupa a linha inteira. Com `hideLabel`, o rótulo não aparece | Rótulo (mesmo escondido na tela), conteúdo (na imagem, o `aiDescription`), notas e fonte |
 | `command` | `body` | Enunciado em destaque | Enviado |
 | `instructions` | `title` (padrão "Instruções"), `items` (lista de textos) | Primeiro item, gerado automaticamente: "**Tipo de redação:** {essayType.name}". Depois os itens cadastrados | Enviado, com o tipo |
 | `card` | `title?`, `items`: exatamente 3 itens, cada um `{ format: "text" \| "image", body? , assetId?, alt?, aiDescription?, caption? }` | Um card com os 3 itens empilhados na vertical, na ordem cadastrada; texto com o markdown permitido, imagem com `alt`, legenda opcional abaixo de cada item | Título e itens em ordem; imagem pelo `aiDescription` |
@@ -73,6 +73,7 @@ Num rascunho, o salvamento aceita conteúdo incompleto e devolve a lista de pend
    - `prose` exige `body`;
    - `verse` exige de 1 a 4 colunas com ao menos um verso;
    - `image` exige `assetId` de um asset `prompt_image`, `alt` com até 300 caracteres e `aiDescription` com 40 a 3.000 caracteres.
+   - `width` só aceita `full` ou `half`, e `notes` tem até 5 notas; os dois são conferidos já no salvamento. O rótulo continua obrigatório com `hideLabel`.
 6. `card`: exatamente 3 itens. Item de texto exige `body`; item de imagem exige `assetId`, `alt` e `aiDescription` (mesmas regras do item 5).
 7. Abordagens esperadas com `expected_focus` e `tangent_signals` preenchidos.
 8. Limites: até 40 blocos; cada texto com até 6.000 caracteres; proposta inteira com até 30.000 caracteres.
@@ -136,7 +137,7 @@ A parte da proposta na chamada de correção (seção 8 da especificação), em 
 ```
 <proposta titulo="{title}" tipo="{essayType.name}" linhas_da_folha="{exam.sheetLines}">
   {blocos na ordem de position, convertidos em texto:
-   collection_item prose → "[Texto 2] corpo — Fonte"
+   collection_item prose → "[Texto 2] corpo — Fonte"; com notas: "[Texto 2] corpo (Notas: nota; nota) — Fonte"
    collection_item verse → "[Texto 3 · verso] coluna 1 / coluna 2 / … — Fonte"
    collection_item image → "[Texto 1 · imagem] aiDescription — Fonte"
    card → "[Card: título] 1) texto ou aiDescription · 2) … · 3) …"
@@ -304,3 +305,18 @@ Os corpos dos textos estão como `[cole aqui…]`: copie-os da prova, palavra po
   }
 }
 ```
+
+## B5. Propostas que vêm com o programa (`import-prompts`)
+
+As propostas das provas da Fuvest de 2016 a 2025, com textos e imagens próprios da RedigiAI, ficam em `api/src/RedigiAI.Api/Content/Prompts`: uma pasta por proposta, com o `prompt.json` (o formato de B4) e as imagens em PNG. No bloco de imagem, `imageFile` (o nome do arquivo na pasta) ocupa o lugar de `assetId`. Os SVG de onde as imagens saíram ficam em `Content/Sources`.
+
+Para publicá-las num ambiente, uma vez:
+
+```bash
+dotnet run --project api/src/RedigiAI.Api -- import-prompts --admin <clerk_user_id de um administrador>
+```
+
+- O comando envia as imagens ao Cloudinary e publica cada proposta cujo endereço ainda não existe no ambiente. A que já existe fica como está: para mudar, crie uma versão nova pelo admin.
+- Pode rodar de novo: nada se duplica, nem as imagens.
+- Ao terminar, lista cada pasta com o resultado (`Created`, `AlreadyPresent` ou `Failed` com o motivo) e sai com código 1 se alguma falhou.
+- Para incluir uma proposta, crie a pasta com o `prompt.json` e as imagens. O teste `Bundled_prompts_are_all_published` confere que todas publicam sem pendência.
