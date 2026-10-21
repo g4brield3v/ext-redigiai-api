@@ -62,17 +62,18 @@ dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
 dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
 dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
 dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
+dotnet run --project api/src/RedigiAI.Api -- private-prompt-images  # torna privadas as imagens de proposta antigas (uma vez por ambiente)
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)
-dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (com DevAuth__Enabled=true, a própria API já roda a fila)
+dotnet run --project api/src/RedigiAI.Api -- worker   # worker da fila (em Development, a própria API já roda a fila)
 # Em desenvolvimento a IA fica desligada (Ai__Enabled=false): os jobs transcribe e grade esperam na fila e nada é
 # cobrado. Ai__Enabled=true no .env liga as chamadas reais ao Claude.
 # E-mails da redação: desligados por padrão (por enquanto só o Clerk manda e-mail). Para ligar, no banco local:
 #   UPDATE feature_flags SET enabled = true, updated_at = now() WHERE key = 'email_sending';
 # Ligados e sem SendGrid__ApiKey, cada aviso vira um arquivo HTML em .outbox/ (abra no navegador);
 # nada é enviado. Os botões apontam para App__BaseUrl (padrão http://localhost:5173).
-# Sem login, só na sua máquina: DevAuth__Enabled=true no .env (exige ambiente Development). A API então migra,
-# carrega o catálogo, cadastra os alunos de teste e aceita o cabeçalho X-Dev-User (ana | bruno | nova | admin).
-# O usuário admin de teste já vem com a flag is_admin. Fora do DevAuth, administrador é quem tem a flag no banco:
+# Não existe acesso sem login, nem na sua máquina: entre pelo Clerk de desenvolvimento (chaves no .env da API e do front).
+# Em Development, a API migra o banco, carrega o catálogo e roda a fila ao subir (LocalRun__Enabled=false desliga).
+# Administrador é quem tem a flag no banco:
 #   BEGIN; UPDATE users SET is_admin = true WHERE clerk_user_id = '<user_… do painel do Clerk>'; -- confira "UPDATE 1"; senão ROLLBACK; COMMIT;
 #   Pelo clerk_user_id (o e-mail não é único). false para tirar; vale na requisição seguinte.
 dotnet ef migrations add <Nome> -p api/src/RedigiAI.Infrastructure -s api/src/RedigiAI.Api -o Persistence/Migrations

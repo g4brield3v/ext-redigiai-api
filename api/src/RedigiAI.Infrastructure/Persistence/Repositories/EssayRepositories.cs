@@ -133,6 +133,9 @@ internal sealed class AssetRepository(AppDbContext db) : IAssetRepository
     public Task<Asset?> FindByIdAsync(Guid assetId, CancellationToken ct) =>
         db.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == assetId, ct);
 
+    public async Task<IReadOnlyList<string>> AllPromptImagePublicIdsAsync(CancellationToken ct) =>
+        await db.Assets.AsNoTracking().Where(a => a.Scope == AssetScope.PromptImage).Select(a => a.PublicId).ToListAsync(ct);
+
     public async Task<IReadOnlyDictionary<Guid, string>> PromptImagePublicIdsAsync(
         IReadOnlyCollection<Guid> assetIds, CancellationToken ct)
     {

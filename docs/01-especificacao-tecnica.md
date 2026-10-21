@@ -172,9 +172,9 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 
 ## 6. API
 
-API REST em ASP.NET Core, prefixo `/v1`, JSON. Rotas públicas servem só catálogo; o resto exige o token do Clerk (`Authorization: Bearer`), validado pelo JWKS do Clerk. As rotas de administração (`/v1/admin/*`) exigem ainda o papel `admin` e o segundo fator na sessão; estão descritas em `docs/07-propostas-de-redacao.md`, A5. Todo acesso a redação filtra por `user_id` do token: um aluno nunca lê a redação de outro (resposta 404, não 403).
+API REST em ASP.NET Core, prefixo `/v1`, JSON. Nada do conteúdo é público: sem login, só respondem `/health`, `/ready` e os avisos assinados do Mercado Pago e do Clerk; todo o resto, inclusive o catálogo, exige o token do Clerk (`Authorization: Bearer`), validado pelo JWKS do Clerk (política padrão: rota sem declaração exige login). Não há acesso sem login nem no desenvolvimento. As rotas de administração (`/v1/admin/*`) exigem ainda a flag `users.is_admin`; estão descritas em `docs/07-propostas-de-redacao.md`, A5. Todo acesso a redação filtra por `user_id` do token: um aluno nunca lê a redação de outro (resposta 404, não 403).
 
-**Catálogo (público)**
+**Catálogo (exige login e o cadastro concluído; sem conta na plataforma, `PROFILE_NOT_FOUND`)**
 
 | Método e rota | Faz |
 |---|---|

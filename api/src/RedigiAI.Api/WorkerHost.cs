@@ -28,8 +28,6 @@ internal static class WorkerHost
     public static HostApplicationBuilder CreateBuilder(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
-        // Worker, migrate e seed também se recusam a subir com o acesso de desenvolvimento ligado fora de Development.
-        _ = Auth.DevAuthentication.IsEnabled(builder.Configuration, builder.Environment);
         builder.Logging.UseJsonConsole();
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure();
@@ -85,6 +83,18 @@ internal static class DatabaseCommands
         var seeded = await scope.ServiceProvider.GetRequiredService<ICatalogSeedService>().SeedAsync(CancellationToken.None);
         scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.Seed")
             .LogInformation(seeded ? "Catalog seeded" : "Catalog already present; nothing to do");
+        return 0;
+    }
+
+    /// <summary>Torna privadas as imagens de proposta enviadas como públicas antes de 20/10/2026.</summary>
+    public static async Task<int> MakePromptImagesPrivateAsync(string[] args)
+    {
+        using var host = WorkerHost.CreateBuilder(args).Build();
+        await using var scope = host.Services.CreateAsyncScope();
+        var (changed, total) = await scope.ServiceProvider.GetRequiredService<RedigiAI.Application.Catalog.IPromptImageMaintenance>()
+            .MakeAllPrivateAsync(CancellationToken.None);
+        scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.PromptImages")
+            .LogInformation("Prompt images made private: {Changed} of {Total}", changed, total);
         return 0;
     }
 }

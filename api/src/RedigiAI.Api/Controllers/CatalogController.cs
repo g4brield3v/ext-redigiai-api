@@ -1,3 +1,4 @@
+using RedigiAI.Api.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RedigiAI.Api.Http;
@@ -6,9 +7,10 @@ using RedigiAI.Domain.Common;
 
 namespace RedigiAI.Api.Controllers;
 
-/// <summary>Catálogo público: vestibulares, propostas de redação e grades de correção.</summary>
+/// <summary>Catálogo: vestibulares, propostas de redação e grades de correção. Só para quem está logado.</summary>
 [ApiController]
-[AllowAnonymous]
+[Authorize]
+[RegisteredOnly]
 [Route("v1")]
 [Tags("Catalog")]
 [Produces("application/json")]

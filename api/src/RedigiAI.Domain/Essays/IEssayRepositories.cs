@@ -67,6 +67,9 @@ public interface IAssetRepository
 
     /// <summary>Entre os ids pedidos, os que são imagens de proposta, com o identificador de cada uma no provedor.</summary>
     Task<IReadOnlyDictionary<Guid, string>> PromptImagePublicIdsAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken ct);
+
+    /// <summary>Os identificadores de todas as imagens de proposta (para torná-las privadas de uma vez).</summary>
+    Task<IReadOnlyList<string>> AllPromptImagePublicIdsAsync(CancellationToken ct);
 }
 
 public interface ITranscriptionRepository

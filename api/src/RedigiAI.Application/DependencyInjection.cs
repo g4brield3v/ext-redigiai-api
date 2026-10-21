@@ -18,7 +18,6 @@ public static class DependencyInjection
         services.AddScoped<IAdminAccessService, AdminAccessService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IClerkWebhookService, ClerkWebhookService>();
-        services.AddScoped<ITestAccountService, TestAccountService>();
         services.AddScoped<ICreditService, CreditService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<PlanCredits>();
@@ -27,6 +26,8 @@ public static class DependencyInjection
         services.AddScoped<Abstractions.IJobHandler, ProcessRefundHandler>();
         services.AddScoped<Abstractions.IJobHandler, ProcessSubscriptionHandler>();
         services.AddScoped<PlanResume>();
+        services.AddScoped<Accounts.IRegisteredAccess, Accounts.RegisteredAccess>();
+        services.AddScoped<Catalog.IPromptImageMaintenance, Catalog.PromptImageMaintenance>();
         services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
         services.AddScoped<Abstractions.IJobHandler, ProcessPaymentHandler>();
         services.AddScoped<ICatalogService, CatalogService>();

@@ -28,9 +28,9 @@ public class PromptFlowTests(ApiFixture api)
         var admin = await AdminAsync();
         var (id, slug) = await PublishAsync(admin, "Proposta para o aluno");
 
-        var listed = (await api.CreateClient().GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts"))
+        var listed = (await api.RegisteredClient().GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts"))
             .EnumerateArray().Single(p => p.GetProperty("id").GetGuid() == id);
-        var raw = await api.CreateClient().GetStringAsync($"/v1/prompts/{slug}");
+        var raw = await api.RegisteredClient().GetStringAsync($"/v1/prompts/{slug}");
         var prompt = JsonDocument.Parse(raw).RootElement;
 
         Assert.Equal(("Proposta para o aluno", "Dissertação em prosa", 5), (
@@ -41,7 +41,7 @@ public class PromptFlowTests(ApiFixture api)
 
         // A imagem chega pelo endereço público, com o texto alternativo.
         var strip = prompt.GetProperty("blocks")[0].GetProperty("data");
-        Assert.StartsWith("https://res.cloudinary.com/test/image/upload/prompts/", strip.GetProperty("imageUrl").GetString());
+        Assert.StartsWith("https://api.cloudinary.test/image/download?public_id=prompts/", strip.GetProperty("imageUrl").GetString());
         Assert.False(string.IsNullOrEmpty(strip.GetProperty("alt").GetString()));
 
         // As abordagens esperadas, a descrição da imagem para a IA e os ids internos não saem.
@@ -149,14 +149,14 @@ public class PromptFlowTests(ApiFixture api)
         var id = await CreateAsync(admin, document);
         (await admin.PostAsync($"/v1/admin/prompts/{id}/publish", null)).EnsureSuccessStatusCode();
 
-        var raw = await api.CreateClient().GetStringAsync($"/v1/prompts/{slug}");
+        var raw = await api.RegisteredClient().GetStringAsync($"/v1/prompts/{slug}");
         var card = JsonDocument.Parse(raw).RootElement.GetProperty("blocks").EnumerateArray()
             .Single(b => b.GetProperty("kind").GetString() == "card").GetProperty("data");
 
         var items = card.GetProperty("cardItems").EnumerateArray().ToList();
         Assert.Equal(["text", "image", "text"], items.Select(i => i.GetProperty("format").GetString()));
         Assert.Equal(("Primeiro item.", "Fonte: IBGE."), (items[0].GetProperty("body").GetString(), items[0].GetProperty("caption").GetString()));
-        Assert.StartsWith("https://res.cloudinary.com/test/image/upload/prompts/", items[1].GetProperty("imageUrl").GetString());
+        Assert.StartsWith("https://api.cloudinary.test/image/download?public_id=prompts/", items[1].GetProperty("imageUrl").GetString());
         Assert.Equal("Gráfico de barras.", items[1].GetProperty("alt").GetString());
         Assert.False(card.TryGetProperty("title", out _));
         Assert.DoesNotContain("aiDescription", raw);

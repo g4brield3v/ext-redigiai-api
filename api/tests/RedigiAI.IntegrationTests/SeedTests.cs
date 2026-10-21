@@ -29,7 +29,7 @@ public class SeedTests(ApiFixture api)
         Assert.Equal(["fuvest", "unicamp", "enem"], await CountAsync(factory, db => db.Exams.OrderBy(e => e.Position).Select(e => e.Slug).ToListAsync()));
         Assert.Equal(1, await CountAsync(factory, db => db.RubricVersions.CountAsync()));
         Assert.Equal(2, await CountAsync(factory, db => db.GradingProfiles.CountAsync(p => p.Status == GradingProfileStatus.Active)));
-        Assert.Empty((await factory.CreateClient().GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts")).EnumerateArray());
+        Assert.Empty((await api.RegisteredClient(factory).GetFromJsonAsync<JsonElement>("/v1/exams/fuvest/prompts")).EnumerateArray());
 
         // Rodar de novo continua sem criar proposta.
         Assert.False(await SeedAsync(factory));
