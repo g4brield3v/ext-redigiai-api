@@ -65,7 +65,8 @@ internal static class PromptText
             CollectionFormat.Image => (" · imagem", data.AiDescription ?? ""),
             _ => ("", data.Body ?? ""),
         };
-        return $"[{data.Label}{mark}] {content} — {data.Source}";
+        var notes = data.Notes is { Count: > 0 } ? $" (Notas: {string.Join("; ", data.Notes)})" : "";
+        return $"[{data.Label}{mark}] {content}{notes} — {data.Source}";
     }
 
     /// <summary><c>[Card: título] 1) texto — legenda · 2) descrição da imagem · 3) …</c>; sem título, <c>[Card]</c>.</summary>

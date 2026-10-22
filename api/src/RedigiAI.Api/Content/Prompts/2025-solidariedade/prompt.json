@@ -1,0 +1,130 @@
+{
+  "exam": "fuvest",
+  "slug": "relacoes-sociais-por-meio-da-solidariedade",
+  "title": "As relações sociais por meio da solidariedade",
+  "summary": "Inspirada no tema da Fuvest 2025. Coletânea com trecho de romance, ensaio, conto, cartaz, notícia, letra de canção e aforismo.",
+  "sourceLabel": "Inspirada na Fuvest 2025 · textos próprios da RedigiAI",
+  "essayType": "dissertacao",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "prose",
+        "body": "Dona Celestina anunciou o bazar beneficente na missa de domingo, em voz alta o bastante para que o vigário ouvisse e as vizinhas também. A lista dos doadores sairia no jornal da vila, com os nomes em ordem de valor — ideia dela, que reservara para si a primeira linha. Os velhos do asilo não leriam o jornal; mas a vila leria, e era isso o que importava. Na véspera, mandou a criada engomar as luvas brancas. Caridade, dizia, também se veste.",
+        "source": "Trecho de romance elaborado pela equipe RedigiAI, à maneira da prosa realista do século XIX."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "prose",
+        "body": "Nenhum ser vivo se basta. As raízes da maior parte das plantas vivem entrelaçadas a fungos que lhes trazem água e sais minerais; em troca, recebem os açúcares que a planta produz na fotossíntese. Nos recifes, pequenos peixes-limpadores retiram parasitas do corpo de peixes muito maiores, que poderiam devorá-los e não o fazem. A biologia chama essas parcerias de mutualismo: associações duradouras em que todos ganham. Talvez a solidariedade humana seja menos uma virtude rara do que a lembrança dessa regra antiga: viver é, antes de tudo, conviver.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "prose",
+        "width": "half",
+        "body": "Na enchente daquele maio, a escola virou abrigo. Minha mãe, que nunca tinha dado aula, passou a organizar a fila do almoço; o seu Jair, do bar da esquina, trouxe o fogão industrial num carrinho de mão; e uns rapazes que eu só conhecia de vista, porque viviam no fundo da quadra jogando bola, apareceram de barco, remando de casa em casa. Ninguém perguntava de quem era o colchão, o cobertor, a lata de leite. Quando a água baixou, cada um voltou para o seu canto, e a rua ficou quieta de novo. Mas, desde então, quando passo pelos rapazes do fundo da quadra, a gente se cumprimenta pelo nome.",
+        "source": "Conto elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "image",
+        "width": "half",
+        "imageFile": "texto-4-cartaz.png",
+        "alt": "Cartaz: cinco pessoas com água até a cintura passam caixas de mão em mão diante de casas alagadas.",
+        "aiDescription": "Cartaz ilustrado de uma campanha fictícia. No alto, em letras grandes: \"NINGUÉM ATRAVESSA A ENCHENTE SOZINHO\". Abaixo, cinco pessoas de tons de pele diferentes estão lado a lado, com a água até a cintura, diante de telhados de casas alagadas. Elas erguem os braços e passam caixas de papelão de mão em mão, formando uma corrente. Na parte de baixo, sobre a água, a frase: \"Doe tempo. Doe abrigo. Doe presença.\"",
+        "source": "Cartaz criado pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "prose",
+        "body": "Em novembro de 2024, na cúpula do G20 realizada no Rio de Janeiro, foi lançada a Aliança Global contra a Fome e a Pobreza, que reúne países e organizações dispostos a compartilhar recursos e experiências de programas sociais. O ponto de partida é um diagnóstico conhecido: o planeta produz alimentos suficientes para todos, e a fome persiste sobretudo por falta de acesso, não por falta de comida. A iniciativa aposta, portanto, numa solidariedade organizada — feita de políticas públicas, financiamento e cooperação entre nações —, e não apenas na boa vontade de cada um.",
+        "source": "Texto elaborado pela equipe RedigiAI com base em informações públicas sobre a cúpula do G20 de 2024."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 6",
+        "format": "verse",
+        "width": "half",
+        "columns": [
+          [
+            "Não me venha com esmola",
+            "de quem passa e não me vê:",
+            "eu não quero o que te sobra,",
+            "quero um lugar com você.",
+            "",
+            "Divida comigo a mesa,",
+            "não o resto do jantar;",
+            "quem dá só o que despreza",
+            "não aprendeu a partilhar."
+          ]
+        ],
+        "source": "Letra de canção elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 70,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 7",
+        "format": "prose",
+        "width": "half",
+        "body": "Ajudar alguém sem lhe devolver a dignidade é como emprestar um guarda-chuva furado: o gesto existe, mas a chuva continua.",
+        "source": "Aforismo elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 80,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e outras informações que julgar pertinentes, redija uma dissertação, na qual você exponha seu ponto de vista sobre o tema: **As relações sociais por meio da solidariedade.**"
+      }
+    },
+    {
+      "position": 90,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva com letra legível e não ultrapasse a quantidade de linhas disponíveis na folha de redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista sobre o papel da solidariedade na construção e na transformação das relações sociais. A coletânea opõe a caridade como exibição e marca de hierarquia (Texto 1) à solidariedade como reciprocidade e reconhecimento da dignidade do outro (Textos 6 e 7); apresenta a interdependência como condição da vida (Texto 2); mostra a solidariedade espontânea em momentos de crise e o vínculo que ela deixa (Textos 3 e 4); e a solidariedade organizada em políticas públicas e cooperação internacional (Texto 5). Espera-se que o candidato discuta o alcance e os limites da solidariedade como forma de criar laços entre pessoas e grupos.",
+    "tangentSignals": "Trata a solidariedade apenas como doação ou caridade individual, sem relacioná-la às relações sociais; enumera ações de ajuda humanitária sem posicionamento; discute fome ou pobreza só como problema econômico, sem o eixo da solidariedade; fala de amizade ou de família de modo genérico, sem a dimensão social do tema.",
+    "offTopicSignals": "Não trata de solidariedade, cooperação ou vínculos entre pessoas e grupos.",
+    "keyData": [
+      "Texto 1: a caridade usada como vitrine social; quem doa importa mais do que quem recebe.",
+      "Texto 2: na natureza, parcerias duradouras em que todos ganham (mutualismo); viver é conviver.",
+      "Texto 3: na crise, desconhecidos se ajudam sem perguntar de quem é cada coisa, e o vínculo permanece depois.",
+      "Texto 4: cartaz fictício — ninguém atravessa a enchente sozinho; doar tempo, abrigo e presença.",
+      "Texto 5: a Aliança Global contra a Fome e a Pobreza (G20, 2024); a fome é falta de acesso; solidariedade organizada em políticas públicas.",
+      "Texto 6: recusa da esmola de quem não vê o outro; partilhar a mesa, não o que sobra.",
+      "Texto 7: ajuda sem dignidade não resolve."
+    ]
+  }
+}

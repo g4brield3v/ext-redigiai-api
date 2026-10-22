@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="250" viewBox="0 0 760 250">
+  <!-- Quatro faces do riso: alegria, ironia, deboche e riso nervoso. -->
+  <rect width="760" height="250" fill="#FFF8EC"/>
+  <g font-family="Segoe UI, Arial" font-size="20" font-weight="600" fill="#1F2A44" text-anchor="middle">
+    <text x="95" y="232">alegria</text>
+    <text x="285" y="232">ironia</text>
+    <text x="475" y="232">deboche</text>
+    <text x="665" y="232">riso nervoso</text>
+  </g>
+  <g stroke="#3A2A1F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 1. Alegria -->
+    <circle cx="95" cy="110" r="80" fill="#FFD166"/>
+    <path d="M58,92 Q70,76 82,92" fill="none"/>
+    <path d="M108,92 Q120,76 132,92" fill="none"/>
+    <path d="M55,122 Q95,190 135,122 Z" fill="#8C2F39"/>
+    <path d="M70,150 Q95,166 120,150" fill="none" stroke="#F28482" stroke-width="7"/>
+    <circle cx="48" cy="126" r="11" fill="#F7A6A0" stroke="none"/>
+    <circle cx="142" cy="126" r="11" fill="#F7A6A0" stroke="none"/>
+
+    <!-- 2. Ironia -->
+    <circle cx="285" cy="110" r="80" fill="#BDE0FE"/>
+    <path d="M240,78 L268,84" fill="none"/>
+    <path d="M300,70 Q318,58 334,72" fill="none"/>
+    <circle cx="256" cy="98" r="6" fill="#3A2A1F"/>
+    <circle cx="316" cy="96" r="6" fill="#3A2A1F"/>
+    <path d="M250,146 L292,146 Q316,142 326,124" fill="none"/>
+
+    <!-- 3. Deboche -->
+    <circle cx="475" cy="110" r="80" fill="#CDB4DB"/>
+    <path d="M432,94 L462,94" fill="none"/>
+    <path d="M488,94 L518,94" fill="none"/>
+    <path d="M436,88 Q447,80 458,88" fill="none" stroke-width="3"/>
+    <path d="M492,88 Q503,80 514,88" fill="none" stroke-width="3"/>
+    <path d="M440,130 Q475,160 510,130" fill="none"/>
+    <path d="M462,142 Q470,176 486,146" fill="#F28482"/>
+
+    <!-- 4. Riso nervoso -->
+    <circle cx="665" cy="110" r="80" fill="#B7E4C7"/>
+    <path d="M622,84 L648,74" fill="none"/>
+    <path d="M682,74 L708,84" fill="none"/>
+    <circle cx="640" cy="98" r="7" fill="#3A2A1F"/>
+    <circle cx="690" cy="98" r="7" fill="#3A2A1F"/>
+    <rect x="626" y="126" width="78" height="30" rx="8" fill="#FFFFFF"/>
+    <path d="M626,141 L704,141 M646,126 L646,156 M665,126 L665,156 M684,126 L684,156" fill="none" stroke-width="3"/>
+    <path d="M718,56 Q726,70 718,78 Q710,70 718,56 Z" fill="#7FB3D5" stroke="#3A6E9C" stroke-width="2"/>
+    <path d="M732,82 Q738,93 732,99 Q726,93 732,82 Z" fill="#7FB3D5" stroke="#3A6E9C" stroke-width="2"/>
+  </g>
+</svg>

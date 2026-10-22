@@ -81,11 +81,20 @@ internal sealed class GradingSeedService(
             created = true;
         }
 
-        // Só nesta carga inicial o perfil já nasce ativo; depois disso, perfil novo passa pelos testes antes.
-        foreach (var essayType in await essayTypes.ListByExamAsync(fuvest.Id, ct))
+        // Só nesta carga inicial o perfil já nasce ativo; depois disso, perfil novo passa pelos testes antes. A exceção
+        // é categoria nova que copia o perfil ativo de outra (CopiesProfileOf): é o mesmo perfil, já em uso.
+        var types = await essayTypes.ListByExamAsync(fuvest.Id, ct);
+        foreach (var essayType in types)
         {
             if (await profiles.FindActiveAsync(fuvest.Id, essayType.Id, ct) is not null)
             {
+                continue;
+            }
+
+            if (await CopyOfActiveProfileAsync(fuvest.Id, essayType, types, now, ct) is { } copy)
+            {
+                profiles.Add(copy);
+                created = true;
                 continue;
             }
 
@@ -188,6 +197,44 @@ internal sealed class GradingSeedService(
                 return true;
             },
             ct);
+    }
+
+    /// <summary>
+    /// Categorias que corrigem exatamente como outra: "Dissertação" (o que a prova de 2025 pede) usa o perfil de
+    /// "Dissertação em prosa" (decisão de 21/10/2026).
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> CopiesProfileOf = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["dissertacao"] = "dissertacao-em-prosa",
+    };
+
+    /// <summary>Um perfil ativo igual em tudo ao da categoria de origem; <c>null</c> se não há de onde copiar.</summary>
+    private async Task<GradingProfile?> CopyOfActiveProfileAsync(
+        Guid examId, EssayType essayType, IReadOnlyList<EssayType> types, DateTimeOffset now, CancellationToken ct)
+    {
+        if (!CopiesProfileOf.TryGetValue(essayType.Slug, out var sourceSlug)
+            || types.FirstOrDefault(type => type.Slug == sourceSlug) is not { } source
+            || await profiles.FindActiveAsync(examId, source.Id, ct) is not { } active
+            || await prompts.FindAsync(active.TranscriptionPromptId, ct) is not { } transcriptionPrompt
+            || await prompts.FindAsync(active.GradingPromptId, ct) is not { } gradingPrompt)
+        {
+            return null;
+        }
+
+        var copy = GradingProfile.Draft(
+            examId,
+            essayType.Id,
+            await profiles.MaxVersionAsync(examId, essayType.Id, ct) + 1,
+            transcriptionPrompt,
+            gradingPrompt,
+            active.RubricVersionId,
+            active.GuidelinesVersionId,
+            active.WritingRulesVersionId,
+            active.TranscriptionModel,
+            active.GradingModel,
+            now);
+        copy.Activate(now);
+        return copy;
     }
 
     public static RubricVersion PublishRubric(Guid examId, int version, DateTimeOffset now) =>

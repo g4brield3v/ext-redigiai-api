@@ -25,6 +25,7 @@ public static partial class PromptRules
     public const int MaxAltLength = 300;
     public const int MinAiDescriptionLength = 40;
     public const int MaxAiDescriptionLength = 3_000;
+    public const int MaxNotes = 5;
 
     /// <summary>Texto como é guardado: quebras de linha uniformes, sem espaço nas pontas; vazio vira ausente.</summary>
     public static string? Clean(string? text)
@@ -84,6 +85,16 @@ public static partial class PromptRules
             {
                 issues.Add(new ValidationIssue(
                     $"blocks[{index}].data.columns", $"Cada coluna de um texto em verso pode ter até {MaxVersesPerColumn} versos."));
+            }
+
+            if (data.Width is not null && !CollectionWidth.IsKnown(data.Width))
+            {
+                issues.Add(new ValidationIssue($"blocks[{index}].data.width", "Largura do texto: inteira ou metade."));
+            }
+
+            if (data.Notes is { Count: > MaxNotes })
+            {
+                issues.Add(new ValidationIssue($"blocks[{index}].data.notes", $"Um texto da coletânea pode ter até {MaxNotes} notas."));
             }
 
             foreach (var text in data.Texts())
@@ -347,6 +358,9 @@ public static partial class PromptRules
             issues.Add(new ValidationIssue(path, ForbiddenMarkupMessage));
         }
     }
+
+    /// <summary>Endereço só com letras minúsculas, números e hífen (o que a publicação exige).</summary>
+    public static bool IsValidSlug(string slug) => SlugPattern().IsMatch(slug);
 
     /// <summary>Número com ponto de milhar, como se escreve em português, em qualquer configuração do servidor.</summary>
     private static string Thousands(int value) => value.ToString("#,0", PtBr);

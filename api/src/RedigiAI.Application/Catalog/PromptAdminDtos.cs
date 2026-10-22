@@ -10,7 +10,7 @@ namespace RedigiAI.Application.Catalog;
 /// <param name="Exam">Endereço do vestibular (<c>fuvest</c>).</param>
 /// <param name="EssayType">
 /// Categoria de correção, escolhida na lista de <c>GET /v1/admin/exams/{slug}/essay-types</c>
-/// (<c>dissertacao-em-prosa</c> ou <c>narrativa</c>). O nome dela é o tipo de redação.
+/// (<c>dissertacao-em-prosa</c>, <c>dissertacao</c> ou <c>narrativa</c>). O nome dela é o tipo de redação.
 /// </param>
 /// <param name="ExpectedUpdatedAt">
 /// Só no salvamento: o <c>updatedAt</c> que o editor tem. Se a proposta mudou depois disso, <c>PROMPT_CHANGED</c>.
@@ -104,6 +104,18 @@ public sealed record PromptBlockDataDto
     /// <summary>Card: exatamente 3 itens, empilhados na ordem.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<PromptCardItemDto>? CardItems { get; init; }
+
+    /// <summary>Texto da coletânea: <c>full</c> (padrão) ou <c>half</c>, lado a lado com o vizinho que também é <c>half</c>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Width { get; init; }
+
+    /// <summary>Texto da coletânea: <c>true</c> esconde o rótulo na tela. A correção continua recebendo o rótulo.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HideLabel { get; init; }
+
+    /// <summary>Texto da coletânea: notas de rodapé (até 5), entre o texto e a fonte.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Notes { get; init; }
 
     /// <summary>Só na resposta: endereço público da imagem do bloco. Ignorado quando enviado.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

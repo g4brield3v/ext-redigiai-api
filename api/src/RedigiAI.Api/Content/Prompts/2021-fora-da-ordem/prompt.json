@@ -1,0 +1,119 @@
+{
+  "exam": "fuvest",
+  "slug": "o-mundo-contemporaneo-esta-fora-da-ordem",
+  "title": "O mundo contemporâneo está fora da ordem?",
+  "summary": "Inspirada no tema da Fuvest 2021. Coletânea com ensaio, poema, letra de canção, ilustração e manifesto.",
+  "sourceLabel": "Inspirada na Fuvest 2021 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "prose",
+        "body": "Já não basta trabalhar: é preciso ser empresa de si mesmo. O jovem cuida do currículo como quem administra uma marca, mede a própria vida em seguidores e metas, trata o descanso como investimento e a amizade como rede de contatos. A concorrência, que antes valia para o mercado, passou a organizar a escola, o bairro, até o afeto. Quem fracassa aprende que a culpa é só sua. Uma ordem assim pode funcionar com eficiência impressionante — e, ainda assim, deixar a sensação de que algo essencial ficou fora dela.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "verse",
+        "width": "half",
+        "columns": [
+          [
+            "Medimos o mar em gráficos,",
+            "o amor em notificações,",
+            "a fome em porcentagens",
+            "que cabem em três colunas.",
+            "",
+            "Tudo tem seu lugar na planilha,",
+            "menos o espanto",
+            "de quem ainda olha a lua",
+            "sem saber para que serve."
+          ]
+        ],
+        "source": "Poema elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "verse",
+        "width": "half",
+        "columns": [
+          [
+            "O prédio ainda nem subiu",
+            "e já tem rachadura na parede;",
+            "a avenida é nova em folha",
+            "e o menino dorme na calçada.",
+            "",
+            "Alguém trocou as peças de lugar,",
+            "alguém esqueceu o manual:",
+            "a ordem do mundo anda bonita",
+            "e tão fora do normal."
+          ]
+        ],
+        "source": "Letra de canção elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "image",
+        "imageFile": "texto-4-planeta.png",
+        "alt": "Ilustração: um planeta Terra coberto de curativos, com um termômetro, sentado numa cadeira de consultório.",
+        "aiDescription": "Ilustração de um planeta Terra com rosto cansado, sentado numa cadeira, como num consultório médico. O planeta tem vários curativos em forma de cruz e uma faixa enrolada na cabeça; um termômetro sai de sua boca, marcando temperatura alta em vermelho. Ao lado, uma mesinha com um frasco de remédio quase vazio. Não há falas.",
+        "source": "Ilustração criada pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "prose",
+        "body": "Os adultos nos pedem calma e nos dão esperança como quem dá um doce para a criança parar de chorar. Não queremos esperança de enfeite. Queremos que vocês façam as contas que nós já fizemos na aula de ciências: o que acontece com uma casa quando o fogo começa pela cozinha e todos continuam jantando na sala? Não pedimos medo. Pedimos que ajam como se a casa estivesse pegando fogo — porque está.",
+        "source": "Manifesto fictício de estudantes, elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **O mundo contemporâneo está fora da ordem?**"
+      }
+    },
+    {
+      "position": 70,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível e não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista, com resposta argumentada à pergunta do tema, sobre se o mundo contemporâneo está \"fora da ordem\": a ordem da competição e do desempenho que invade todas as esferas da vida (Texto 1), a racionalidade que mede tudo e perde o essencial (Texto 2), as contradições entre progresso e desigualdade (Texto 3), a crise ambiental como sintoma (Textos 4 e 5). Espera-se discussão do que se entende por ordem — e de quem ela beneficia —, com posicionamento claro.",
+    "tangentSignals": "Lista problemas do mundo atual (violência, desemprego, aquecimento) sem discutir a ideia de ordem ou de desordem; trata só da crise ambiental ou só de tecnologia; responde à pergunta sem argumentar ou fica no plano da opinião vaga (\"o mundo está cada vez pior\").",
+    "offTopicSignals": "Não discute o mundo contemporâneo nem a ideia de ordem e desordem social.",
+    "keyData": [
+      "Texto 1: a lógica da concorrência e do desempenho aplicada à vida inteira; cada um como empresa de si mesmo.",
+      "Texto 2: poema — a vida medida em gráficos e notificações; o espanto fica fora da planilha.",
+      "Texto 3: canção — obras novas já em ruína e desigualdade visível; a ordem do mundo bonita e fora do normal.",
+      "Texto 4: ilustração do planeta doente, com curativos e febre.",
+      "Texto 5: manifesto de estudantes — não basta esperança; é preciso agir como se a casa estivesse pegando fogo."
+    ]
+  }
+}

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="720" viewBox="0 0 560 720">
+  <!-- Esquema: duas réguas para medir o sucesso, numa folha de caderno. -->
+  <rect width="560" height="720" fill="#FBFAF5"/>
+  <g stroke="#D7E3EF" stroke-width="1.5">
+    <line x1="0" y1="60" x2="560" y2="60"/><line x1="0" y1="100" x2="560" y2="100"/>
+    <line x1="0" y1="140" x2="560" y2="140"/><line x1="0" y1="180" x2="560" y2="180"/>
+    <line x1="0" y1="220" x2="560" y2="220"/><line x1="0" y1="260" x2="560" y2="260"/>
+    <line x1="0" y1="300" x2="560" y2="300"/><line x1="0" y1="340" x2="560" y2="340"/>
+    <line x1="0" y1="380" x2="560" y2="380"/><line x1="0" y1="420" x2="560" y2="420"/>
+    <line x1="0" y1="460" x2="560" y2="460"/><line x1="0" y1="500" x2="560" y2="500"/>
+    <line x1="0" y1="540" x2="560" y2="540"/><line x1="0" y1="580" x2="560" y2="580"/>
+    <line x1="0" y1="620" x2="560" y2="620"/><line x1="0" y1="660" x2="560" y2="660"/>
+  </g>
+  <line x1="56" y1="0" x2="56" y2="720" stroke="#E8A1A1" stroke-width="2"/>
+
+  <text x="300" y="48" text-anchor="middle" font-family="Segoe UI, Arial" font-weight="700" font-size="26" fill="#1F2A44">A régua que nos ensinaram</text>
+  <!-- Círculo em duas metades -->
+  <g transform="translate(300 175)">
+    <path d="M0,0 L0,-95 A95,95 0 0 1 0,95 Z" fill="#2F5D8C"/>
+    <path d="M0,0 L0,95 A95,95 0 0 1 0,-95 Z" fill="#7FA6CE"/>
+    <circle r="38" fill="#FBFAF5"/>
+  </g>
+  <text x="420" y="160" font-family="Segoe UI, Arial" font-size="22" fill="#2F5D8C">salário</text>
+  <text x="128" y="200" font-family="Segoe UI, Arial" font-size="22" fill="#4C78A8">cargo</text>
+
+  <line x1="80" y1="318" x2="520" y2="318" stroke="#1F2A44" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <text x="300" y="370" text-anchor="middle" font-family="Segoe UI, Arial" font-weight="700" font-size="26" fill="#1F2A44">Outra régua possível</text>
+  <!-- Círculo em seis fatias (60° cada) -->
+  <g transform="translate(300 525)">
+    <path d="M0,0 L0,-110 A110,110 0 0 1 95.26,-55 Z" fill="#E07A5F"/>
+    <path d="M0,0 L95.26,-55 A110,110 0 0 1 95.26,55 Z" fill="#F2CC8F"/>
+    <path d="M0,0 L95.26,55 A110,110 0 0 1 0,110 Z" fill="#81B29A"/>
+    <path d="M0,0 L0,110 A110,110 0 0 1 -95.26,55 Z" fill="#3D405B"/>
+    <path d="M0,0 L-95.26,55 A110,110 0 0 1 -95.26,-55 Z" fill="#7FA6CE"/>
+    <path d="M0,0 L-95.26,-55 A110,110 0 0 1 0,-110 Z" fill="#C9A0DC"/>
+    <circle r="40" fill="#FBFAF5"/>
+  </g>
+  <g font-family="Segoe UI, Arial" font-size="20" fill="#1F2A44">
+    <text x="372" y="420">renda</text>
+    <text x="422" y="530">aprendizado</text>
+    <text x="372" y="648">convivência</text>
+    <text x="150" y="648" text-anchor="end">saúde</text>
+    <text x="96" y="530">tempo</text>
+    <text x="96" y="552">livre</text>
+    <text x="150" y="420" text-anchor="end">sentido</text>
+  </g>
+</svg>

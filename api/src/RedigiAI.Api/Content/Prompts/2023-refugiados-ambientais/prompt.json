@@ -1,0 +1,108 @@
+{
+  "exam": "fuvest",
+  "slug": "refugiados-ambientais-e-vulnerabilidade-social",
+  "title": "Refugiados ambientais e vulnerabilidade social",
+  "summary": "Inspirada no tema da Fuvest 2023. Coletânea com texto informativo, gráfico, ilustração, trecho de conto, reportagem e reflexão.",
+  "sourceLabel": "Inspirada na Fuvest 2023 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "prose",
+        "body": "Quando se fala em refugiados, a imagem mais comum é a de quem foge da guerra. Os números contam outra história. Segundo o Observatório de Deslocamento Interno (IDMC), em 2022 os desastres — enchentes, secas, tempestades, terremotos — provocaram 32,6 milhões de deslocamentos dentro dos próprios países, mais do que os conflitos e a violência, responsáveis por 28,3 milhões. A crise climática tende a ampliar essa diferença: eventos extremos mais frequentes significam mais gente obrigada a deixar a casa, a lavoura e o bairro onde construiu a vida.",
+        "source": "Texto elaborado pela equipe RedigiAI com dados do Observatório de Deslocamento Interno (IDMC), relatório de 2023."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "image",
+        "width": "half",
+        "imageFile": "texto-2-grafico.png",
+        "alt": "Gráfico de barras: migrantes climáticos internos projetados até 2050 em seis regiões, somando 216 milhões.",
+        "aiDescription": "Gráfico de barras horizontais com o título \"Migrantes climáticos internos projetados até 2050\" e o subtítulo \"Até 216 milhões de pessoas em seis regiões, no cenário mais pessimista\". As barras, da maior para a menor: África Subsaariana, 86 milhões; Leste Asiático e Pacífico, 49 milhões; Sul da Ásia, 40 milhões; Norte da África, 19 milhões; América Latina, 17 milhões; Leste Europeu e Ásia Central, 5 milhões. Fonte indicada no rodapé: Banco Mundial, relatório Groundswell, parte 2 (2021).",
+        "source": "Gráfico elaborado pela equipe RedigiAI com dados do Banco Mundial (Groundswell, parte 2, 2021)."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "image",
+        "width": "half",
+        "imageFile": "texto-3-ilustracao.png",
+        "alt": "Ilustração: uma família, vista de costas, caminha sobre chão rachado, sob sol forte, levando uma trouxa e uma mala.",
+        "aiDescription": "Ilustração em tons terrosos. Sob um sol grande e alaranjado, uma família de quatro pessoas, vista de costas, caminha sobre um chão seco e rachado. Um homem carrega uma trouxa redonda no ombro; uma mulher leva uma criança pela mão; outra criança segue ao lado com uma pequena mala. Ao fundo, uma árvore sem folhas e uma casa abandonada, com o telhado quebrado.",
+        "source": "Ilustração criada pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "prose",
+        "body": "A seca levou primeiro o milho, depois as cabras, por último a paciência. Quando o açude virou um prato de barro, o pai juntou as panelas num saco e disse que iam para a cidade, onde havia água encanada e serviço para quem soubesse trabalhar. A mãe não respondeu; ficou olhando o pé de umbu que ela mesma tinha plantado. No caminho, o menino perguntou se voltariam quando chovesse. O pai demorou a responder, e a demora foi a resposta.",
+        "source": "Trecho de conto elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "prose",
+        "body": "As enchentes que atingiram o Rio Grande do Sul em 2024 obrigaram centenas de milhares de pessoas a deixar suas casas. Para muitas famílias, a volta foi rápida: tinham seguro, parentes em outra cidade, economias para recomeçar. Para outras, morar perto do rio era a única opção possível, e a casa perdida não tinha substituta. É aí que o desastre deixa de ser apenas natural. Além disso, o direito internacional não reconhece a categoria de \"refugiado climático\": a Convenção de 1951 protege quem foge de perseguição, não de uma inundação, e quem atravessa fronteiras por causa do clima depende da boa vontade do país que o recebe.",
+        "source": "Reportagem elaborada pela equipe RedigiAI com base em informações públicas."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 6",
+        "format": "prose",
+        "body": "Ninguém escolhe nascer numa várzea ou numa encosta. Mas a sociedade escolhe quem mora nelas, quem é avisado antes da tempestade e quem é ajudado depois. Cuidar dos que o clima expulsa não é favor: é reconhecer que a próxima enchente pode bater em qualquer porta, e que o abrigo que construirmos para os outros é o mesmo de que um dia poderemos precisar.",
+        "source": "Reflexão elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 70,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **Refugiados ambientais e vulnerabilidade social.**"
+      }
+    },
+    {
+      "position": 80,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível e não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista sobre a relação entre deslocamentos forçados por causas ambientais e a vulnerabilidade social: os desastres já deslocam mais pessoas do que os conflitos (Texto 1), as projeções de migração climática se concentram nas regiões mais pobres (Texto 2), e quem tem menos recursos é quem mais perde e mais demora a se recuperar (Textos 4 e 5). Espera-se discussão de que o impacto ambiental não é igual para todos, das lacunas de proteção (inexistência do status de refugiado climático) e de responsabilidades e respostas possíveis (Texto 6).",
+    "tangentSignals": "Fala só de mudanças climáticas ou de preservação ambiental, sem tratar das pessoas deslocadas; trata só de refugiados de guerra ou de imigração em geral, sem a causa ambiental; descreve desastres naturais sem relacioná-los à desigualdade e à vulnerabilidade social.",
+    "offTopicSignals": "Não trata de deslocamento de pessoas nem de vulnerabilidade social diante de problemas ambientais.",
+    "keyData": [
+      "Texto 1: em 2022, desastres causaram 32,6 milhões de deslocamentos internos, mais que conflitos (28,3 milhões), segundo o IDMC.",
+      "Texto 2: Banco Mundial (Groundswell, 2021) projeta até 216 milhões de migrantes climáticos internos até 2050, concentrados na África Subsaariana (86 milhões), no Leste Asiático e Pacífico (49 milhões) e no Sul da Ásia (40 milhões); América Latina, 17 milhões.",
+      "Texto 3: ilustração de uma família retirante sobre chão rachado.",
+      "Texto 4: a seca expulsa a família do campo; a volta é incerta.",
+      "Texto 5: enchentes do Rio Grande do Sul (2024); os mais pobres têm menos condições de recomeçar; o direito internacional não reconhece o refugiado climático.",
+      "Texto 6: a sociedade decide quem mora em áreas de risco e quem recebe ajuda; acolher é interesse comum."
+    ]
+  }
+}

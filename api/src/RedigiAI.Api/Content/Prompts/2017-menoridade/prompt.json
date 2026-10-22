@@ -1,0 +1,73 @@
+{
+  "exam": "fuvest",
+  "slug": "o-homem-saiu-de-sua-menoridade",
+  "title": "O homem saiu de sua menoridade?",
+  "summary": "Inspirada no tema da Fuvest 2017. Um texto só: os parágrafos iniciais de \"O que é Esclarecimento?\", de Kant, em tradução própria, com notas e contexto.",
+  "sourceLabel": "Inspirada na Fuvest 2017 · tradução e textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "paragraph",
+      "data": { "body": "Examine o texto abaixo para fazer sua redação." }
+    },
+    {
+      "position": 20,
+      "kind": "heading",
+      "data": { "text": "Resposta à pergunta: o que é Esclarecimento?" }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "Esclarecimento é a saída do ser humano da menoridade da qual ele mesmo é culpado. Menoridade é a incapacidade de usar o próprio entendimento sem a condução de outra pessoa. A culpa é dele mesmo quando a causa não está na falta de entendimento, mas na falta de decisão e de coragem para servir-se dele sem a condução alheia. *Sapere aude!*² Tenha coragem de usar o seu próprio entendimento! Esse é o lema do Esclarecimento.\nPreguiça e covardia explicam por que tantas pessoas, mesmo depois de a natureza tê-las libertado há muito da condução alheia, permanecem de bom grado menores a vida inteira — e por que é tão fácil a outros se apresentarem como seus tutores. Ser menor é muito confortável. Se tenho um livro que entende por mim, um conselheiro espiritual que faz as vezes da minha consciência, um médico que decide a minha dieta, não preciso me dar trabalho algum. Não preciso pensar, desde que possa pagar: outros cuidarão por mim dessa tarefa aborrecida.\nOs tutores, que tão gentilmente tomaram para si a supervisão da maioria, cuidam para que ela considere o passo rumo à maioridade não só difícil, mas perigoso. Primeiro emburrecem o seu gado doméstico e impedem com cuidado que essas criaturas dóceis deem um único passo fora do andador em que as prenderam; depois lhes mostram o perigo que as ameaça se tentarem andar sozinhas. Ora, o perigo não é tão grande: depois de alguns tombos, elas aprenderiam a andar. Mas um exemplo desses intimida e, em geral, afasta qualquer nova tentativa.",
+        "notes": [
+          "¹ Tradução da equipe RedigiAI, a partir do original alemão de Immanuel Kant (1784), que está em domínio público.",
+          "² *Sapere aude*: expressão latina do poeta Horácio, que significa \"ousa saber\"."
+        ],
+        "source": "Immanuel Kant, *Resposta à pergunta: o que é Esclarecimento?*, 1784. Parágrafos iniciais.¹"
+      }
+    },
+    {
+      "position": 40,
+      "kind": "paragraph",
+      "data": {
+        "body": "Esses são os parágrafos de abertura de um texto que o filósofo Immanuel Kant publicou em 1784 numa revista de Berlim, dirigida ao público em geral, e não apenas a especialistas. Nele, Kant define o Esclarecimento como a saída da menoridade: a capacidade de pensar de modo livre e autônomo, sem a tutela de outra pessoa.\nO Esclarecimento — também chamado de Iluminismo ou Ilustração — foi um amplo movimento de ideias que, a partir do século XVIII, procurou estender o uso da razão, como guia e como crítica, a todos os campos da vida. Mais de dois séculos depois, num mundo de algoritmos que escolhem o que lemos, de especialistas para cada decisão e de respostas prontas a um toque na tela, continua aberta a pergunta sobre o alcance e a atualidade desse projeto."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "command",
+      "data": {
+        "body": "Com base nas ideias presentes no texto de Kant, acima apresentado, e valendo-se tanto de outras informações que você julgue pertinentes quanto dos dados de sua própria observação da realidade, redija uma dissertação em prosa, na qual você exponha o seu ponto de vista sobre o tema: **O homem saiu de sua menoridade?**"
+      }
+    },
+    {
+      "position": 60,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível. Não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Resposta argumentada à pergunta do tema, a partir do conceito kantiano de menoridade: a incapacidade de usar o próprio entendimento sem a condução de outro, por preguiça e covardia, e não por falta de capacidade. Espera-se que o candidato avalie se, hoje, as pessoas pensam por si mesmas ou se transferem o pensamento a tutores (livros, conselheiros, especialistas e, na atualidade, algoritmos, redes sociais, influenciadores e respostas prontas), discutindo o conforto da tutela e o papel de quem se beneficia dela. O texto deve mostrar compreensão do conceito, e não apenas usar \"menoridade\" no sentido de idade.",
+    "tangentSignals": "Entende menoridade como idade legal (maioridade penal, menores de 18 anos); faz um resumo histórico do Iluminismo sem posicionamento sobre o presente; trata só de tecnologia ou de redes sociais sem relacioná-las à autonomia do pensamento; discute educação de modo genérico, sem o conceito de Kant.",
+    "offTopicSignals": "Não trata de autonomia do pensamento, de esclarecimento nem da ideia de menoridade intelectual.",
+    "keyData": [
+      "Esclarecimento: saída da menoridade da qual o próprio ser humano é culpado; menoridade é não usar o próprio entendimento sem a condução de outro.",
+      "Sapere aude: ter coragem de usar o próprio entendimento.",
+      "Preguiça e covardia mantêm as pessoas na menoridade; é confortável ter quem pense por nós (livro, conselheiro, médico).",
+      "Os tutores fazem a autonomia parecer perigosa; depois de alguns tombos, as pessoas aprenderiam a andar sozinhas.",
+      "Texto de contexto: o Iluminismo estendeu o uso da razão a todos os campos; hoje, algoritmos, especialistas e respostas prontas recolocam a questão."
+    ]
+  }
+}

@@ -7,7 +7,7 @@ namespace RedigiAI.Application.Catalog;
 public sealed record ExamDto(string Slug, string Name, ExamStatus Status, int SheetLines, Guid? CurrentRubricVersionId);
 
 /// <summary>Categoria de correção: o nome é o tipo de redação que o aluno vê e o que entra no título da redação.</summary>
-/// <param name="Slug"><c>dissertacao-em-prosa</c> ou <c>narrativa</c>.</param>
+/// <param name="Slug"><c>dissertacao-em-prosa</c>, <c>dissertacao</c> ou <c>narrativa</c>.</param>
 /// <param name="Name">"Dissertação em prosa".</param>
 public sealed record EssayTypeDto(string Slug, string Name);
 
@@ -84,6 +84,21 @@ public sealed record PromptBlockPublicDataDto
     /// <summary>Os 3 itens do card, empilhados na ordem.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<PromptCardItemPublicDto>? CardItems { get; init; }
+
+    /// <summary>
+    /// Texto da coletânea: <c>half</c> fica lado a lado com o texto vizinho que também é <c>half</c> (no celular, um
+    /// embaixo do outro). Ausente: largura inteira.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Width { get; init; }
+
+    /// <summary>Texto da coletânea: <c>true</c> quando o rótulo não aparece na tela.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HideLabel { get; init; }
+
+    /// <summary>Texto da coletânea: notas de rodapé, mostradas entre o texto e a fonte.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Notes { get; init; }
 }
 
 /// <param name="Kind">

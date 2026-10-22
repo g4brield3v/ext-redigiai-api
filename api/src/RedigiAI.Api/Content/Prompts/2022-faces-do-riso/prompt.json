@@ -1,0 +1,105 @@
+{
+  "exam": "fuvest",
+  "slug": "diferentes-faces-do-riso",
+  "title": "As diferentes faces do riso",
+  "summary": "Inspirada no tema da Fuvest 2022. Coletânea com divulgação científica, ensaio, crônica, texto sobre arte com ilustração e frase.",
+  "sourceLabel": "Inspirada na Fuvest 2022 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "format": "prose",
+        "body": "Rimos antes de saber falar: os bebês costumam dar as primeiras risadas por volta dos quatro meses, muito antes da primeira palavra. Chimpanzés e outros grandes primatas, quando brincam, soltam um som ofegante que lembra o nosso riso. Em todas as culturas conhecidas há quem conte piadas, e em todas elas o corpo reage de modo parecido: o diafragma se contrai, a respiração se quebra em pequenos sopros, os olhos se apertam. O motivo da graça muda de um povo para outro; a gargalhada, quase nada.",
+        "source": "Texto de divulgação científica elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "format": "prose",
+        "body": "Ninguém ri sozinho por muito tempo. O riso precisa de eco, e por isso é um fato social antes de ser um prazer íntimo. Ele também vigia: rimos de quem tropeça, de quem fala diferente, de quem se veste fora da moda, e esse riso funciona como um pequeno castigo que empurra cada um de volta à norma do grupo. A mesma risada que une os que estão dentro marca, com precisão, os que ficaram de fora.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "format": "prose",
+        "body": "No intervalo, a turma inteira riu quando o Lucas errou a leitura em voz alta. Ele riu também — mais alto que todos, para não chorar. À noite, no velório da avó, a família, exausta, desatou a rir de uma história antiga que o tio contou, e ninguém achou que fosse desrespeito. Há riso que machuca, riso que se defende, riso que consola. Talvez o difícil não seja rir, mas saber de que lado da risada estamos.",
+        "source": "Crônica elaborada pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "format": "prose",
+        "body": "Dos bobos da corte às charges de jornal, o humor sempre teve licença para dizer o que a seriedade não podia. Quem ri do poderoso diminui, por um instante, o seu tamanho. Não por acaso, regimes autoritários costumam censurar humoristas tanto quanto jornalistas. A ilustração abaixo reúne quatro faces do riso: a alegria, a ironia, o deboche e o riso nervoso.",
+        "source": "Texto elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Ilustração do Texto 4",
+        "hideLabel": true,
+        "format": "image",
+        "imageFile": "texto-4-quatro-risos.png",
+        "alt": "Ilustração com quatro rostos que riem de jeitos diferentes: alegria, ironia, deboche e riso nervoso.",
+        "aiDescription": "Ilustração com quatro rostos redondos lado a lado, cada um com uma legenda. 1) \"alegria\": olhos fechados em arco e boca bem aberta, com bochechas coradas. 2) \"ironia\": uma sobrancelha erguida e sorriso de canto, só de um lado da boca. 3) \"deboche\": olhos semicerrados e língua para fora. 4) \"riso nervoso\": gotas de suor na testa, sobrancelhas inclinadas para cima e um sorriso tenso, mostrando os dentes cerrados.",
+        "source": "Ilustração criada pela equipe RedigiAI para esta proposta."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "format": "prose",
+        "body": "Quem ri junto já começou a conversar.",
+        "source": "Frase elaborada pela equipe RedigiAI."
+      }
+    },
+    { "position": 70, "kind": "divider", "data": {} },
+    {
+      "position": 80,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias apresentadas nos textos e também outras informações que julgar pertinentes, redija uma dissertação em prosa, na qual você exponha seu ponto de vista sobre o tema: **As diferentes faces do riso.**"
+      }
+    },
+    {
+      "position": 90,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A dissertação deve ser redigida de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível e não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista sobre a ambiguidade do riso e suas funções: um traço humano universal e biológico (Texto 1), um fato social que une o grupo e, ao mesmo tempo, exclui e corrige quem foge da norma (Texto 2), uma forma de agressão, de defesa ou de consolo (Texto 3), um instrumento de crítica ao poder (Texto 4) e um meio de aproximação (Texto 5). Espera-se que o candidato discuta mais de uma face do riso e se posicione sobre seus efeitos nas relações humanas.",
+    "tangentSignals": "Trata o riso só como alegria ou bem-estar, sem as outras faces; fala só de humor na internet ou de memes, sem discutir as funções do riso; discute apenas os limites do humor e a liberdade de expressão, sem tratar do riso como fenômeno humano e social; lista tipos de humor sem posicionamento.",
+    "offTopicSignals": "Não trata do riso nem do humor.",
+    "keyData": [
+      "Texto 1: o riso é universal e anterior à fala; aparece também em outros primatas; o motivo da graça muda conforme a cultura.",
+      "Texto 2: o riso é social; une quem está dentro e funciona como castigo para quem foge da norma.",
+      "Texto 3: o riso que humilha, o que serve de defesa e o que consola no luto.",
+      "Texto 4: o humor como crítica ao poder (bobos da corte, charges); censura de humoristas em regimes autoritários; ilustração com quatro faces do riso: alegria, ironia, deboche e riso nervoso.",
+      "Texto 5: rir junto aproxima as pessoas."
+    ]
+  }
+}

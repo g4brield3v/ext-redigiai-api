@@ -4186,6 +4186,27 @@
               "$ref": "#/components/schemas/PromptCardItemDto"
             }
           },
+          "width": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hideLabel": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "notes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
           "imageUrl": {
             "type": [
               "null",
@@ -4308,6 +4329,27 @@
             ],
             "items": {
               "$ref": "#/components/schemas/PromptCardItemPublicDto"
+            }
+          },
+          "width": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hideLabel": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "notes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
             }
           }
         }

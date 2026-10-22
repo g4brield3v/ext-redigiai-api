@@ -70,6 +70,9 @@ public interface IAssetRepository
 
     /// <summary>Os identificadores de todas as imagens de proposta (para torná-las privadas de uma vez).</summary>
     Task<IReadOnlyList<string>> AllPromptImagePublicIdsAsync(CancellationToken ct);
+
+    /// <summary>O id da imagem de proposta com esse identificador no provedor; <c>null</c> se ainda não foi registrada.</summary>
+    Task<Guid?> FindPromptImageIdAsync(string publicId, CancellationToken ct);
 }
 
 public interface ITranscriptionRepository

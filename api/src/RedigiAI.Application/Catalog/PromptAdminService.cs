@@ -448,7 +448,12 @@ internal sealed class PromptAdminService(
         return (await exams.ListAsync(ct)).FirstOrDefault(exam => exam.Status == ExamStatus.Active) ?? throw Errors.Internal();
     }
 
-    private async Task<PromptContent> ToContentAsync(PromptDocument document, Exam exam, string slug, CancellationToken ct)
+    private Task<PromptContent> ToContentAsync(PromptDocument document, Exam exam, string slug, CancellationToken ct) =>
+        ToContentAsync(essayTypes, document, exam, slug, ct);
+
+    /// <summary>O JSON do cadastro como conteúdo da proposta; o que não dá nem para guardar vira <c>VALIDATION_FAILED</c>.</summary>
+    internal static async Task<PromptContent> ToContentAsync(
+        IEssayTypeRepository essayTypes, PromptDocument document, Exam exam, string slug, CancellationToken ct)
     {
         var issues = new List<ValidationIssue>();
 
@@ -522,6 +527,9 @@ internal sealed class PromptAdminService(
                 AiDescription = item?.AiDescription,
                 Caption = item?.Caption,
             }).ToList(),
+            Width = data.Width,
+            HideLabel = data.HideLabel,
+            Notes = data.Notes,
         };
 
     private PromptBlockDto ToDto(PromptBlock block, IReadOnlyDictionary<Guid, string> imageIds)
@@ -554,6 +562,9 @@ internal sealed class PromptAdminService(
                     Caption = item.Caption,
                     ImageUrl = ImageUrl(item.AssetId, imageIds),
                 }).ToList(),
+                Width = data.Width,
+                HideLabel = data.HideLabel,
+                Notes = data.Notes,
                 ImageUrl = ImageUrl(data.AssetId, imageIds),
             });
     }

@@ -558,6 +558,70 @@ public class PromptTests
     public void Image_format_comes_from_the_first_bytes(byte[] content, string? expected) =>
         Assert.Equal(expected, RedigiAI.Application.Catalog.ImageFormat.Detect(content));
 
+    // Textos lado a lado, sem rótulo na tela e com notas de rodapé (decisão de 21/10/2026).
+    [Theory]
+    [InlineData("half", "half")]
+    [InlineData("full", null)]
+    [InlineData(" ", null)]
+    [InlineData(null, null)]
+    public void Width_half_is_kept_and_full_is_stored_as_absent(string? width, string? stored)
+    {
+        var prose = Prose() with { Data = Prose().Data with { Width = width } };
+
+        var prompt = Prompt.Draft(Complete(Image(), prose, Command(), Instructions()), null, Now);
+
+        Assert.Equal(stored, prompt.Blocks[1].Data.Width);
+        Assert.Null(prompt.Blocks[0].Data.Width);
+        Assert.Empty(prompt.PublicationIssues(Context));
+    }
+
+    [Fact]
+    public void Unknown_width_is_not_even_saved()
+    {
+        var prose = Prose() with { Data = Prose().Data with { Width = "third" } };
+
+        AssertRefused(() => Prompt.Draft(Complete(prose, Command(), Instructions()), null, Now), "blocks[0].data.width");
+    }
+
+    [Fact]
+    public void Width_hidden_label_and_notes_belong_only_to_collection_items()
+    {
+        var command = Command() with { Data = Command().Data with { Width = "half", HideLabel = true, Notes = ["Nota."] } };
+
+        var prompt = Prompt.Draft(Complete(Prose(), command, Instructions()), null, Now);
+
+        var data = prompt.Blocks[1].Data;
+        Assert.Null(data.Width);
+        Assert.Null(data.HideLabel);
+        Assert.Null(data.Notes);
+    }
+
+    [Fact]
+    public void Hidden_label_still_needs_a_label_for_the_correction()
+    {
+        var hidden = Prose() with { Data = Prose().Data with { HideLabel = true } };
+        var hiddenWithoutLabel = Prose(label: null) with { Data = Prose(label: null).Data with { HideLabel = true } };
+        var shown = Prose() with { Data = Prose().Data with { HideLabel = false } };
+
+        Assert.True(Prompt.Draft(Complete(hidden, Command(), Instructions()), null, Now).Blocks[0].Data.HideLabel);
+        Assert.Null(Prompt.Draft(Complete(shown, Command(), Instructions()), null, Now).Blocks[0].Data.HideLabel);
+        AssertIssue(Complete(hiddenWithoutLabel, Command(), Instructions()), "blocks[0].data.label");
+    }
+
+    [Fact]
+    public void Notes_are_cleaned_and_limited_to_five()
+    {
+        var notes = Prose() with { Data = Prose().Data with { Notes = [" * Sapere aude: ousa saber. ", "", "** Tradução adaptada."] } };
+        var tooMany = Prose() with { Data = Prose().Data with { Notes = ["1", "2", "3", "4", "5", "6"] } };
+        var withMarkup = Prose() with { Data = Prose().Data with { Notes = ["<b>nota</b>"] } };
+
+        var prompt = Prompt.Draft(Complete(notes, Command(), Instructions()), null, Now);
+
+        Assert.Equal(["* Sapere aude: ousa saber.", "** Tradução adaptada."], prompt.Blocks[0].Data.Notes);
+        AssertRefused(() => Prompt.Draft(Complete(tooMany, Command(), Instructions()), null, Now), "blocks[0].data.notes");
+        AssertRefused(() => Prompt.Draft(Complete(withMarkup, Command(), Instructions()), null, Now), "blocks[0].data");
+    }
+
     [Fact]
     public void Only_a_published_prompt_is_archived()
     {

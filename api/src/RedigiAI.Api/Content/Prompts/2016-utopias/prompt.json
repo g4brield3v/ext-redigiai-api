@@ -1,0 +1,123 @@
+{
+  "exam": "fuvest",
+  "slug": "as-utopias-indispensaveis-inuteis-ou-nocivas",
+  "title": "As utopias: indispensáveis, inúteis ou nocivas?",
+  "summary": "Inspirada no tema da Fuvest 2016. Coletânea sem numeração: um verbete sobre utopia e cinco reflexões, uma delas em poema.",
+  "sourceLabel": "Inspirada na Fuvest 2016 · textos próprios da RedigiAI",
+  "essayType": "dissertacao-em-prosa",
+  "blocks": [
+    {
+      "position": 10,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 1",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "**UTOPIA** (do grego *ou*, \"não\", e *tópos*, \"lugar\": \"lugar nenhum\"; há quem leia também *eu-tópos*, \"lugar bom\"). Nome que o inglês Thomas More deu, em livro de 1516, a uma ilha imaginária onde não haveria propriedade privada nem perseguição religiosa, e onde a vida comum seria organizada de forma justa. Por extensão, qualquer projeto de sociedade ideal, diferente da existente — político, social ou religioso. Em sentido negativo, plano irrealizável, quimera, fantasia.",
+        "source": "Verbete elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 20,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 2",
+        "hideLabel": true,
+        "format": "prose",
+        "width": "half",
+        "body": "A utopia nos tira do lugar. Ao imaginar uma sociedade diferente, deixamos de ver a atual como natural, obrigatória, inevitável: o que parecia destino passa a parecer escolha. E, mais do que isso, a utopia propõe outras realidades possíveis. Nela se reúnem os desejos de um grupo que a ordem do presente mantém calados. Abolição da escravidão, voto das mulheres, escola para todos — cada uma dessas conquistas foi, um dia, chamada de utopia.\n\nSem utopia, o mundo se congela. O ser humano que domina a técnica e já não sonha com nada corre o risco de virar coisa entre as coisas, movido só por impulsos. Perderia, com isso, a vontade de fazer a história — e a capacidade de entendê-la.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 30,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 3",
+        "hideLabel": true,
+        "format": "verse",
+        "width": "half",
+        "columns": [
+          [
+            "A cidade que virá",
+            "",
+            "Não vou morar nela, eu sei.",
+            "Talvez meus netos, talvez nem eles.",
+            "Mas eu a desenho no guardanapo",
+            "toda vez que o ônibus atrasa:",
+            "uma cidade de praças sem grade,",
+            "de portas sem tranca,",
+            "de escolas mais bonitas que os bancos,",
+            "onde cada um cabe",
+            "com o jeito que tem.",
+            "",
+            "Não está pronta, nem perto.",
+            "Mas é por ela",
+            "que eu acordo cedo."
+          ]
+        ],
+        "source": "Poema elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 40,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 4",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "Prefiro viver sem utopias. Elas falham de dois modos: são ineficazes enquanto ficam no papel, como sonhos que consolam e nada mudam; e são perigosas quando alguém decide realizá-las a qualquer custo. Entre a promessa do paraíso e a reforma possível de uma rua, fico com a rua.",
+        "source": "Depoimento fictício, elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 50,
+      "kind": "collection_item",
+      "data": {
+        "label": "Texto 5",
+        "hideLabel": true,
+        "format": "prose",
+        "body": "Levada a sério, a utopia não é um projeto gentil e difícil: é o desejo de construir aqui e agora uma sociedade perfeita, uma cidade ideal feita sob medida para um homem novo. Perfeição, porém, não admite diferença, conflito nem acaso. Para chegar a ela, é preciso controlar tudo — as coisas, as pessoas, a natureza, a própria história. Por isso, quando se tenta realizá-la, a utopia tende ao autoritarismo: um fim tão elevado parece justificar qualquer meio, e o sonho de harmonia termina em violência.",
+        "source": "Ensaio elaborado pela equipe RedigiAI."
+      }
+    },
+    {
+      "position": 60,
+      "kind": "paragraph",
+      "data": {
+        "body": "O conjunto de excertos acima contém um verbete, que traz uma definição de **utopia**, seguido de outros textos que apresentam diferentes reflexões sobre o mesmo assunto."
+      }
+    },
+    {
+      "position": 70,
+      "kind": "command",
+      "data": {
+        "body": "Considerando as ideias neles contidas, além de outras informações que você julgue pertinentes, redija uma dissertação em prosa, na qual você exponha o seu ponto de vista sobre o tema: **As utopias: indispensáveis, inúteis ou nocivas?**"
+      }
+    },
+    {
+      "position": 80,
+      "kind": "instructions",
+      "data": {
+        "title": "Instruções",
+        "items": [
+          "A redação deve ser uma dissertação, escrita de acordo com a norma-padrão da língua portuguesa.",
+          "Escreva, no mínimo, 20 linhas, com letra legível. Não ultrapasse o espaço de 30 linhas da folha de redação.",
+          "Dê um título a sua redação."
+        ]
+      }
+    }
+  ],
+  "gradingNotes": {
+    "expectedFocus": "Ponto de vista argumentado sobre o valor das utopias, respondendo às alternativas do tema (indispensáveis, inúteis ou nocivas) ou combinando-as. A coletânea define utopia em sentido positivo e negativo (Texto 1), defende-a como forma de desnaturalizar o presente, de abrir possibilidades e de manter viva a vontade de fazer a história (Textos 2 e 3), considera-a ineficaz e perigosa (Texto 4) e associa a busca da perfeição ao autoritarismo (Texto 5). Espera-se que o candidato discuta o conceito, e não apenas sonhos individuais.",
+    "tangentSignals": "Trata utopia como sonho pessoal ou meta de carreira, sem a dimensão de projeto coletivo de sociedade; descreve a obra de Thomas More sem posicionamento; fala apenas de política ou de ideologias sem relacioná-las à ideia de utopia; escolhe uma alternativa sem argumentar.",
+    "offTopicSignals": "Não trata de utopias nem de projetos de sociedade ideal.",
+    "keyData": [
+      "Texto 1: verbete — utopia como \"lugar nenhum\" ou \"lugar bom\"; a ilha de Thomas More (1516); projeto de sociedade ideal ou, em sentido negativo, fantasia irrealizável.",
+      "Texto 2: a utopia desnaturaliza o presente e propõe outras realidades; conquistas como a abolição e o voto feminino já foram chamadas de utopias; sem utopia, o ser humano perde a vontade de fazer a história.",
+      "Texto 3: poema — a cidade ideal que não se verá, mas que dá sentido à ação no presente.",
+      "Texto 4: as utopias são ineficazes como sonho e perigosas quando realizadas a qualquer custo; preferência pela reforma possível.",
+      "Texto 5: a busca da perfeição exige controle total e tende ao autoritarismo e à violência."
+    ]
+  }
+}
