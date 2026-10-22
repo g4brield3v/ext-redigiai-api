@@ -2545,6 +2545,52 @@
           }
         ]
       }
+    },
+    "/v1/me/progress": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "A evolução da nota (as 10 correções mais recentes, da mais antiga para a mais recente, com a variação da\r\núltima) e o foco de melhoria: o critério que mais tirou pontos nas 3 últimas correções sem nota zero.",
+        "operationId": "getProgress",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4010,6 +4056,91 @@
               "string"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "ProgressDto": {
+        "required": [
+          "points",
+          "lastDelta",
+          "focus"
+        ],
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgressPointDto"
+            }
+          },
+          "lastDelta": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "focus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProgressFocusDto"
+              }
+            ]
+          }
+        }
+      },
+      "ProgressFocusDto": {
+        "required": [
+          "criterionPosition",
+          "criterionName",
+          "guidance",
+          "essayId"
+        ],
+        "type": "object",
+        "properties": {
+          "criterionPosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "criterionName": {
+            "type": "string"
+          },
+          "guidance": {
+            "type": "string"
+          },
+          "essayId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProgressPointDto": {
+        "required": [
+          "essayId",
+          "date",
+          "score",
+          "maxScore"
+        ],
+        "type": "object",
+        "properties": {
+          "essayId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxScore": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

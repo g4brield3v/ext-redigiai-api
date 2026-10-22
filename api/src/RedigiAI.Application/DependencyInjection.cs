@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IPromptAdminService, PromptAdminService>();
         services.AddScoped<IPromptImportService, PromptImportService>();
+        services.AddScoped<Grading.IProgressService, Grading.ProgressService>();
         services.AddOptions<SeedOptions>();
         services.AddScoped<ICatalogSeedService, CatalogSeedService>();
         services.AddScoped<GradingSeedService>();
