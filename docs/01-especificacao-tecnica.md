@@ -14,7 +14,7 @@ O MVP do RedigiAI corrige redações manuscritas da Fuvest com IA: o aluno escol
 - Entrada: somente foto JPG da folha, até 10 MB, uma face por redação. Envio em lote permitido.
 - Fluxo: seleção (vestibular → proposta → leitura da proposta e da coletânea, em página própria) → foto → confirmação → transcrição → revisão de palavras ilegíveis, se houver → correção → aviso por e-mail → correção na plataforma.
 - Cobrança: 1 correção grátis por conta, plano mensal no cartão e correção avulsa por Pix ou cartão.
-- Painel do aluno: lista de correções, evolução da nota e foco de melhoria.
+- Painel do aluno: lista de correções, evolução da nota e foco de melhoria (seção 6, "Painel de progresso").
 - Folha pautada da plataforma para download (PDF, 30 linhas).
 - Área de administração de propostas de redação (`/admin/propostas`): cadastro, versões e publicação, só para o administrador (`docs/07-propostas-de-redacao.md`).
 
@@ -206,7 +206,26 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Nada do conteúdo é público: se
 | `GET /v1/essays/{id}/correction` | Correção completa, com tudo já calculado (o front só exibe): `rubric` (`maxLevel`, `maxScore`, `versionLabel`); `score`, `scoreDelta` e `previousVersionScore`; `zero` (`applies`, `ruleCode`, `ruleLabel`, `ruleNote`, `explanation`); `strengths`; `mainIssue` e `nextSteps` (`text`, `criterion`, `potentialGain` = (nível máximo − nível) × peso; os passos saem do maior ganho para o menor); `lines` (transcrição com as palavras do aluno); `annotations` (`id` sequencial em ordem de linha, `kind`, `criterion`, linhas e posições, `quote` recortado pelo backend, `note`, `ruleName`, `fix`); `criteria` (`shortName`, `fullName`, `weight`, `level`, `points`, `maxPoints`, `pointsLost`, `currentDescriptor`, `nextDescriptor`, `justification`, `guidance`, `annotationIds`); `feedback`, se o aluno já avaliou. |
 | `GET /v1/essays/{id}/photo` | URL assinada da foto, válida por 5 min. |
 | `POST /v1/corrections/{id}/feedback` | Avaliação (3 opções) + comentário opcional. Corpo: `{rating, comment?}`. Uma por correção: a segunda responde `INVALID_STATE` (409). Correção de outro aluno → 404. |
-| `GET /v1/me/progress` | Notas por data e critério que mais tirou pontos nas últimas 3 correções. |
+| `GET /v1/me/progress` | Painel de progresso: `points` (as notas das correções, por data), `lastDelta` e `focus` (o critério que mais tirou pontos nas últimas 3 correções). Regras na seção "Painel de progresso", abaixo. |
+
+**Painel de progresso (`GET /v1/me/progress`)**
+
+Mostra, no painel, a evolução da nota ("Sua evolução") e o critério em que o aluno mais precisa melhorar ("Seu foco agora"). Tudo é calculado pelo backend; o front só exibe. Só entram redações do aluno do token (regra 16).
+
+```json
+{
+  "points": [{ "essayId": "…", "date": "2026-10-10T12:00:00Z", "score": 23, "maxScore": 40 }],
+  "lastDelta": 2,
+  "focus": { "criterionPosition": 3, "criterionName": "Coesão e progressão", "guidance": "…", "essayId": "…" }
+}
+```
+
+1. **Pontos do gráfico (`points`):** as **10 correções mais recentes** do aluno (redações `completed`), em ordem da data da correção, da mais antiga para a mais recente. `date` é a data da correção; `score` e `maxScore` são os gravados na correção. Redação com nota zero entra com `score` 0. A reescrita é mais um ponto, como qualquer correção. Sem correção, `points` é vazio e o painel não mostra os dois cartões.
+2. **Variação (`lastDelta`):** nota da última correção menos a da penúltima, entre as dos pontos; `null` com menos de duas correções.
+3. **Foco (`focus`):** olha as **3 últimas correções sem nota zero** (ou as que houver, se forem menos). Para cada critério, soma os pontos perdidos em cada uma: (nível máximo da grade − nível) × peso. O foco é o critério com a maior soma; no empate, o de maior peso e, depois, o de menor posição.
+   - `criterionPosition` e `criterionName` (o nome curto da grade) são os desse critério;
+   - `guidance` é a orientação desse critério na correção mais recente, entre as 3, em que ele perdeu pontos, e `essayId` é a redação dessa correção (o link "Ver na última correção" abre nela, no critério);
+   - `focus` é `null` quando não há correção sem nota zero ou quando nenhum critério perdeu pontos nelas.
 
 **Pagamentos**
 

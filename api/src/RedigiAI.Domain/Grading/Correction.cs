@@ -486,4 +486,13 @@ public interface ICorrectionRepository
     /// <summary>Nota e nota máxima de cada redação já corrigida.</summary>
     Task<IReadOnlyDictionary<Guid, (int Score, int MaxScore)>> ScoresAsync(
         IReadOnlyCollection<Guid> essayIds, CancellationToken ct);
+
+    /// <summary>As notas das correções mais recentes do aluno, da mais recente para a mais antiga.</summary>
+    Task<IReadOnlyList<ProgressScore>> RecentScoresAsync(Guid userId, int count, CancellationToken ct);
+
+    /// <summary>
+    /// As correções sem nota zero mais recentes do aluno, da mais recente para a mais antiga, com os critérios e os
+    /// pontos que cada um perdeu.
+    /// </summary>
+    Task<IReadOnlyList<ProgressCorrection>> RecentGradedAsync(Guid userId, int count, CancellationToken ct);
 }

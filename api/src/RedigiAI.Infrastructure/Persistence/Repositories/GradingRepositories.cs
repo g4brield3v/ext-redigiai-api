@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RedigiAI.Domain.Catalog;
 using RedigiAI.Domain.Grading;
 
 namespace RedigiAI.Infrastructure.Persistence.Repositories;
@@ -97,5 +98,57 @@ internal sealed class CorrectionRepository(AppDbContext db) : ICorrectionReposit
 
         return scores.ToDictionary(c => c.EssayId, c => (c.Score, c.MaxScore));
     }
+
+    public async Task<IReadOnlyList<ProgressScore>> RecentScoresAsync(Guid userId, int count, CancellationToken ct) =>
+        await OfUser(userId)
+            .OrderByDescending(c => c.CreatedAt)
+            .ThenByDescending(c => c.Id)
+            .Take(count)
+            .Select(c => new ProgressScore(c.EssayId, c.CreatedAt, c.Score, c.MaxScore))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ProgressCorrection>> RecentGradedAsync(Guid userId, int count, CancellationToken ct)
+    {
+        var recent = await OfUser(userId)
+            .Where(c => c.ZeroReason == null)
+            .OrderByDescending(c => c.CreatedAt)
+            .ThenByDescending(c => c.Id)
+            .Take(count)
+            .Select(c => new { c.Id, c.EssayId })
+            .ToListAsync(ct);
+        if (recent.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = recent.Select(c => c.Id).ToList();
+        var criteria = await (
+                from graded in db.Set<CorrectionCriterion>().AsNoTracking()
+                join rubric in db.Set<RubricCriterion>().AsNoTracking() on graded.CriterionId equals rubric.Id
+                where ids.Contains(graded.CorrectionId)
+                select new
+                {
+                    graded.CorrectionId,
+                    graded.Position,
+                    rubric.ShortName,
+                    rubric.Weight,
+                    PointsLost = rubric.MaxPoints - graded.Points,
+                    Guidance = graded.Guidance ?? graded.Justification,
+                })
+            .ToListAsync(ct);
+
+        return [.. recent.Select(correction => new ProgressCorrection(
+            correction.EssayId,
+            [.. criteria
+                .Where(c => c.CorrectionId == correction.Id)
+                .OrderBy(c => c.Position)
+                .Select(c => new ProgressCriterion(c.Position, c.ShortName, c.Weight, c.PointsLost, c.Guidance))]))];
+    }
+
+    /// <summary>As correções das redações do aluno (regra 16).</summary>
+    private IQueryable<Correction> OfUser(Guid userId) =>
+        db.Corrections
+            .AsNoTracking()
+            .Where(c => db.Essays.Any(e => e.Id == c.EssayId && e.UserId == userId));
 }
 
