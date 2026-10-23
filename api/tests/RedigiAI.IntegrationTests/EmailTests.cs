@@ -295,7 +295,18 @@ public class EmailTests(ApiFixture api) : IAsyncLifetime
         await RunAsync(JobTypes.Transcribe);
         await RunAsync(JobTypes.Grade);
 
-        await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => HandleAsync(EmailTemplates.CorrectionReady, essayId)));
+        // Quem encontra a reserva de outra execução ainda enviando sai com EMAIL_BUSY, para o job tentar de novo:
+        // isso depende de quanto o envio demora, então só não pode haver outra falha nem um segundo e-mail.
+        await Task.WhenAll(Enumerable.Range(0, 5).Select(async _ =>
+        {
+            try
+            {
+                await HandleAsync(EmailTemplates.CorrectionReady, essayId);
+            }
+            catch (RedigiAI.Domain.Common.AppError busy) when (busy.Code == "EMAIL_BUSY")
+            {
+            }
+        }));
 
         Assert.Single(api.Emails.For(essayId));
         Assert.Equal(1, await api.QueryAsync(db => db.EmailLog.CountAsync(e => e.RefId == essayId)));
