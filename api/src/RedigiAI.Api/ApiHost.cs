@@ -182,6 +182,22 @@ internal static class ApiHost
                 return Task.CompletedTask;
             });
 
+            // Campo marcado com [Obsolete] continua no contrato, como deprecated, até o front deixar de usá-lo.
+            openApi.AddSchemaTransformer((schema, context, _) =>
+            {
+                foreach (var property in context.JsonTypeInfo.Properties)
+                {
+                    if (property.AttributeProvider?.IsDefined(typeof(ObsoleteAttribute), inherit: false) == true
+                        && schema.Properties?.TryGetValue(property.Name, out var propertySchema) == true
+                        && propertySchema is OpenApiSchema inline)
+                    {
+                        inline.Deprecated = true;
+                    }
+                }
+
+                return Task.CompletedTask;
+            });
+
             openApi.AddOperationTransformer((operation, context, _) =>
             {
                 var metadata = context.Description.ActionDescriptor.EndpointMetadata;
