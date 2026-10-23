@@ -10,6 +10,6 @@ public class AiBudgetTests
     {
         var options = new AiBudgetOptions();
 
-        Assert.Equal((0.15m, 0.33m), (options.ReferenceCapUsd, options.HardCapUsd));
+        Assert.Equal((0.26m, 0.57m), (options.ReferenceCapUsd, options.HardCapUsd));
     }
 }

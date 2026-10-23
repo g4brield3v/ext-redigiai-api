@@ -409,11 +409,11 @@ public class GradingTests(ApiFixture api)
 
         // A resposta cortada não é completada: a segunda chamada, com o dobro, conclui a correção.
         Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
-        Assert.Equal([32_000, 64_000], api.Grader.Requests.Skip(before).Select(request => request.MaxTokens));
+        Assert.Equal([55_000, 110_000], api.Grader.Requests.Skip(before).Select(request => request.MaxTokens));
         // As duas chamadas são cobradas e entram no gasto da redação.
         Assert.Equal(2, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
         var truncated = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_truncated"));
-        Assert.Contains("\"maxTokens\":32000", truncated.Data!.Replace(" ", ""));
+        Assert.Contains("\"maxTokens\":55000", truncated.Data!.Replace(" ", ""));
         // Cortada não é o mesmo que recusada pelas regras.
         Assert.False(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_rejected")));
     }
@@ -481,7 +481,7 @@ public class GradingTests(ApiFixture api)
     [Fact]
     public async Task Max_tokens_is_reduced_to_what_fits_in_the_hard_cap_at_the_worst_case()
     {
-        // Limite padrão de US$ 0,33: 32 mil tokens de saída no Opus (US$ 20 por milhão) seriam US$ 0,64.
+        // Limite padrão de US$ 0,57: 55 mil tokens de saída no Opus (US$ 20 por milhão) seriam US$ 1,10.
         var student = await QueuedEssayAsync();
         var before = api.Grader.Requests.Count;
 
@@ -489,7 +489,7 @@ public class GradingTests(ApiFixture api)
 
         Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
         var sent = api.Grader.Requests.Skip(before).Single().MaxTokens;
-        Assert.InRange(sent, 1_024, 16_499);
+        Assert.InRange(sent, 1_024, 28_499);
         var reduced = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "ai.max_tokens_reduced"));
         Assert.Contains($"\"allowed\":{sent}", reduced.Data!.Replace(" ", ""));
     }
@@ -509,7 +509,7 @@ public class GradingTests(ApiFixture api)
         Assert.Equal(1, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
         // O gasto gravado nunca passa do limite rígido.
         var spent = await api.QueryAsync(db => db.AiUsages.Where(u => u.EssayId == student.EssayId).SumAsync(u => u.CostMicroUsd ?? 0));
-        Assert.True(spent <= 330_000, $"gasto de {spent} milionésimos de dólar");
+        Assert.True(spent <= 570_000, $"gasto de {spent} milionésimos de dólar");
         Assert.Equal(1, await student.BalanceAsync());
     }
 

@@ -68,7 +68,7 @@ Especificação: seções 3 (Correção e nota), 8 inteira, 10 e 12.
 
 - Tabelas da base de conhecimento: `prompt_templates`, `rubric_guidelines`, `writing_rules`, `anchor_essays`, `anchor_scores`, `prompt_grading_notes` (na etapa 3b, no lugar de `theme_grading_notes`), `grading_profiles` (índice único parcial do ativo), `reference_essays`, `eval_runs`; `corrections`, `correction_criteria`, `correction_marks`, `correction_feedback`.
 - Job `grade`: lê o perfil ativo, monta as camadas na ordem de cache, chama o modelo, valida as 7 regras, calcula a nota (soma de nível × peso), consome o crédito, `completed`, e-mail `correction_ready`.
-- Controle de custo: teto de referência US$ 0,15 (alerta) e limite rígido US$ 0,33 (falha com devolução).
+- Controle de custo: teto de referência US$ 0,26 (alerta) e limite rígido US$ 0,57 (falha com devolução); eram US$ 0,15 e 0,33 até 23/10/2026.
 - Defesa contra prompt injection: redação delimitada como dado.
 - Comando de linha `eval` que roda um perfil sobre o conjunto de referência (Batch API) e grava em `eval_runs`; comando `activate-profile` e `rollback-profile`.
 - Testes sem professor: defeitos plantados, consistência (3 execuções) e transcrição contra digitação.

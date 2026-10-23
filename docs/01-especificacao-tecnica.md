@@ -289,7 +289,7 @@ Duas chamadas à API do Claude por redação: uma de transcrição (imagem → t
 | Transcrição | `claude-sonnet-5-5` | Leitura de letra cursiva é a base de tudo; um erro aqui vira erro "do aluno" na nota. |
 | Correção | `claude-opus-5-5` | É a etapa em que a qualidade mais pesa. Cabe no teto com uma nova tentativa. |
 
-Custo estimado da combinação: US$ 0,08 por redação, abaixo do teto de US$ 0,15. Primeiro teste de economia: rodar o conjunto de referência com `claude-haiku-5-5` na transcrição e trocar se a precisão for a mesma.
+Custo estimado da combinação: US$ 0,08 por redação, abaixo do teto de US$ 0,26. Primeiro teste de economia: rodar o conjunto de referência com `claude-haiku-5-5` na transcrição e trocar se a precisão for a mesma.
 
 **Base de conhecimento da correção**
 
@@ -361,7 +361,7 @@ A proposta não faz parte do perfil: tem versão própria, porque muda a cada pr
 - O conteúdo do aluno vai delimitado como dado (`<redacao>…</redacao>`), com instrução explícita de ignorar qualquer ordem escrita nele. Defesa contra prompt injection.
 - Partes fixas (instruções, grade, enunciado e coletânea) vêm primeiro e usam prompt caching; o texto do aluno vem por último.
 - Chamadas em streaming, com timeout de 10 min por chamada (`docs/08-ajustes-correcao.md`, item 1). Erros 429, 5xx, overloaded, conexão perdida e timeout são retentáveis; 400 e resposta inválida após 2 tentativas são definitivos.
-- `max_tokens` em configuração, como teto de segurança e não como meta: `Ai__Grading__MaxTokens` (32.000) e `Ai__Transcription__MaxTokens` (8.000). Resposta cortada (`stop_reason = "max_tokens"`) nunca é completada: a nova chamada usa o dobro, até o máximo do modelo; cortada de novo, `AI_OUTPUT_TRUNCATED`, a redação falha e o crédito volta. Toda nova chamada respeita o limite rígido de gasto.
+- `max_tokens` em configuração, como teto de segurança e não como meta: `Ai__Grading__MaxTokens` (55.000) e `Ai__Transcription__MaxTokens` (8.000). Resposta cortada (`stop_reason = "max_tokens"`) nunca é completada: a nova chamada usa o dobro, até o máximo do modelo; cortada de novo, `AI_OUTPUT_TRUNCATED`, a redação falha e o crédito volta. Toda nova chamada respeita o limite rígido de gasto.
 - A resposta bruta é guardada (`raw_response`) para auditoria e para o feedback do aluno.
 
 **Transcrição**
@@ -424,7 +424,7 @@ A nota é sempre calculada pelo backend: soma de `level × weight`; o modelo nun
 
 **Custo por correção**
 
-O custo de IA por correção fica em centavos de real e é controlado por um teto de **US$ 0,15** por redação (transcrição + correção + novas tentativas), cerca de 5% do preço da correção avulsa.
+O custo de IA por correção fica em centavos de real e é controlado por um teto de **US$ 0,26** por redação (transcrição + correção + novas tentativas), cerca de 9% do preço da correção avulsa. Os limites subiram 1,72× em 23/10/2026, na mesma proporção da resposta da correção com os campos de aprendizado (ver `docs/decisoes.md`).
 
 Estimativa com preços de tabela da API (out/2026) e estas premissas: foto recortada na área da folha (até 4.784 tokens de imagem), transcrição de 1.500 tokens de saída, correção com 7.000 tokens fixos em cache (instruções, grade, enunciado, coletânea) + 1.200 da redação e 2.500 de saída. Câmbio de referência: R$ 5,50 por US$.
 
@@ -443,7 +443,7 @@ Regras para manter qualidade dentro do teto:
 2. **Cache na ordem certa.** Instruções e grade (iguais para todos) → proposta e abordagens esperadas (iguais por versão de proposta) → redação (única). Redações da mesma proposta em sequência reaproveitam o cache.
 3. **Saída estruturada, sem limite artificial.** Justificativa direta (sem limite rígido de palavras), todas as marcas que afetam a nota e os principais acertos, com teto de 80 só contra o caso absurdo (marcas repetidas entram uma vez; acima de 80 ficam primeiro as que tiraram pontos, sem recusar a resposta), no máximo 3 próximos passos (limite pedagógico). O `max_tokens` é só teto de segurança (ver a seção 8): resposta cortada custa a chamada inteira e nunca é aproveitada.
 4. **Imagem enxuta.** Recortar a área da folha e reduzir para o menor tamanho que mantenha a leitura, medido no conjunto de referência. A imagem vai só para a transcrição; a correção recebe apenas texto.
-5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,15 é a referência; a redação nunca é bloqueada enquanto o gasto ficar até o limite rígido de US$ 0,33 (`Ai__HardCapUsd`). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
+5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,26 (`Ai__ReferenceCapUsd`) é a referência; a redação nunca é bloqueada enquanto o gasto ficar até o limite rígido de US$ 0,57 (`Ai__HardCapUsd`). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
 6. **Batch API como opção futura.** Dá 50% de desconto, mas pode levar até 24 h (em geral menos de 1 h). Fica fora do fluxo normal; serve para rodar o conjunto de referência e reprocessamentos.
 
 ## 9. Pagamentos e créditos
