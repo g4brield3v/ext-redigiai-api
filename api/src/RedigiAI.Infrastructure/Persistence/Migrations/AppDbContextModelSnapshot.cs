@@ -1612,6 +1612,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("criterion_id");
 
+                    b.Property<string>("Example")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("example");
+
                     b.Property<string>("Guidance")
                         .HasColumnType("text")
                         .HasColumnName("guidance");
@@ -1629,6 +1633,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("integer[]")
                         .HasColumnName("lines");
+
+                    b.Property<string>("PlainExplanation")
+                        .HasColumnType("text")
+                        .HasColumnName("plain_explanation");
 
                     b.Property<int>("Points")
                         .HasColumnType("integer")
@@ -1692,6 +1700,20 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Answer")
+                        .HasColumnType("text")
+                        .HasColumnName("answer");
+
+                    b.Property<string>("AnswerKind")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("answer_kind");
+
+                    b.Property<string>("AskLabel")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("ask_label");
+
                     b.Property<int>("CharEnd")
                         .HasColumnType("integer")
                         .HasColumnName("char_end");
@@ -1738,6 +1760,10 @@ namespace RedigiAI.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("rule_code");
+
+                    b.Property<string>("Why")
+                        .HasColumnType("text")
+                        .HasColumnName("why");
 
                     b.HasKey("Id")
                         .HasName("pk_correction_marks");

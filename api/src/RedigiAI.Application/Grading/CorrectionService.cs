@@ -32,7 +32,11 @@ public sealed record CorrectionPointDto(string Text, int? Criterion, int? Potent
 /// <param name="CharEnd">Posição no texto da linha final, excluída.</param>
 /// <param name="Quote">O trecho marcado, recortado da redação.</param>
 /// <param name="RuleName">Nome da regra de escrita, como "Crase antes de verbo".</param>
-/// <param name="Fix">A forma correta do trecho, nos desvios de escrita.</param>
+/// <param name="Fix">Obsoleto: a forma correta, igual a <c>answer</c> quando <c>answerKind</c> é <c>exact</c>.</param>
+/// <param name="Why">A regra geral por trás do desvio; nulo nos acertos e nas correções antigas.</param>
+/// <param name="Answer">A forma correta (critério 4) ou uma reescrita possível (critérios 1 a 3).</param>
+/// <param name="AnswerKind"><c>exact</c> no critério 4; <c>example</c> nos critérios 1 a 3.</param>
+/// <param name="AskLabel">O pedido ao aluno antes de ver a resposta, até 60 caracteres; opcional.</param>
 public sealed record CorrectionAnnotationDto(
     int Id,
     MarkKind Kind,
@@ -44,7 +48,24 @@ public sealed record CorrectionAnnotationDto(
     string Quote,
     string? Note,
     string? RuleName,
-    string? Fix);
+    [property: Obsolete("Use answer, com answerKind = exact.")] string? Fix,
+    string? Why,
+    string? Answer,
+    AnswerKind? AnswerKind,
+    string? AskLabel);
+
+/// <summary>Um pedaço do exemplo de reescrita.</summary>
+/// <param name="Kind"><c>keep</c>: texto do aluno que fica; <c>remove</c>: texto do aluno que sai; <c>add</c>: texto novo.</param>
+public sealed record CorrectionExampleSegmentDto(string Text, ExampleSegmentKind Kind);
+
+/// <summary>Como ficaria um trecho do texto: um exemplo, não a única forma.</summary>
+/// <param name="LineLabel">Onde fica o trecho, como "Fim do parágrafo, linha 29".</param>
+public sealed record CorrectionExampleDto(string LineLabel, IReadOnlyList<CorrectionExampleSegmentDto> Segments);
+
+/// <summary>Os desvios de um critério, na ordem em que o aluno deve olhar.</summary>
+/// <param name="PotentialGain">Pontos perdidos no critério.</param>
+/// <param name="MarkIds">Números dos apontamentos (<c>id</c>), em ordem de linha; no critério 4, os da mesma regra juntos.</param>
+public sealed record CorrectionAnnotationGroupDto(int Criterion, int PotentialGain, IReadOnlyList<int> MarkIds);
 
 /// <param name="Points">Nível × peso, calculado pelo backend.</param>
 /// <param name="PointsLost">Pontos que faltam para a nota máxima do critério.</param>
@@ -52,6 +73,8 @@ public sealed record CorrectionAnnotationDto(
 /// <param name="NextDescriptor">Descritor do nível seguinte; nulo no nível máximo.</param>
 /// <param name="Guidance">O que corrigir, sempre como afirmação; nulo quando o nível é o máximo.</param>
 /// <param name="AnnotationIds">Apontamentos deste critério, em ordem de linha.</param>
+/// <param name="PlainExplanation">O que muda para o próximo nível neste texto; nulo no nível máximo e nas correções antigas.</param>
+/// <param name="Example">Como ficaria um trecho do texto, nos critérios 1 a 3 abaixo do nível máximo; opcional.</param>
 public sealed record CorrectionCriterionDto(
     int Position,
     string ShortName,
@@ -65,7 +88,9 @@ public sealed record CorrectionCriterionDto(
     string? NextDescriptor,
     string Justification,
     string? Guidance,
-    IReadOnlyList<int> AnnotationIds);
+    IReadOnlyList<int> AnnotationIds,
+    string? PlainExplanation,
+    CorrectionExampleDto? Example);
 
 public sealed record CorrectionFeedbackDto(FeedbackRating Rating, string? Comment);
 
@@ -78,6 +103,10 @@ public sealed record CorrectionFeedbackDto(FeedbackRating Rating, string? Commen
 /// <param name="Lines">A redação como foi corrigida: a transcrição com as palavras digitadas pelo aluno.</param>
 /// <param name="NextSteps">Plano de reescrita, do passo que mais aumenta a nota para o que menos aumenta.</param>
 /// <param name="Feedback">A avaliação que o aluno fez desta correção, se já avaliou.</param>
+/// <param name="AnnotationGroups">
+/// Os desvios por critério, do que mais aumenta a nota para o que menos: o critério do problema principal, depois
+/// os de mais pontos perdidos (no empate, o menor número) e o critério 4 por último. Vazio com nota zero.
+/// </param>
 public sealed record CorrectionDto(
     Guid Id,
     Guid EssayId,
@@ -103,7 +132,8 @@ public sealed record CorrectionDto(
     IReadOnlyList<CorrectionAnnotationDto> Annotations,
     IReadOnlyList<CorrectionCriterionDto> Criteria,
     IReadOnlyList<CorrectionPointDto> NextSteps,
-    CorrectionFeedbackDto? Feedback);
+    CorrectionFeedbackDto? Feedback,
+    IReadOnlyList<CorrectionAnnotationGroupDto> AnnotationGroups);
 
 public interface ICorrectionService
 {
@@ -172,7 +202,11 @@ internal sealed class CorrectionService(
                 Quote(mark, textByLine),
                 mark.Note,
                 mark.RuleCode is { } code ? ruleNames.GetValueOrDefault(code, code) : null,
-                mark.Fix))
+                mark.Fix,
+                mark.Why,
+                mark.Answer,
+                mark.AnswerKind,
+                mark.AskLabel))
             .ToList();
 
         // Quanto cada critério ainda pode render; vazio com nota zero, quando nenhum é pontuado.
@@ -215,7 +249,39 @@ internal sealed class CorrectionService(
             [.. correction.Criteria.OrderBy(c => c.Position).Select(graded => ToDto(graded, rubric, annotations))],
             // A ordenação é estável: passos de mesmo ganho ficam na ordem em que a IA os escreveu.
             [.. correction.NextSteps.Select(step => Point(step.Text, step.Criterion)).OrderByDescending(step => step.PotentialGain ?? -1)],
-            feedback is null ? null : new CorrectionFeedbackDto(feedback.Rating, feedback.Comment));
+            feedback is null ? null : new CorrectionFeedbackDto(feedback.Rating, feedback.Comment),
+            AnnotationGroups(annotations, gainByCriterion, correction.MainIssueCriterion));
+    }
+
+    /// <summary>
+    /// Os desvios agrupados por critério, do que mais aumenta a nota para o que menos. Com nota zero nenhum
+    /// critério é pontuado e não há ganho a ordenar: a lista vem vazia.
+    /// </summary>
+    internal static List<CorrectionAnnotationGroupDto> AnnotationGroups(
+        IReadOnlyList<CorrectionAnnotationDto> annotations, IReadOnlyDictionary<int, int> gainByCriterion, int? mainIssueCriterion)
+    {
+        return
+        [
+            .. annotations
+                .Where(annotation => annotation.Kind == MarkKind.Issue && gainByCriterion.ContainsKey(annotation.Criterion))
+                .GroupBy(annotation => annotation.Criterion)
+                .OrderBy(group => group.Key == mainIssueCriterion ? 0 : group.Key == Correction.WritingCriterion ? 2 : 1)
+                .ThenByDescending(group => gainByCriterion[group.Key])
+                .ThenBy(group => group.Key)
+                .Select(group => new CorrectionAnnotationGroupDto(
+                    group.Key,
+                    gainByCriterion[group.Key],
+                    group.Key == Correction.WritingCriterion ? ByRule(group) : [.. group.Select(annotation => annotation.Id).Order()])),
+        ];
+
+        // Os desvios da mesma regra ficam juntos, na ordem de linha da primeira ocorrência; o id já é a ordem de linha.
+        static List<int> ByRule(IEnumerable<CorrectionAnnotationDto> group) =>
+        [
+            .. group
+                .GroupBy(annotation => annotation.RuleName)
+                .OrderBy(rule => rule.Min(annotation => annotation.Id))
+                .SelectMany(rule => rule.Select(annotation => annotation.Id).Order()),
+        ];
     }
 
     public async Task SendFeedbackAsync(
@@ -285,7 +351,12 @@ internal sealed class CorrectionService(
             criterion.LevelDescriptors.GetValueOrDefault(graded.Level + 1),
             graded.Justification,
             graded.Guidance,
-            [.. annotations.Where(annotation => annotation.Criterion == graded.Position).Select(annotation => annotation.Id)]);
+            [.. annotations.Where(annotation => annotation.Criterion == graded.Position).Select(annotation => annotation.Id)],
+            graded.PlainExplanation,
+            graded.Example is { } example
+                ? new CorrectionExampleDto(
+                    example.LineLabel, [.. example.Segments.Select(segment => new CorrectionExampleSegmentDto(segment.Text, segment.Kind))])
+                : null);
     }
 
     /// <summary>"Fuvest 2027 (v1)"; grade sem rótulo leva o nome do vestibular.</summary>

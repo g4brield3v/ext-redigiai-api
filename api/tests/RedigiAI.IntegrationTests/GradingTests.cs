@@ -125,6 +125,7 @@ public class GradingTests(ApiFixture api)
     [InlineData("main-issue-without-criterion", 2)]
     [InlineData("main-issue-as-question", 4)]
     [InlineData("no-tool", 1)]
+    [InlineData("learning-question", 4)]
     public async Task Bad_response_is_rejected_and_asked_again(string problem, int rule)
     {
         var student = await QueuedEssayAsync();
@@ -140,6 +141,158 @@ public class GradingTests(ApiFixture api)
         Assert.Contains($"\"rule\":{rule}", rejected.Data!.Replace(" ", ""));
     }
 
+    [Theory]
+    [InlineData("missing-why", 9, "AI_MISSING_FIELD")]
+    [InlineData("leaked-answer", 10, "AI_ANSWER_LEAKED")]
+    [InlineData("example-mismatch", 11, "AI_EXAMPLE_MISMATCH")]
+    public async Task Learning_field_problem_is_rejected_with_its_code_and_asked_again(string problem, int rule, string code)
+    {
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(() => Bad(problem));
+
+        await RunAsync(JobTypes.Grade);
+
+        // A segunda chamada, boa, conclui; a recusa fica registrada com a regra e o código, sem o texto.
+        Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
+        Assert.Equal(2, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
+        var rejected = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_rejected"));
+        var data = JsonDocument.Parse(rejected.Data!).RootElement;
+        Assert.Equal((rule, code), (data.GetProperty("rule").GetInt32(), data.GetProperty("code").GetString()));
+        Assert.DoesNotContain("partir", rejected.Data, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Learning_field_problem_twice_fails_the_essay_and_gives_the_credit_back()
+    {
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(() => Bad("leaked-answer"));
+        api.Grader.Script.Enqueue(() => Bad("missing-why"));
+
+        await RunAsync(JobTypes.Grade);
+
+        var essay = await api.QueryAsync(db => db.Essays.SingleAsync(e => e.Id == student.EssayId));
+        Assert.Equal((EssayStatus.Failed, "GRADING_FAILED"), (essay.Status, essay.FailureCode));
+        Assert.Equal("AI_INVALID_RESPONSE", (await student.JobAsync(JobTypes.Grade)).LastError);
+        Assert.Equal(1, await student.BalanceAsync());
+    }
+
+    [Fact]
+    public async Task Annotation_groups_follow_the_main_issue_then_the_gain_and_leave_criterion_4_last()
+    {
+        // Níveis 2, 3, 2 e 1 com pesos 3, 2, 3 e 2: os critérios 1, 3 e 4 perdem 6 pontos; o 2, só 2.
+        static JsonObject Response(int mainIssue)
+        {
+            var response = FakeGrader.Good();
+            response["criteria"] = new JsonArray(
+                FakeGrader.Criterion(1, 2), FakeGrader.Criterion(2, 3), FakeGrader.Criterion(3, 2), FakeGrader.Criterion(4, 1));
+            response["criteria"]![0]!["plain_explanation"] = "Na linha 1, a tese ainda não tem um argumento próprio.";
+            response["criteria"]![0]!["example"] = Example(
+                ("A tecnologia mudou ", "keep"), ("a forma", "remove"), ("o jeito", "add"), (" de debater.", "keep"));
+            response["main_issue"] = FakeGrader.Point("Comece por aqui.", mainIssue);
+            // Linha 1: "A tecnologia mudou a forma de debater."; linha 2: "Os algoritmos escolhem o que cada um vê."
+            response["marks"] = new JsonArray(
+                FakeGrader.Issue(4, 1, 0, 1, rule: "CRASE_VERBO", answer: "Uma"),
+                FakeGrader.Issue(1, 1, 2, 12),
+                FakeGrader.Issue(3, 1, 13, 18),
+                FakeGrader.Issue(4, 1, 19, 20, rule: "INVENTADA", answer: "uma"),
+                FakeGrader.Issue(2, 2, 0, 2),
+                FakeGrader.Issue(4, 2, 3, 13, rule: "CRASE_VERBO", answer: "palavras"),
+                FakeGrader.Issue(1, 2, 14, 22),
+                new JsonObject
+                {
+                    ["criterion"] = 3, ["kind"] = "good", ["line"] = 2, ["start"] = 23, ["end"] = 24,
+                    ["note"] = null, ["rule"] = null, ["why"] = null, ["answer"] = null, ["ask_label"] = null,
+                });
+            return response;
+        }
+
+        static List<string> Groups(JsonElement shown) =>
+            [.. shown.GetProperty("annotationGroups").EnumerateArray().Select(group =>
+                $"{group.GetProperty("criterion").GetInt32()}:{group.GetProperty("potentialGain").GetInt32()}:"
+                + string.Join(',', group.GetProperty("markIds").EnumerateArray().Select(id => id.GetInt32())))];
+
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(() => Response(mainIssue: 2).ToJsonString());
+        await RunAsync(JobTypes.Grade);
+        var shown = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction");
+
+        // O do problema principal primeiro, mesmo valendo menos; 1 e 3 empatam e vai o menor; o 4 por último, com os
+        // desvios da mesma regra juntos (os de crase, 1 e 6, antes do 4, de outra regra).
+        Assert.Equal(["2:2:5", "1:6:2,7", "3:6:3", "4:6:1,6,4"], Groups(shown));
+
+        // As explicações do critério: em palavras simples e o exemplo, gravado e devolvido como veio.
+        var first = shown.GetProperty("criteria")[0];
+        Assert.Equal("Na linha 1, a tese ainda não tem um argumento próprio.", first.GetProperty("plainExplanation").GetString());
+        var example = first.GetProperty("example");
+        Assert.Equal("Linha 1", example.GetProperty("lineLabel").GetString());
+        Assert.Equal(
+            ["keep:A tecnologia mudou ", "remove:a forma", "add:o jeito", "keep: de debater."],
+            example.GetProperty("segments").EnumerateArray().Select(s => $"{s.GetProperty("kind").GetString()}:{s.GetProperty("text").GetString()}"));
+        Assert.Equal(JsonValueKind.Null, shown.GetProperty("criteria")[1].GetProperty("example").ValueKind);
+
+        // Nos critérios 1 a 3 a resposta é um exemplo, sem a forma correta antiga.
+        var annotations = shown.GetProperty("annotations");
+        Assert.Equal(("example", JsonValueKind.Null), (annotations[1].GetProperty("answerKind").GetString(), annotations[1].GetProperty("fix").ValueKind));
+
+        // Com o problema principal no critério 4, ele vem primeiro.
+        var other = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(() => Response(mainIssue: 4).ToJsonString());
+        await RunAsync(JobTypes.Grade);
+        var otherShown = await other.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{other.EssayId}/correction");
+        Assert.Equal(["4:6:1,6,4", "1:6:2,7", "3:6:3", "2:2:5"], Groups(otherShown));
+    }
+
+    [Fact]
+    public async Task Correction_made_before_the_learning_fields_is_shown_without_them()
+    {
+        var student = await QueuedEssayAsync();
+        await RunAsync(JobTypes.Grade);
+
+        // Uma correção antiga: os campos novos ficaram nulos e só a forma correta foi gravada.
+        await api.QueryAsync(db => db.Set<CorrectionMark>()
+            .Where(m => db.Corrections.Any(c => c.Id == m.CorrectionId && c.EssayId == student.EssayId))
+            .ExecuteUpdateAsync(m => m
+                .SetProperty(x => x.Why, (string?)null)
+                .SetProperty(x => x.Answer, (string?)null)
+                .SetProperty(x => x.AnswerKind, (AnswerKind?)null)
+                .SetProperty(x => x.AskLabel, (string?)null)));
+        await api.QueryAsync(db => db.Set<CorrectionCriterion>()
+            .Where(c => db.Corrections.Any(x => x.Id == c.CorrectionId && x.EssayId == student.EssayId))
+            .ExecuteUpdateAsync(c => c.SetProperty(x => x.PlainExplanation, (string?)null)));
+
+        var shown = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction");
+
+        var deviation = shown.GetProperty("annotations")[0];
+        Assert.Equal("A partir", deviation.GetProperty("fix").GetString());
+        Assert.All(["why", "answer", "answerKind", "askLabel"], name => Assert.Equal(JsonValueKind.Null, deviation.GetProperty(name).ValueKind));
+        Assert.All(
+            shown.GetProperty("criteria").EnumerateArray(),
+            criterion => Assert.Equal(
+                (JsonValueKind.Null, JsonValueKind.Null),
+                (criterion.GetProperty("plainExplanation").ValueKind, criterion.GetProperty("example").ValueKind)));
+
+        // A ordem por importância não depende dos campos novos: vale também para a correção antiga.
+        Assert.Equal(4, shown.GetProperty("annotationGroups")[0].GetProperty("criterion").GetInt32());
+    }
+
+    [Fact]
+    public async Task Zero_correction_has_no_annotation_groups()
+    {
+        var student = await QueuedEssayAsync();
+        api.Grader.Script.Enqueue(() => FakeGrader.Zero("theme_not_addressed").ToJsonString());
+        await RunAsync(JobTypes.Grade);
+
+        var shown = await student.Client.GetFromJsonAsync<JsonElement>($"/v1/essays/{student.EssayId}/correction");
+        Assert.Empty(shown.GetProperty("annotationGroups").EnumerateArray());
+    }
+
+    private static JsonObject Example(params (string Text, string Kind)[] segments) =>
+        new()
+        {
+            ["line_label"] = "Linha 1",
+            ["segments"] = new JsonArray([.. segments.Select(segment => (JsonNode)new JsonObject { ["text"] = segment.Text, ["kind"] = segment.Kind })]),
+        };
+
     [Fact]
     public async Task Correction_with_more_than_twelve_marks_is_accepted()
     {
@@ -152,7 +305,7 @@ public class GradingTests(ApiFixture api)
             marks.Add(new JsonObject
             {
                 ["criterion"] = 3, ["kind"] = "issue", ["line"] = 1, ["start"] = i, ["end"] = i + 1,
-                ["note"] = $"Apontamento {i + 1}.", ["rule"] = null, ["fix"] = null,
+                ["note"] = $"Apontamento {i + 1}.", ["rule"] = null, ["why"] = FakeGrader.Why, ["answer"] = "Outra forma.",
             });
         }
 
@@ -184,7 +337,7 @@ public class GradingTests(ApiFixture api)
             marks.Add(new JsonObject
             {
                 ["criterion"] = 1 + (position % 3), ["kind"] = "issue", ["line"] = 1, ["start"] = position / 3, ["end"] = (position / 3) + 1,
-                ["note"] = "Apontamento.", ["rule"] = null, ["fix"] = null,
+                ["note"] = "Apontamento.", ["rule"] = null, ["why"] = FakeGrader.Why, ["answer"] = "Outra forma.",
             });
         }
 
@@ -256,11 +409,11 @@ public class GradingTests(ApiFixture api)
 
         // A resposta cortada não é completada: a segunda chamada, com o dobro, conclui a correção.
         Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
-        Assert.Equal([32_000, 64_000], api.Grader.Requests.Skip(before).Select(request => request.MaxTokens));
+        Assert.Equal([55_000, 110_000], api.Grader.Requests.Skip(before).Select(request => request.MaxTokens));
         // As duas chamadas são cobradas e entram no gasto da redação.
         Assert.Equal(2, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
         var truncated = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_truncated"));
-        Assert.Contains("\"maxTokens\":32000", truncated.Data!.Replace(" ", ""));
+        Assert.Contains("\"maxTokens\":55000", truncated.Data!.Replace(" ", ""));
         // Cortada não é o mesmo que recusada pelas regras.
         Assert.False(await api.QueryAsync(db => db.AuditLog.AnyAsync(a => a.EntityId == student.EssayId && a.Action == "grading.response_rejected")));
     }
@@ -328,7 +481,7 @@ public class GradingTests(ApiFixture api)
     [Fact]
     public async Task Max_tokens_is_reduced_to_what_fits_in_the_hard_cap_at_the_worst_case()
     {
-        // Limite padrão de US$ 0,33: 32 mil tokens de saída no Opus (US$ 20 por milhão) seriam US$ 0,64.
+        // Limite padrão de US$ 0,57: 55 mil tokens de saída no Opus (US$ 20 por milhão) seriam US$ 1,10.
         var student = await QueuedEssayAsync();
         var before = api.Grader.Requests.Count;
 
@@ -336,7 +489,7 @@ public class GradingTests(ApiFixture api)
 
         Assert.Equal(EssayStatus.Completed, await student.StatusAsync());
         var sent = api.Grader.Requests.Skip(before).Single().MaxTokens;
-        Assert.InRange(sent, 1_024, 16_499);
+        Assert.InRange(sent, 1_024, 28_499);
         var reduced = await api.QueryAsync(db => db.AuditLog.SingleAsync(a => a.EntityId == student.EssayId && a.Action == "ai.max_tokens_reduced"));
         Assert.Contains($"\"allowed\":{sent}", reduced.Data!.Replace(" ", ""));
     }
@@ -356,7 +509,7 @@ public class GradingTests(ApiFixture api)
         Assert.Equal(1, await api.QueryAsync(db => db.AiUsages.CountAsync(u => u.EssayId == student.EssayId && u.Stage == AiUsage.Grading)));
         // O gasto gravado nunca passa do limite rígido.
         var spent = await api.QueryAsync(db => db.AiUsages.Where(u => u.EssayId == student.EssayId).SumAsync(u => u.CostMicroUsd ?? 0));
-        Assert.True(spent <= 330_000, $"gasto de {spent} milionésimos de dólar");
+        Assert.True(spent <= 570_000, $"gasto de {spent} milionésimos de dólar");
         Assert.Equal(1, await student.BalanceAsync());
     }
 
@@ -752,12 +905,26 @@ public class GradingTests(ApiFixture api)
             deviation.GetProperty("id").GetInt32(), deviation.GetProperty("kind").GetString(), deviation.GetProperty("criterion").GetInt32(),
             deviation.GetProperty("lineStart").GetInt32(), deviation.GetProperty("lineEnd").GetInt32(),
             deviation.GetProperty("charStart").GetInt32(), deviation.GetProperty("charEnd").GetInt32()));
-        Assert.Equal(("A", "\"A partir\", sem crase", "Crase antes de verbo", "A partir"), (
+        Assert.Equal(("A", "Sobra o acento grave no começo da linha.", "Crase antes de verbo", "A partir"), (
             deviation.GetProperty("quote").GetString(), deviation.GetProperty("note").GetString(),
             deviation.GetProperty("ruleName").GetString(), deviation.GetProperty("fix").GetString()));
+        // Aprendizado: a regra geral, a resposta exata (no critério 4) e o pedido antes da resposta.
+        Assert.Equal((FakeGrader.Why, "A partir", "exact", "Escreva a forma correta"), (
+            deviation.GetProperty("why").GetString(), deviation.GetProperty("answer").GetString(),
+            deviation.GetProperty("answerKind").GetString(), deviation.GetProperty("askLabel").GetString()));
         var good = annotations[1];
         Assert.Equal((2, "good", "tecnologia"), (good.GetProperty("id").GetInt32(), good.GetProperty("kind").GetString(), good.GetProperty("quote").GetString()));
-        Assert.Equal((JsonValueKind.Null, JsonValueKind.Null), (good.GetProperty("ruleName").ValueKind, good.GetProperty("fix").ValueKind));
+        Assert.All(
+            ["ruleName", "fix", "why", "answer", "answerKind", "askLabel"],
+            name => Assert.Equal(JsonValueKind.Null, good.GetProperty(name).ValueKind));
+
+        // Só o desvio entra nos grupos por importância; o acerto fica de fora.
+        Assert.Equal(
+            [(4, 2, "1")],
+            shown.GetProperty("annotationGroups").EnumerateArray().Select(group => (
+                group.GetProperty("criterion").GetInt32(),
+                group.GetProperty("potentialGain").GetInt32(),
+                string.Join(',', group.GetProperty("markIds").EnumerateArray().Select(id => id.GetInt32())))));
 
         // Por onde começar e o plano: o ganho é (nível máximo − nível) × peso, e o plano sai do maior para o menor.
         var mainIssue = shown.GetProperty("mainIssue");
@@ -794,7 +961,7 @@ public class GradingTests(ApiFixture api)
             foreach (var mark in response["marks"]!.AsArray())
             {
                 mark!["note"] = escaped;
-                mark["fix"] = escaped;
+                mark["why"] = escaped;
             }
 
             return response.ToJsonString();
@@ -811,7 +978,7 @@ public class GradingTests(ApiFixture api)
         var correction = await api.QueryAsync(db => db.Corrections.Include(c => c.Criteria).Include(c => c.Marks).SingleAsync(c => c.EssayId == student.EssayId));
         Assert.DoesNotContain('\\', correction.Strengths + correction.MainIssue + correction.NextSteps[0].Text
             + string.Concat(correction.Criteria.Select(c => c.Justification + c.Guidance))
-            + string.Concat(correction.Marks.Select(m => m.Note + m.Fix)));
+            + string.Concat(correction.Marks.Select(m => m.Note + m.Why)));
         Assert.Contains("\\\\\\\"A vida é bela", correction.RawResponse);
     }
 
@@ -895,7 +1062,7 @@ public class GradingTests(ApiFixture api)
             new()
             {
                 ["criterion"] = 1, ["kind"] = "good", ["line"] = line, ["start"] = start, ["end"] = end,
-                ["note"] = "Bom trecho.", ["rule"] = null, ["fix"] = null,
+                ["note"] = "Bom trecho.", ["rule"] = null,
             };
     }
 
@@ -997,6 +1164,18 @@ public class GradingTests(ApiFixture api)
                 break;
             case "no-tool":
                 return null;
+            case "missing-why":
+                response["marks"]![0]!["why"] = null;
+                break;
+            case "leaked-answer":
+                response["marks"]![0]!["note"] = "Escreva “A partir”, sem o acento.";
+                break;
+            case "example-mismatch":
+                response["criteria"]![0]!["example"] = Example(("um trecho que não está na redação", "remove"), ("outro", "add"));
+                break;
+            case "learning-question":
+                response["marks"]![0]!["why"] = "Qual é a regra da crase antes de verbo?";
+                break;
         }
 
         return response.ToJsonString();

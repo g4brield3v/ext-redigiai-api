@@ -23,16 +23,16 @@ public sealed class AiBudgetOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>Teto de referência por redação; passar dele só gera alerta.</summary>
-    public decimal ReferenceCapUsd { get; set; } = 0.15m;
+    public decimal ReferenceCapUsd { get; set; } = 0.26m;
 
     /// <summary>Limite rígido: uma nova tentativa que não cabe nele não é feita.</summary>
-    public decimal HardCapUsd { get; set; } = 0.33m;
+    public decimal HardCapUsd { get; set; } = 0.57m;
 
     /// <summary>Preço por modelo (<c>Ai__Pricing__&lt;modelo&gt;__Input</c> etc.). Sem preço, o custo fica sem registro.</summary>
     public Dictionary<string, ModelPriceOptions> Pricing { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Tamanho máximo da resposta da correção (<c>Ai__Grading__MaxTokens</c>).</summary>
-    public AiCallOptions Grading { get; set; } = new() { MaxTokens = 32_000 };
+    public AiCallOptions Grading { get; set; } = new() { MaxTokens = 55_000 };
 
     /// <summary>Tamanho máximo da resposta da transcrição (<c>Ai__Transcription__MaxTokens</c>).</summary>
     public AiCallOptions Transcription { get; set; } = new() { MaxTokens = 8_000 };

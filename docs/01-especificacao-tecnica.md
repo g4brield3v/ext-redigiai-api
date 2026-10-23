@@ -146,8 +146,8 @@ PostgreSQL é a única base: dados do produto, fila de jobs e livro-razão de cr
 | `transcriptions` | id, essay_id, lines (jsonb: número + texto), illegible_count, model, created_at | Texto fiel, nunca editado. |
 | `illegible_words` | id, transcription_id, line_number, char_start, char_end, student_value, filled_at | O que o aluno digitou fica separado da transcrição. |
 | `corrections` | id, essay_id, rubric_version_id, grading_profile_id, prompt_id, prompt_grading_notes_id, collection_copy (jsonb), zero_reason, zero_explanation, score, max_score, strengths, main_issue, main_issue_criterion, next_steps (jsonb: `[{text, criterion}]`), model, raw_response (jsonb), created_at | `score` calculado pelo backend. Uma por redação. O critério do problema principal e de cada passo é a posição na grade; nulo com nota zero. `prompt_id` é a versão da proposta usada; `collection_copy` guarda os trechos copiados da coletânea achados pela verificação automática. |
-| `correction_criteria` | id, correction_id, criterion_id, position, level, points, justification, guidance, lines (int[]) | `points` = level × weight. |
-| `correction_marks` | id, correction_id, criterion_id, criterion_position, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note, rule_code, fix | Apontamentos na redação. `fix` é a forma correta do trecho e só existe em desvio de escrita (marca `issue` com `rule_code`). |
+| `correction_criteria` | id, correction_id, criterion_id, position, level, points, justification, guidance, lines (int[]), plain_explanation, example (jsonb) | `points` = level × weight. `plain_explanation` (o que muda para o próximo nível, em palavras simples) e `example` (`{lineLabel, segments: [{text, kind: keep\|remove\|add}]}`, só nos critérios 1 a 3) existem só abaixo do nível máximo; nulos nas correções anteriores a 22/10/2026. |
+| `correction_marks` | id, correction_id, criterion_id, criterion_position, kind (`good`, `issue`), line_start, line_end, char_start, char_end, note, rule_code, fix, why, answer, answer_kind, ask_label | Apontamentos na redação. `why` (a regra geral), `answer` (forma correta no critério 4, reescrita possível nos critérios 1 a 3), `answer_kind` (`exact` no critério 4, `example` nos outros) e `ask_label` (opcional, até 60 caracteres) só existem nas marcas `issue`. `fix` é a resposta exata do critério 4 (nas correções antigas, a forma correta do desvio de escrita); fica por compatibilidade. Os quatro campos novos são nulos nas correções anteriores a 22/10/2026. |
 | `correction_feedback` | id, correction_id, rating (`helped_a_lot`, `helped_partly`, `did_not_help`), comment (até 1.000 caracteres), created_at | 1 por correção (índice único em `correction_id`). |
 | `assets` | id, user_id, provider (`cloudinary`), public_id, bytes, mime, purge_after, scope (`essay_photo`, `prompt_image`) | Fotos de redação privadas. Imagens de proposta ficam numa pasta pública, com URL estável. |
 
@@ -203,7 +203,7 @@ API REST em ASP.NET Core, prefixo `/v1`, JSON. Nada do conteúdo é público: se
 | `GET /v1/essays?status=&cursor=` | Lista do painel, com título no formato "Vestibular – Tipo – Tema" e, se a redação falhou ou foi cancelada, `failure` (`code`, `occurredAt`, `creditRefunded`, `details`). |
 | `GET /v1/essays/{id}` | Status, prazo de revisão, palavras ilegíveis (se houver), `failure` (como na lista) e `timeline` (`at`, `type`, `details`), montada da trilha de auditoria com uma lista fechada de eventos (ver `docs/08-ajustes-correcao.md`, item 3). |
 | `PUT /v1/essays/{id}/illegible` | Corpo: `[{wordId, value}]`. Só aceito em `awaiting_review`, antes do prazo e com todas as palavras preenchidas; muda para `queued` e cria job `grade`. |
-| `GET /v1/essays/{id}/correction` | Correção completa, com tudo já calculado (o front só exibe): `rubric` (`maxLevel`, `maxScore`, `versionLabel`); `score`, `scoreDelta` e `previousVersionScore`; `zero` (`applies`, `ruleCode`, `ruleLabel`, `ruleNote`, `explanation`); `strengths`; `mainIssue` e `nextSteps` (`text`, `criterion`, `potentialGain` = (nível máximo − nível) × peso; os passos saem do maior ganho para o menor); `lines` (transcrição com as palavras do aluno); `annotations` (`id` sequencial em ordem de linha, `kind`, `criterion`, linhas e posições, `quote` recortado pelo backend, `note`, `ruleName`, `fix`); `criteria` (`shortName`, `fullName`, `weight`, `level`, `points`, `maxPoints`, `pointsLost`, `currentDescriptor`, `nextDescriptor`, `justification`, `guidance`, `annotationIds`); `feedback`, se o aluno já avaliou. |
+| `GET /v1/essays/{id}/correction` | Correção completa, com tudo já calculado (o front só exibe): `rubric` (`maxLevel`, `maxScore`, `versionLabel`); `score`, `scoreDelta` e `previousVersionScore`; `zero` (`applies`, `ruleCode`, `ruleLabel`, `ruleNote`, `explanation`); `strengths`; `mainIssue` e `nextSteps` (`text`, `criterion`, `potentialGain` = (nível máximo − nível) × peso; os passos saem do maior ganho para o menor); `lines` (transcrição com as palavras do aluno); `annotations` (`id` sequencial em ordem de linha, `kind`, `criterion`, linhas e posições, `quote` recortado pelo backend, `note`, `ruleName`, `why`, `answer`, `answerKind`, `askLabel` e `fix`, obsoleto, igual a `answer` quando `answerKind = exact`; os campos de aprendizado são nulos nos acertos e nas correções antigas); `criteria` (`shortName`, `fullName`, `weight`, `level`, `points`, `maxPoints`, `pointsLost`, `currentDescriptor`, `nextDescriptor`, `justification`, `guidance`, `annotationIds`, `plainExplanation`, `example`); `annotationGroups` (`criterion`, `potentialGain` = pontos perdidos no critério, `markIds`: só desvios; primeiro o critério do `mainIssue`, depois o maior `potentialGain`, no empate o menor critério, e o critério 4 por último, salvo se for o do `mainIssue`; dentro do grupo, ordem de linha, e no critério 4 os da mesma regra juntos, na ordem da primeira ocorrência; vazio com nota zero); `feedback`, se o aluno já avaliou. |
 | `GET /v1/essays/{id}/photo` | URL assinada da foto, válida por 5 min. |
 | `POST /v1/corrections/{id}/feedback` | Avaliação (3 opções) + comentário opcional. Corpo: `{rating, comment?}`. Uma por correção: a segunda responde `INVALID_STATE` (409). Correção de outro aluno → 404. |
 | `GET /v1/me/progress` | Painel de progresso: `points` (as notas das correções, por data), `lastDelta` e `focus` (o critério que mais tirou pontos nas últimas 3 correções). Regras na seção "Painel de progresso", abaixo. |
@@ -289,7 +289,7 @@ Duas chamadas à API do Claude por redação: uma de transcrição (imagem → t
 | Transcrição | `claude-sonnet-5-5` | Leitura de letra cursiva é a base de tudo; um erro aqui vira erro "do aluno" na nota. |
 | Correção | `claude-opus-5-5` | É a etapa em que a qualidade mais pesa. Cabe no teto com uma nova tentativa. |
 
-Custo estimado da combinação: US$ 0,08 por redação, abaixo do teto de US$ 0,15. Primeiro teste de economia: rodar o conjunto de referência com `claude-haiku-5-5` na transcrição e trocar se a precisão for a mesma.
+Custo estimado da combinação: US$ 0,08 por redação, abaixo do teto de US$ 0,26. Primeiro teste de economia: rodar o conjunto de referência com `claude-haiku-5-5` na transcrição e trocar se a precisão for a mesma.
 
 **Base de conhecimento da correção**
 
@@ -361,7 +361,7 @@ A proposta não faz parte do perfil: tem versão própria, porque muda a cada pr
 - O conteúdo do aluno vai delimitado como dado (`<redacao>…</redacao>`), com instrução explícita de ignorar qualquer ordem escrita nele. Defesa contra prompt injection.
 - Partes fixas (instruções, grade, enunciado e coletânea) vêm primeiro e usam prompt caching; o texto do aluno vem por último.
 - Chamadas em streaming, com timeout de 10 min por chamada (`docs/08-ajustes-correcao.md`, item 1). Erros 429, 5xx, overloaded, conexão perdida e timeout são retentáveis; 400 e resposta inválida após 2 tentativas são definitivos.
-- `max_tokens` em configuração, como teto de segurança e não como meta: `Ai__Grading__MaxTokens` (32.000) e `Ai__Transcription__MaxTokens` (8.000). Resposta cortada (`stop_reason = "max_tokens"`) nunca é completada: a nova chamada usa o dobro, até o máximo do modelo; cortada de novo, `AI_OUTPUT_TRUNCATED`, a redação falha e o crédito volta. Toda nova chamada respeita o limite rígido de gasto.
+- `max_tokens` em configuração, como teto de segurança e não como meta: `Ai__Grading__MaxTokens` (55.000) e `Ai__Transcription__MaxTokens` (8.000). Resposta cortada (`stop_reason = "max_tokens"`) nunca é completada: a nova chamada usa o dobro, até o máximo do modelo; cortada de novo, `AI_OUTPUT_TRUNCATED`, a redação falha e o crédito volta. Toda nova chamada respeita o limite rígido de gasto.
 - A resposta bruta é guardada (`raw_response`) para auditoria e para o feedback do aluno.
 
 **Transcrição**
@@ -374,7 +374,7 @@ A proposta não faz parte do perfil: tem versão própria, porque muda a cada pr
 **Correção**
 
 - Entrada: grade da versão (critérios, pesos, descritores por nível, hipóteses de nota zero), a proposta (blocos em ordem, com o tipo definido no cadastro), as abordagens esperadas, os trechos copiados da coletânea e a transcrição final com o número de cada linha (com as palavras digitadas pelo aluno inseridas no lugar).
-- Instruções: avaliar como a banca; verificar nota zero primeiro; para cada critério dar nível, justificativa e linhas; orientações sempre como afirmações do que corrigir, nunca perguntas; não reescrever o texto do aluno nos critérios 1 a 3; no critério 4, agrupar desvios pela regra e indicar a forma correta.
+- Instruções: avaliar como a banca; verificar nota zero primeiro; para cada critério dar nível, justificativa e linhas; orientações sempre como afirmações do que corrigir, nunca perguntas; no critério 4, agrupar desvios pela regra e indicar a forma correta. Desde 22/10/2026 (`docs/09-aprendizado-correcao.md`, no repositório do front), cada desvio traz também a regra geral (`why`) e a resposta (`answer`): no critério 4, a forma correta; nos critérios 1 a 3, uma reescrita possível do trecho, apresentada ao aluno como exemplo, não como a única forma, e só depois de ele tentar. Abaixo do nível máximo, o critério traz `plain_explanation` e, opcional nos critérios 1 a 3, um `example` de reescrita de um trecho.
 - Saída:
 
 ```json
@@ -382,28 +382,38 @@ A proposta não faz parte do perfil: tem versão própria, porque muda a cada pr
   "zero": {"applies": false, "reason": null, "explanation": null},
   "criteria": [
     {"position": 3, "level": 2, "justification": "...", "lines": [11, 12, 13],
-     "guidance": "Troque o parágrafo das linhas 11 a 13 por ..."}
+     "guidance": "Troque o parágrafo das linhas 11 a 13 por ...",
+     "plain_explanation": "Nas linhas 11 a 13, ...",
+     "example": {"line_label": "Fim do parágrafo, linha 13",
+                 "segments": [{"text": "...", "kind": "keep"}, {"text": "...", "kind": "remove"}, {"text": "...", "kind": "add"}]}}
   ],
   "marks": [{"criterion": 4, "kind": "issue", "line": 14, "start": 0, "end": 8,
-             "note": "Não há crase antes de verbo", "rule": "CRASE_VERBO", "fix": "A partir"}],
+             "note": "Sobra o acento grave antes do verbo", "rule": "CRASE_VERBO",
+             "why": "Antes de verbo não há artigo; sem artigo, não há crase.", "answer": "A partir",
+             "ask_label": "Escreva a forma correta"}],
   "strengths": "...",
   "main_issue": {"text": "...", "criterion": 3},
   "next_steps": [{"text": "...", "criterion": 3}, {"text": "...", "criterion": 4}]
 }
 ```
 
-`fix` é a forma correta do trecho marcado e só vem nos desvios de escrita (critério 4); nos demais é nulo. Em `main_issue` e em cada próximo passo, `criterion` é a posição do critério a que o texto se refere: é com ele que o backend calcula quantos pontos aquele passo pode render. Com nota zero, `criterion` é nulo.
+Nas marcas `issue`, `why` e `answer` são obrigatórios e `ask_label` é opcional; nas marcas `good`, os três são nulos (o que vier é descartado). O modelo não envia mais `fix`: o backend grava `fix` = `answer` nos desvios do critério 4. `plain_explanation` e `example` são nulos no nível máximo, e `example` também no critério 4 (o que vier é descartado). Em `main_issue` e em cada próximo passo, `criterion` é a posição do critério a que o texto se refere: é com ele que o backend calcula quantos pontos aquele passo pode render. Com nota zero, `criterion` é nulo.
 
 **Validação no backend** (falha → nova tentativa; repetida → GRADING_FAILED)
 
 1. JSON válido contra o schema. Aspas que o modelo escreve já com a barra de escape (`\"assim\"`) são gravadas sem a barra em todos os campos de texto; `raw_response` guarda a resposta como veio.
 2. Exatamente um item por critério da versão; `level` inteiro de 1 a `max_level` da versão. Sem nota zero, `main_issue.criterion` é um critério da grade que não está no nível máximo (a não ser que todos estejam); o `criterion` de um próximo passo é um critério da grade ou nulo.
 3. Linhas e posições citadas existem na transcrição.
-4. Nenhuma orientação, próximo passo ou problema principal termina com ponto de interrogação nem traz "?" fora de um trecho entre aspas.
+4. Nenhuma orientação, próximo passo, problema principal, `why` ou `plain_explanation` termina com ponto de interrogação nem traz "?" fora de um trecho entre aspas; `answer` e `ask_label` não têm "?" algum.
 5. No máximo 3 próximos passos.
 6. Se `zero.applies`, `reason` é uma das hipóteses da grade e a nota gravada é 0.
 7. A transcrição indicou identificação na folha e a correção não aplicou nota zero → inconsistência, nova tentativa.
 8. A verificação automática achou 30% ou mais das palavras da redação copiadas da coletânea e a correção não aplicou nota zero → inconsistência, nova tentativa. Os limites (8 palavras em sequência, 30%) ficam em configuração (`CollectionCopy__MinWords`, `CollectionCopy__ZeroShare`); ver `docs/07-propostas-de-redacao.md`, A6.
+9. `AI_MISSING_FIELD`: marca `issue` sem `why` ou sem `answer`, quando as instruções do perfil pedem esses campos (as anteriores a 22/10/2026 não pedem, e a falta deles não recusa). `ask_label` com mais de 60 caracteres, `line_label` com mais de 60, `why`, `answer`, `plain_explanation` ou pedaço de `example` com mais de 800, ou `example` com mais de 20 pedaços recusa pela regra 1. Em `answer`, o "?" só é aceito quando o trecho marcado já tem "?" (por exemplo, "Por quê?").
+10. `AI_ANSWER_LEAKED`: a `note` ou o `why` contêm o `answer`. A comparação é palavra por palavra, sem maiúsculas, aspas nem pontuação; não conta a resposta de uma palavra só com até 3 letras ("à", "há"), que aparece por acaso em qualquer explicação.
+11. `AI_EXAMPLE_MISMATCH`: os segmentos `keep` e `remove` do `example`, juntos e na ordem, não estão na transcrição. Espaços e quebras de linha não contam, e a palavra partida por hífen no fim da linha vale partida ou inteira.
+
+As regras 9 a 11 seguem o mesmo caminho das outras: nova tentativa e, repetida, `GRADING_FAILED` com o crédito devolvido (o job termina com `AI_INVALID_RESPONSE`). O código fica só em `audit_log` (`grading.response_rejected`, com `rule` e `code`, sem o texto da resposta).
 
 A nota é sempre calculada pelo backend: soma de `level × weight`; o modelo nunca envia a nota.
 
@@ -414,7 +424,7 @@ A nota é sempre calculada pelo backend: soma de `level × weight`; o modelo nun
 
 **Custo por correção**
 
-O custo de IA por correção fica em centavos de real e é controlado por um teto de **US$ 0,15** por redação (transcrição + correção + novas tentativas), cerca de 5% do preço da correção avulsa.
+O custo de IA por correção fica em centavos de real e é controlado por um teto de **US$ 0,26** por redação (transcrição + correção + novas tentativas), cerca de 9% do preço da correção avulsa. Os limites subiram 1,72× em 23/10/2026, na mesma proporção da resposta da correção com os campos de aprendizado (ver `docs/decisoes.md`).
 
 Estimativa com preços de tabela da API (out/2026) e estas premissas: foto recortada na área da folha (até 4.784 tokens de imagem), transcrição de 1.500 tokens de saída, correção com 7.000 tokens fixos em cache (instruções, grade, enunciado, coletânea) + 1.200 da redação e 2.500 de saída. Câmbio de referência: R$ 5,50 por US$.
 
@@ -433,7 +443,7 @@ Regras para manter qualidade dentro do teto:
 2. **Cache na ordem certa.** Instruções e grade (iguais para todos) → proposta e abordagens esperadas (iguais por versão de proposta) → redação (única). Redações da mesma proposta em sequência reaproveitam o cache.
 3. **Saída estruturada, sem limite artificial.** Justificativa direta (sem limite rígido de palavras), todas as marcas que afetam a nota e os principais acertos, com teto de 80 só contra o caso absurdo (marcas repetidas entram uma vez; acima de 80 ficam primeiro as que tiraram pontos, sem recusar a resposta), no máximo 3 próximos passos (limite pedagógico). O `max_tokens` é só teto de segurança (ver a seção 8): resposta cortada custa a chamada inteira e nunca é aproveitada.
 4. **Imagem enxuta.** Recortar a área da folha e reduzir para o menor tamanho que mantenha a leitura, medido no conjunto de referência. A imagem vai só para a transcrição; a correção recebe apenas texto.
-5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,15 é a referência; a redação nunca é bloqueada enquanto o gasto ficar até o limite rígido de US$ 0,33 (`Ai__HardCapUsd`). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
+5. **Teto aplicado no código.** O custo de cada chamada é calculado pelo `usage` da resposta e gravado. O teto de US$ 0,26 (`Ai__ReferenceCapUsd`) é a referência; a redação nunca é bloqueada enquanto o gasto ficar até o limite rígido de US$ 0,57 (`Ai__HardCapUsd`). Passar do teto de referência só gera alerta. Antes de uma nova tentativa, o worker confere se ela cabe no limite rígido; se não couber, a redação falha com crédito devolvido e alerta. Alerta também quando o custo médio diário passar de 60% do teto.
 6. **Batch API como opção futura.** Dá 50% de desconto, mas pode levar até 24 h (em geral menos de 1 h). Fica fora do fluxo normal; serve para rodar o conjunto de referência e reprocessamentos.
 
 ## 9. Pagamentos e créditos

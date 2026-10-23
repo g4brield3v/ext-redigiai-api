@@ -55,7 +55,36 @@ internal static class GradingResponseParser
                 return null;
             }
 
-            criteria.Add(new GradedCriterion(position, level, Unescaped(item.Justification), item.Lines, Unescaped(item.Guidance)));
+            CriterionExample? example = null;
+            if (item.Example is { } graded)
+            {
+                if (string.IsNullOrWhiteSpace(graded.LineLabel) || graded.Segments is not { Count: > 0 } segments)
+                {
+                    return null;
+                }
+
+                var parts = new List<ExampleSegment>(segments.Count);
+                foreach (var segment in segments)
+                {
+                    if (segment?.Text is not { } text || SegmentKind(segment.Kind) is not { } segmentKind)
+                    {
+                        return null;
+                    }
+
+                    parts.Add(new ExampleSegment(Unescaped(text), segmentKind));
+                }
+
+                example = new CriterionExample(Unescaped(graded.LineLabel), parts);
+            }
+
+            criteria.Add(new GradedCriterion(
+                position,
+                level,
+                Unescaped(item.Justification),
+                item.Lines,
+                Unescaped(item.Guidance),
+                Unescaped(item.PlainExplanation),
+                example));
         }
 
         var marks = new List<GradedMark>(response.Marks.Count);
@@ -79,7 +108,8 @@ internal static class GradingResponseParser
                 return null;
             }
 
-            marks.Add(new GradedMark(criterion, kind, line, start, end, Unescaped(item.Note), item.Rule, Unescaped(item.Fix)));
+            marks.Add(new GradedMark(
+                criterion, kind, line, start, end, Unescaped(item.Note), item.Rule, Unescaped(item.Why), Unescaped(item.Answer), Unescaped(item.AskLabel)));
         }
 
         return new GradingOutput(
@@ -97,6 +127,26 @@ internal static class GradingResponseParser
     /// </summary>
     [return: NotNullIfNotNull(nameof(text))]
     internal static string? Unescaped(string? text) => text?.Replace("\\\"", "\"");
+
+    private static ExampleSegmentKind? SegmentKind(string? kind) => kind switch
+    {
+        "keep" => ExampleSegmentKind.Keep,
+        "remove" => ExampleSegmentKind.Remove,
+        "add" => ExampleSegmentKind.Add,
+        _ => null,
+    };
+
+    private sealed class Example
+    {
+        public string? LineLabel { get; init; }
+        public List<Segment?>? Segments { get; init; }
+    }
+
+    private sealed class Segment
+    {
+        public string? Text { get; init; }
+        public string? Kind { get; init; }
+    }
 
     private sealed class Response
     {
@@ -128,6 +178,8 @@ internal static class GradingResponseParser
         public string? Justification { get; init; }
         public List<int>? Lines { get; init; }
         public string? Guidance { get; init; }
+        public string? PlainExplanation { get; init; }
+        public Example? Example { get; init; }
     }
 
     private sealed class Mark
@@ -139,6 +191,8 @@ internal static class GradingResponseParser
         public int? End { get; init; }
         public string? Note { get; init; }
         public string? Rule { get; init; }
-        public string? Fix { get; init; }
+        public string? Why { get; init; }
+        public string? Answer { get; init; }
+        public string? AskLabel { get; init; }
     }
 }

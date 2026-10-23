@@ -2595,6 +2595,13 @@
   },
   "components": {
     "schemas": {
+      "AnswerKind": {
+        "enum": [
+          "exact",
+          "example",
+          null
+        ]
+      },
       "BatchEssayItem": {
         "required": [
           "promptId",
@@ -2806,7 +2813,11 @@
           "quote",
           "note",
           "ruleName",
-          "fix"
+          "fix",
+          "why",
+          "answer",
+          "answerKind",
+          "askLabel"
         ],
         "type": "object",
         "properties": {
@@ -2856,7 +2867,61 @@
             "type": [
               "null",
               "string"
+            ],
+            "deprecated": true
+          },
+          "why": {
+            "type": [
+              "null",
+              "string"
             ]
+          },
+          "answer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "answerKind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AnswerKind"
+              }
+            ]
+          },
+          "askLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CorrectionAnnotationGroupDto": {
+        "required": [
+          "criterion",
+          "potentialGain",
+          "markIds"
+        ],
+        "type": "object",
+        "properties": {
+          "criterion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "potentialGain": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "markIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -2874,7 +2939,9 @@
           "nextDescriptor",
           "justification",
           "guidance",
-          "annotationIds"
+          "annotationIds",
+          "plainExplanation",
+          "example"
         ],
         "type": "object",
         "properties": {
@@ -2932,6 +2999,22 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          "plainExplanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "example": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CorrectionExampleDto"
+              }
+            ]
           }
         }
       },
@@ -2961,7 +3044,8 @@
           "annotations",
           "criteria",
           "nextSteps",
-          "feedback"
+          "feedback",
+          "annotationGroups"
         ],
         "type": "object",
         "properties": {
@@ -3080,6 +3164,45 @@
                 "$ref": "#/components/schemas/CorrectionFeedbackDto"
               }
             ]
+          },
+          "annotationGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrectionAnnotationGroupDto"
+            }
+          }
+        }
+      },
+      "CorrectionExampleDto": {
+        "required": [
+          "lineLabel",
+          "segments"
+        ],
+        "type": "object",
+        "properties": {
+          "lineLabel": {
+            "type": "string"
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrectionExampleSegmentDto"
+            }
+          }
+        }
+      },
+      "CorrectionExampleSegmentDto": {
+        "required": [
+          "text",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ExampleSegmentKind"
           }
         }
       },
@@ -3752,6 +3875,13 @@
             "format": "uuid"
           }
         }
+      },
+      "ExampleSegmentKind": {
+        "enum": [
+          "keep",
+          "remove",
+          "add"
+        ]
       },
       "ExamStatus": {
         "enum": [

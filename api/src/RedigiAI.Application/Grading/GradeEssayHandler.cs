@@ -84,7 +84,8 @@ internal sealed class GradeEssayHandler(
             transcription.IdentificationFound,
             layers.WritingRules.Rules.Select(rule => rule.Code).ToHashSet(StringComparer.Ordinal),
             copy.Passages,
-            CopyRequiresZero: copy.CopiedWords > 0 && copy.Share >= copyOptions.Value.ZeroShare);
+            CopyRequiresZero: copy.CopiedWords > 0 && copy.Share >= copyOptions.Value.ZeroShare,
+            LearningFieldsRequired: layers.Prompt.SystemText.Contains(FuvestKnowledgeBaseV1.LearningFieldsMarker, StringComparison.Ordinal));
 
         var request = GradingPromptBuilder.Build(
             layers, lines, transcription.IdentificationFound, copy.Passages, profile.GradingModel, budget.GradingMaxTokens);
@@ -202,6 +203,7 @@ internal sealed class GradeEssayHandler(
             }
 
             int rule;
+            string? code = null;
             if (GradingResponseParser.Parse(call.ToolInput) is not { } output)
             {
                 rule = 1;
@@ -227,12 +229,13 @@ internal sealed class GradeEssayHandler(
                 catch (InvalidGradingException invalid)
                 {
                     rule = invalid.Rule;
+                    code = invalid.Code;
                 }
             }
 
-            // Só o número da regra: o motivo pode citar o texto da correção.
+            // Só o número e o código da regra: o motivo pode citar o texto da correção.
             invalidResponses++;
-            audit.Record("system", "grading.response_rejected", "essay", essayId, new { attempt = invalidResponses, rule });
+            audit.Record("system", "grading.response_rejected", "essay", essayId, new { attempt = invalidResponses, rule, code });
             await unitOfWork.SaveChangesAsync(ct);
             if (invalidResponses >= InvalidResponseAttempts)
             {

@@ -183,6 +183,9 @@ internal sealed class CorrectionCriterionConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<CorrectionCriterion> builder)
     {
         builder.ToTable("correction_criteria");
+        builder.Property(c => c.Example)
+            .HasColumnType("jsonb")
+            .HasConversion<JsonConverter<CriterionExample?>, JsonComparer<CriterionExample?>>();
         builder.HasOne<RubricCriterion>().WithMany().HasForeignKey(c => c.CriterionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(c => new { c.CorrectionId, c.Position }).IsUnique();
     }
@@ -195,6 +198,8 @@ internal sealed class CorrectionMarkConfiguration : IEntityTypeConfiguration<Cor
         builder.ToTable("correction_marks");
         builder.Property(m => m.Kind).HasMaxLength(10);
         builder.Property(m => m.RuleCode).HasMaxLength(40);
+        builder.Property(m => m.AnswerKind).HasMaxLength(10);
+        builder.Property(m => m.AskLabel).HasMaxLength(Correction.MaxAskLabelLength);
         builder.HasOne<RubricCriterion>().WithMany().HasForeignKey(m => m.CriterionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(m => m.CorrectionId);
     }
