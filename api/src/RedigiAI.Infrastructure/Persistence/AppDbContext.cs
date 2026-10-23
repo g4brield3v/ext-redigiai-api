@@ -59,6 +59,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configuration.Properties<PromptKind>().HaveConversion<SnakeCaseEnumConverter<PromptKind>>();
         configuration.Properties<GradingProfileStatus>().HaveConversion<SnakeCaseEnumConverter<GradingProfileStatus>>();
         configuration.Properties<MarkKind>().HaveConversion<SnakeCaseEnumConverter<MarkKind>>();
+        configuration.Properties<AnswerKind>().HaveConversion<SnakeCaseEnumConverter<AnswerKind>>();
         configuration.Properties<FeedbackRating>().HaveConversion<SnakeCaseEnumConverter<FeedbackRating>>();
         configuration.Properties<BirthDate>().HaveConversion<BirthDateConverter>();
     }
