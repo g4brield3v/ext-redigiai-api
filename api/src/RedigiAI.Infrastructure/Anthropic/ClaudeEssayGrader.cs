@@ -73,6 +73,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
 
         JsonObject Text() => new() { ["type"] = "string" };
         JsonObject OptionalText() => new() { ["type"] = new JsonArray("string", "null") };
+        JsonObject LearningText() => new() { ["type"] = new JsonArray("string", "null"), ["maxLength"] = Correction.MaxLearningTextLength };
         JsonObject Line() => Integer(1, schema.SheetLines);
         JsonObject Criterion() => Integer(1, schema.CriteriaCount);
 
@@ -88,6 +89,34 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                 ["criterion"] = new JsonObject
                 {
                     ["type"] = new JsonArray("integer", "null"), ["minimum"] = 1, ["maximum"] = schema.CriteriaCount,
+                },
+            },
+        };
+
+        // Exemplo de reescrita de um critério: os pedaços mantidos e tirados, na ordem, são o texto do aluno.
+        JsonObject Example() => new()
+        {
+            ["type"] = new JsonArray("object", "null"),
+            ["additionalProperties"] = false,
+            ["required"] = new JsonArray("line_label", "segments"),
+            ["properties"] = new JsonObject
+            {
+                ["line_label"] = new JsonObject { ["type"] = "string", ["maxLength"] = Correction.MaxAskLabelLength },
+                ["segments"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["maxItems"] = Correction.MaxExampleSegments,
+                    ["items"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["additionalProperties"] = false,
+                        ["required"] = new JsonArray("text", "kind"),
+                        ["properties"] = new JsonObject
+                        {
+                            ["text"] = new JsonObject { ["type"] = "string", ["maxLength"] = Correction.MaxLearningTextLength },
+                            ["kind"] = new JsonObject { ["enum"] = new JsonArray("keep", "remove", "add") },
+                        },
+                    },
                 },
             },
         };
@@ -135,7 +164,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                     {
                         ["type"] = "object",
                         ["additionalProperties"] = false,
-                        ["required"] = new JsonArray("position", "level", "justification", "lines", "guidance"),
+                        ["required"] = new JsonArray("position", "level", "justification", "lines", "guidance", "plain_explanation", "example"),
                         ["properties"] = new JsonObject
                         {
                             ["position"] = Criterion(),
@@ -143,6 +172,8 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                             ["justification"] = Text(),
                             ["lines"] = new JsonObject { ["type"] = "array", ["items"] = Line() },
                             ["guidance"] = OptionalText(),
+                            ["plain_explanation"] = LearningText(),
+                            ["example"] = Example(),
                         },
                     },
                 },
@@ -155,7 +186,7 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                     {
                         ["type"] = "object",
                         ["additionalProperties"] = false,
-                        ["required"] = new JsonArray("criterion", "kind", "line", "start", "end", "note", "rule", "fix"),
+                        ["required"] = new JsonArray("criterion", "kind", "line", "start", "end", "note", "rule", "why", "answer", "ask_label"),
                         ["properties"] = new JsonObject
                         {
                             ["criterion"] = Criterion(),
@@ -165,7 +196,12 @@ internal sealed class ClaudeEssayGrader(ClaudeMessagesApi api) : IEssayGrader
                             ["end"] = Integer(1),
                             ["note"] = OptionalText(),
                             ["rule"] = new JsonObject { ["enum"] = rules },
-                            ["fix"] = OptionalText(),
+                            ["why"] = LearningText(),
+                            ["answer"] = LearningText(),
+                            ["ask_label"] = new JsonObject
+                            {
+                                ["type"] = new JsonArray("string", "null"), ["maxLength"] = Correction.MaxAskLabelLength,
+                            },
                         },
                     },
                 },

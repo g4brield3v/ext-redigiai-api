@@ -35,6 +35,19 @@ public class CorrectionTests
     private static GradedCriterion Criterion(int position, int level = 3, string? guidance = "Troque o parágrafo da linha 2 por um argumento próprio.") =>
         new(position, level, "Justificativa com as linhas 1 e 2.", [1, 2], guidance);
 
+    /// <summary>Um desvio completo: comentário, regra geral e resposta, sem a resposta no comentário.</summary>
+    private static GradedMark Issue(
+        int criterion,
+        int line,
+        int start,
+        int end,
+        string? note = "nota",
+        string? rule = null,
+        string? why = "Antes de verbo não há artigo, e sem artigo não há crase.",
+        string? answer = "A partir",
+        string? askLabel = null) =>
+        new(criterion, MarkKind.Issue, line, start, end, note, rule, why, answer, askLabel);
+
     private static GradingOutput Output(
         IReadOnlyList<GradedCriterion>? criteria = null,
         IReadOnlyList<GradedMark>? marks = null,
@@ -45,7 +58,7 @@ public class CorrectionTests
         new(
             zero ?? new GradedZero(false, null, null),
             criteria ?? [Criterion(1, 3), Criterion(2, 3), Criterion(3, 2), Criterion(4, 3)],
-            marks ?? [new GradedMark(4, MarkKind.Issue, 2, 0, 8, "\"A partir\", sem crase", "CRASE_VERBO")],
+            marks ?? [Issue(4, 2, 0, 8, "Crase antes de verbo.", "CRASE_VERBO")],
             "Tese clara.",
             mainIssue ?? new GradedPoint("Poucos argumentos próprios.", 1),
             [.. (nextSteps ?? ["Releia a coletânea.", "Reescreva o segundo parágrafo."]).Select(text => new GradedPoint(text, stepCriterion))]);
@@ -55,6 +68,9 @@ public class CorrectionTests
 
     private static void AssertRejected(int rule, GradingOutput output, GradingContext? context = null) =>
         Assert.Equal(rule, Assert.Throws<InvalidGradingException>(() => Grade(output, context)).Rule);
+
+    private static void AssertRejectedWith(string code, GradingOutput output) =>
+        Assert.Equal(code, Assert.Throws<InvalidGradingException>(() => Grade(output)).Code);
 
     [Fact]
     public void Score_is_the_sum_of_level_times_weight_computed_by_the_backend()
@@ -143,15 +159,17 @@ public class CorrectionTests
 
     /// <summary>Marcas em trechos diferentes: de um em um caractere, revezando os quatro critérios.</summary>
     private static List<GradedMark> DistinctMarks(int count, MarkKind kind, int firstLine = 1) =>
-        [.. Enumerable.Range(0, count).Select(i => new GradedMark(1 + (i % 4), kind, firstLine, i / 4, (i / 4) + 1, "nota", null))];
+        [.. Enumerable.Range(0, count).Select(i => kind == MarkKind.Issue
+            ? Issue(1 + (i % 4), firstLine, i / 4, (i / 4) + 1)
+            : new GradedMark(1 + (i % 4), kind, firstLine, i / 4, (i / 4) + 1, "nota", null))];
     [Fact]
     public void Rule_outside_the_catalog_is_recorded_as_other()
     {
         var invented = new string('X', 200);
         var correction = Grade(Output(marks:
         [
-            new GradedMark(4, MarkKind.Issue, 2, 0, 8, "nota", invented),
-            new GradedMark(4, MarkKind.Issue, 1, 0, 1, "nota", " CRASE_VERBO "),
+            Issue(4, 2, 0, 8, rule: invented),
+            Issue(4, 1, 0, 1, rule: " CRASE_VERBO "),
             new GradedMark(1, MarkKind.Good, 1, 0, 1, null, "  "),
         ]));
 
@@ -159,17 +177,186 @@ public class CorrectionTests
     }
 
     [Fact]
-    public void Correct_form_is_kept_only_for_writing_deviations()
+    public void Answer_is_exact_in_criterion_4_and_an_example_elsewhere_and_fix_repeats_the_exact_answer()
     {
         var correction = Grade(Output(marks:
         [
-            new GradedMark(4, MarkKind.Issue, 2, 0, 8, "sem crase", "CRASE_VERBO", "A partir"),
-            new GradedMark(3, MarkKind.Issue, 1, 0, 1, "repete a ideia", null, "Outra frase"),
-            new GradedMark(1, MarkKind.Good, 1, 2, 12, "bom repertório", "CRASE_VERBO", "tecnologia"),
-            new GradedMark(4, MarkKind.Issue, 2, 9, 14, "vago", "OUTRO", "  "),
+            Issue(4, 2, 0, 8, "sem crase", "CRASE_VERBO", askLabel: "  Escreva a forma correta  "),
+            Issue(3, 1, 0, 1, "repete a ideia", answer: "Outra frase, com um dado novo."),
+            new GradedMark(1, MarkKind.Good, 1, 2, 12, "bom repertório", null, "Regra.", "tecnologia", "Escreva"),
         ]));
 
-        Assert.Equal(["A partir", null, null, null], correction.Marks.Select(mark => mark.Fix));
+        Assert.Equal(["A partir", null, null], correction.Marks.Select(mark => mark.Fix));
+        Assert.Equal([AnswerKind.Exact, AnswerKind.Example, null], correction.Marks.Select(mark => mark.AnswerKind));
+        Assert.Equal(["A partir", "Outra frase, com um dado novo.", null], correction.Marks.Select(mark => mark.Answer));
+        Assert.Equal(["Escreva a forma correta", null, null], correction.Marks.Select(mark => mark.AskLabel));
+
+        // Num acerto, os campos de aprendizado são descartados.
+        Assert.Null(correction.Marks[2].Why);
+    }
+
+    [Fact]
+    public void An_issue_without_why_or_answer_is_rejected_as_missing_field()
+    {
+        AssertRejectedWith(GradingRejections.MissingField, Output(marks: [Issue(4, 2, 0, 8, why: null)]));
+        AssertRejectedWith(GradingRejections.MissingField, Output(marks: [Issue(4, 2, 0, 8, answer: "  ")]));
+    }
+
+    [Fact]
+    public void Note_or_why_that_gives_the_answer_is_rejected_as_leaked()
+    {
+        // Sem contar maiúsculas, aspas e pontuação final.
+        AssertRejectedWith(GradingRejections.AnswerLeaked, Output(marks: [Issue(4, 2, 0, 8, note: "Escreva “a partir.”")]));
+        AssertRejectedWith(GradingRejections.AnswerLeaked, Output(marks: [Issue(4, 2, 0, 8, why: "O certo é A PARTIR, sem crase.")]));
+
+        // Só palavras inteiras contam: "apartir" não é "a partir".
+        Assert.Single(Grade(Output(marks: [Issue(4, 2, 0, 8, note: "Não junte em apartir.")])).Marks);
+
+        // Resposta curta de uma palavra ("à") aparece por acaso em qualquer explicação.
+        Assert.Single(Grade(Output(marks: [Issue(4, 2, 0, 8, why: "Antes de palavra feminina, à indica crase.", answer: "à")])).Marks);
+    }
+
+    [Fact]
+    public void Learning_fields_are_statements_and_the_ask_label_is_short()
+    {
+        AssertRejected(4, Output(marks: [Issue(4, 2, 0, 8, why: "Qual é a regra?")]));
+        AssertRejected(4, Output(marks: [Issue(4, 2, 0, 8, answer: "A partir?")]));
+        AssertRejected(4, Output(marks: [Issue(4, 2, 0, 8, askLabel: "Como você escreveria?")]));
+        AssertRejected(1, Output(marks: [Issue(4, 2, 0, 8, askLabel: new string('a', Correction.MaxAskLabelLength + 1))]));
+        AssertRejected(4, Output(criteria: [Criterion(1, 3) with { PlainExplanation = "O que falta?" }, Criterion(2, 3), Criterion(3, 2), Criterion(4, 3)]));
+    }
+
+    [Fact]
+    public void Answer_may_be_a_question_when_the_marked_text_already_is_one()
+    {
+        var lines = new List<EssayLine> { new(1, "Por que? Ninguém sabe.", true), new(2, "E segue.", false) };
+        var context = Context() with { Lines = lines };
+        var output = Output(marks:
+        [
+            Issue(4, 1, 0, 8, note: "Pergunta no fim da frase.", why: "No fim da pergunta, o porquê é separado e acentuado.", answer: "Por quê?"),
+        ]);
+
+        Assert.Equal("Por quê?", Grade(output, context).Marks.Single().Answer);
+    }
+
+    [Fact]
+    public void Profile_with_the_previous_instructions_is_not_rejected_for_missing_learning_fields()
+    {
+        var context = Context() with { LearningFieldsRequired = false };
+        var correction = Grade(Output(marks: [Issue(4, 2, 0, 8, why: null, answer: null)]), context);
+
+        var mark = correction.Marks.Single();
+        Assert.Null(mark.Why);
+        Assert.Null(mark.Answer);
+        Assert.Null(mark.AnswerKind);
+        Assert.Null(mark.Fix);
+    }
+
+    [Fact]
+    public void Learning_fields_too_long_are_rejected()
+    {
+        var huge = new string('a', Correction.MaxLearningTextLength + 1);
+        AssertRejected(1, Output(marks: [Issue(4, 2, 0, 8, why: huge)]));
+        AssertRejected(1, Output(criteria: [Criterion(1, 3) with { PlainExplanation = huge }, Criterion(2, 3), Criterion(3, 2), Criterion(4, 3)]));
+        var manySegments = Example([.. Enumerable.Repeat(("À ", ExampleSegmentKind.Keep), Correction.MaxExampleSegments + 1)]);
+        AssertRejected(1, Output(criteria: [Criterion(1, 3) with { Example = manySegments }, Criterion(2, 3), Criterion(3, 2), Criterion(4, 3)]));
+    }
+
+    [Fact]
+    public void Example_copied_from_what_the_model_read_matches_the_angle_brackets()
+    {
+        // A IA lê "<" e ">" do aluno como "＜" e "＞".
+        var context = Context() with { Lines = [new(1, "A rede <social> decide tudo.", true), new(2, "E segue.", false)] };
+        var output = Output(
+            criteria: [Criterion(1, 3) with { Example = Example(("A rede ＜social＞ ", ExampleSegmentKind.Keep), ("decide", ExampleSegmentKind.Remove)) }, Criterion(2, 3), Criterion(3, 2), Criterion(4, 3)],
+            marks: []);
+
+        Assert.NotNull(Grade(output, context).Criteria[0].Example);
+    }
+
+    private static CriterionExample Example(params (string Text, ExampleSegmentKind Kind)[] segments) =>
+        new("Linha 2", [.. segments.Select(segment => new ExampleSegment(segment.Text, segment.Kind))]);
+
+    [Fact]
+    public void Example_must_start_from_the_text_of_the_essay()
+    {
+        var example = Example(
+            ("À partir desse ponto, ", ExampleSegmentKind.Keep),
+            ("os algoritmos", ExampleSegmentKind.Remove),
+            ("as plataformas", ExampleSegmentKind.Add),
+            ("  escolhem.", ExampleSegmentKind.Keep));
+        var correction = Grade(Output(criteria:
+        [
+            Criterion(1, 3) with { PlainExplanation = "Falta um argumento próprio na linha 2.", Example = example },
+            Criterion(2, 3),
+            Criterion(3, 2),
+            Criterion(4, 3),
+        ]));
+
+        var first = correction.Criteria.Single(criterion => criterion.Position == 1);
+        Assert.Equal(example, first.Example);
+        Assert.Equal("Falta um argumento próprio na linha 2.", first.PlainExplanation);
+
+        // O texto mantido e tirado não está na redação.
+        AssertRejectedWith(GradingRejections.ExampleMismatch, Output(criteria:
+        [
+            Criterion(1, 3) with { Example = Example(("os robôs escolhem", ExampleSegmentKind.Remove), ("nós", ExampleSegmentKind.Add)) },
+            Criterion(2, 3),
+            Criterion(3, 2),
+            Criterion(4, 3),
+        ]));
+
+        // Só texto novo, sem nada da redação: não há de onde partir.
+        AssertRejectedWith(GradingRejections.ExampleMismatch, Output(criteria:
+        [
+            Criterion(1, 3) with { Example = Example(("Um parágrafo novo.", ExampleSegmentKind.Add)) },
+            Criterion(2, 3),
+            Criterion(3, 2),
+            Criterion(4, 3),
+        ]));
+    }
+
+    [Fact]
+    public void Example_crosses_lines_and_joins_a_word_split_by_a_hyphen()
+    {
+        var lines = new List<EssayLine>
+        {
+            new(1, "A tecnologia mudou a for-", true),
+            new(2, "ma de debater.", false),
+        };
+        var context = Context() with { Lines = lines };
+        GradingOutput WithExample(string text) => Output(
+            criteria:
+            [
+                Criterion(1, 3) with { Example = Example((text, ExampleSegmentKind.Keep), ("hoje", ExampleSegmentKind.Add)) },
+                Criterion(2, 3),
+                Criterion(3, 2),
+                Criterion(4, 3),
+            ],
+            marks: []);
+
+        Assert.NotNull(Grade(WithExample("mudou a forma de debater."), context).Criteria[0].Example);
+        Assert.NotNull(Grade(WithExample("mudou a for- ma de debater."), context).Criteria[0].Example);
+    }
+
+    [Fact]
+    public void Explanation_and_example_are_dropped_at_the_top_level_and_the_example_in_criterion_4()
+    {
+        var example = Example(("os algoritmos escolhem", ExampleSegmentKind.Remove), ("as pessoas escolhem", ExampleSegmentKind.Add));
+        var correction = Grade(Output(criteria:
+        [
+            Criterion(1, 3),
+            Criterion(2, 4, guidance: null) with { PlainExplanation = "Está no nível máximo.", Example = example },
+            Criterion(3, 2),
+            Criterion(4, 3) with { PlainExplanation = "Revise a crase da linha 2.", Example = example },
+        ]));
+
+        var top = correction.Criteria.Single(criterion => criterion.Position == 2);
+        var writing = correction.Criteria.Single(criterion => criterion.Position == 4);
+        Assert.Null(top.PlainExplanation);
+        Assert.Null(top.Example);
+        Assert.Equal("Revise a crase da linha 2.", writing.PlainExplanation);
+        Assert.Null(writing.Example);
     }
 
     [Fact]

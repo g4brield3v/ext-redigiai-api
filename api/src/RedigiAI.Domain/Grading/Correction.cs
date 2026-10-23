@@ -12,13 +12,58 @@ public enum MarkKind
 
 public sealed record GradedZero(bool Applies, string? Reason, string? Explanation);
 
-public sealed record GradedCriterion(int Position, int Level, string Justification, IReadOnlyList<int> Lines, string? Guidance);
+/// <param name="PlainExplanation">O que muda do nível atual para o próximo neste texto, em palavras simples.</param>
+/// <param name="Example">Como ficaria um trecho do texto, nos critérios 1 a 3.</param>
+public sealed record GradedCriterion(
+    int Position,
+    int Level,
+    string Justification,
+    IReadOnlyList<int> Lines,
+    string? Guidance,
+    string? PlainExplanation = null,
+    CriterionExample? Example = null);
+
+/// <summary>Os valores são gravados como número no jsonb de <c>correction_criteria.example</c>: não mude nenhum.</summary>
+public enum ExampleSegmentKind
+{
+    Keep = 0,
+    Remove = 1,
+    Add = 2,
+}
+
+/// <summary>Um pedaço do exemplo: texto do aluno mantido, texto do aluno tirado ou texto acrescentado.</summary>
+public sealed record ExampleSegment(string Text, ExampleSegmentKind Kind);
+
+/// <summary>Um trecho da redação reescrito como exemplo, não como a única forma.</summary>
+/// <param name="LineLabel">Onde fica o trecho, como "Fim do parágrafo, linha 29".</param>
+public sealed record CriterionExample(string LineLabel, IReadOnlyList<ExampleSegment> Segments);
+
+/// <summary>Como ler a resposta de um apontamento.</summary>
+public enum AnswerKind
+{
+    /// <summary>A forma correta, no critério de correção gramatical.</summary>
+    Exact,
+
+    /// <summary>Uma reescrita possível, nos outros critérios.</summary>
+    Example,
+}
 
 /// <param name="Start">Posição no texto da linha: início incluído, fim excluído.</param>
 /// <param name="Rule">Código da regra de escrita, nas marcas do critério de correção gramatical.</param>
-/// <param name="Fix">A forma correta do trecho, nos desvios de escrita.</param>
+/// <param name="Why">A regra geral por trás do apontamento, que vale para outros textos.</param>
+/// <param name="Answer">A forma correta (critério 4) ou uma reescrita possível (critérios 1 a 3).</param>
+/// <param name="AskLabel">O pedido ao aluno antes de ver a resposta, como "Escreva a frase que fecha o parágrafo".</param>
 public sealed record GradedMark(
-    int Criterion, MarkKind Kind, int Line, int Start, int End, string? Note, string? Rule, string? Fix = null);
+    int Criterion,
+    MarkKind Kind,
+    int Line,
+    int Start,
+    int End,
+    string? Note,
+    string? Rule,
+    string? Why = null,
+    string? Answer = null,
+    string? AskLabel = null);
 
 /// <summary>O problema principal ou um próximo passo, com o critério a que se refere.</summary>
 /// <param name="Criterion">Posição do critério na grade; nulo quando o texto não é de um critério só.</param>
@@ -52,6 +97,10 @@ public sealed record CopiedPassage(string Label, int LineStart, int LineEnd, int
 /// <param name="WritingRuleCodes">Códigos do catálogo de regras de escrita do perfil.</param>
 /// <param name="CopiedPassages">Trechos copiados da coletânea que a verificação automática encontrou.</param>
 /// <param name="CopyRequiresZero">A cópia passa do limite: a correção só é aceita com nota zero.</param>
+/// <param name="LearningFieldsRequired">
+/// As instruções do perfil pedem a regra geral e a resposta de cada desvio. Um perfil ainda com as instruções
+/// anteriores não é recusado por não mandá-las.
+/// </param>
 public sealed record GradingContext(
     Guid EssayId,
     RubricVersion Rubric,
@@ -62,13 +111,30 @@ public sealed record GradingContext(
     bool IdentificationFound,
     IReadOnlySet<string> WritingRuleCodes,
     IReadOnlyList<CopiedPassage> CopiedPassages,
-    bool CopyRequiresZero);
+    bool CopyRequiresZero,
+    bool LearningFieldsRequired = true);
 
 /// <summary>A resposta da IA não passa em uma das regras de validação; vale pedir de novo.</summary>
-/// <param name="rule">Número da regra da seção 8 da especificação (1 a 8).</param>
-public sealed class InvalidGradingException(int rule, string reason) : Exception(reason)
+/// <param name="rule">Número da regra da seção 8 da especificação (1 a 11).</param>
+/// <param name="code">Código da recusa, nas regras que têm um (<see cref="GradingRejections"/>).</param>
+public sealed class InvalidGradingException(int rule, string reason, string? code = null) : Exception(reason)
 {
     public int Rule { get; } = rule;
+
+    public string? Code { get; } = code;
+}
+
+/// <summary>Códigos das recusas dos campos de aprendizado (regras 9 a 11 da validação).</summary>
+public static class GradingRejections
+{
+    /// <summary>Um desvio sem a regra geral ou sem a resposta.</summary>
+    public const string MissingField = "AI_MISSING_FIELD";
+
+    /// <summary>O comentário ou a regra geral entrega a resposta que o aluno deveria tentar sozinho.</summary>
+    public const string AnswerLeaked = "AI_ANSWER_LEAKED";
+
+    /// <summary>O exemplo de reescrita parte de um texto que não está na redação.</summary>
+    public const string ExampleMismatch = "AI_EXAMPLE_MISMATCH";
 }
 
 /// <summary>
@@ -84,6 +150,24 @@ public sealed class Correction
     /// fica bem abaixo disso. Passou, a correção fica com as marcas que tiraram pontos antes dos acertos.
     /// </summary>
     public const int MaxMarks = 80;
+
+    /// <summary>
+    /// O critério de correção gramatical da grade da Fuvest: nele a resposta é a forma correta exata e não há
+    /// exemplo de reescrita.
+    /// </summary>
+    public const int WritingCriterion = 4;
+
+    /// <summary>Tamanho máximo do pedido ao aluno antes da resposta.</summary>
+    public const int MaxAskLabelLength = 60;
+
+    /// <summary>
+    /// Teto da regra geral, da resposta, da explicação e de cada pedaço do exemplo: bem acima de 3 frases, só
+    /// para um campo não tomar a saída inteira.
+    /// </summary>
+    public const int MaxLearningTextLength = 800;
+
+    /// <summary>Teto de pedaços de um exemplo de reescrita.</summary>
+    public const int MaxExampleSegments = 20;
 
     private readonly List<CorrectionCriterion> _criteria = [];
     private readonly List<CorrectionMark> _marks = [];
@@ -206,9 +290,50 @@ public sealed class Correction
             }
         }
 
-        correction.AddMarks(rubric, output.Marks, textByLine, context.WritingRuleCodes);
+        correction.AddMarks(rubric, output.Marks, textByLine, context.WritingRuleCodes, context.LearningFieldsRequired);
         correction.Score = correction._criteria.Sum(criterion => criterion.Points);
         return correction;
+    }
+
+    /// <summary>
+    /// Regras 4, 9 e 10 nos campos de aprendizado de um desvio: a regra geral e a resposta são obrigatórias, nada
+    /// é pergunta, e nem o comentário nem a regra geral entregam a resposta. Num acerto, os campos são descartados.
+    /// Com as instruções anteriores do perfil, que não pedem esses campos, a falta deles não recusa a resposta.
+    /// </summary>
+    /// <param name="quote">O trecho marcado: a resposta pode ter "?" se o trecho do aluno já é uma pergunta.</param>
+    private static GradedMark LearningFields(GradedMark mark, string quote, bool required)
+    {
+        if (mark.Kind != MarkKind.Issue)
+        {
+            return mark with { Why = null, Answer = null, AskLabel = null };
+        }
+
+        var why = string.IsNullOrWhiteSpace(mark.Why) ? null : mark.Why;
+        var answer = string.IsNullOrWhiteSpace(mark.Answer) ? null : mark.Answer;
+        var askLabel = string.IsNullOrWhiteSpace(mark.AskLabel) ? null : mark.AskLabel.Trim();
+        if (required && (why is null || answer is null))
+        {
+            throw new InvalidGradingException(9, "An issue mark has no why or no answer.", GradingRejections.MissingField);
+        }
+
+        if ((why is not null && Feedback.IsQuestion(why))
+            || (answer?.Contains('?') == true && !quote.Contains('?'))
+            || askLabel?.Contains('?') == true)
+        {
+            throw new InvalidGradingException(4, "The why, the answer or the ask label of a mark is a question.");
+        }
+
+        if (askLabel?.Length > MaxAskLabelLength || why?.Length > MaxLearningTextLength || answer?.Length > MaxLearningTextLength)
+        {
+            throw new InvalidGradingException(1, "A learning field of a mark is too long.");
+        }
+
+        if (answer is not null && (LearningText.Reveals(mark.Note, answer) || LearningText.Reveals(why, answer)))
+        {
+            throw new InvalidGradingException(10, "The note or the why of a mark gives the answer.", GradingRejections.AnswerLeaked);
+        }
+
+        return mark with { Why = why, Answer = answer, AskLabel = askLabel };
     }
 
     private static bool HasCriterion(RubricVersion rubric, int position) =>
@@ -241,7 +366,32 @@ public sealed class Correction
                 throw new InvalidGradingException(4, $"The guidance of criterion {criterion.Position} is a question.");
             }
 
-            _criteria.Add(new CorrectionCriterion(Id, criterion, item));
+            // Explicação e exemplo só servem a quem ainda pode subir de nível; o critério 4 não tem exemplo.
+            var belowTop = item.Level < rubric.MaxLevel;
+            var explanation = belowTop && !string.IsNullOrWhiteSpace(item.PlainExplanation) ? item.PlainExplanation : null;
+            var example = belowTop && criterion.Position != WritingCriterion ? item.Example : null;
+
+            if (explanation is not null && Feedback.IsQuestion(explanation))
+            {
+                throw new InvalidGradingException(4, $"The plain explanation of criterion {criterion.Position} is a question.");
+            }
+
+            if (explanation?.Length > MaxLearningTextLength
+                || (example is not null
+                    && (example.Segments.Count > MaxExampleSegments
+                        || example.LineLabel.Length > MaxAskLabelLength
+                        || example.Segments.Any(segment => segment.Text.Length > MaxLearningTextLength))))
+            {
+                throw new InvalidGradingException(1, $"A learning field of criterion {criterion.Position} is too long.");
+            }
+
+            if (example is not null && !LearningText.ExampleMatches(example, textByLine))
+            {
+                throw new InvalidGradingException(
+                    11, $"The example of criterion {criterion.Position} is not in the essay.", GradingRejections.ExampleMismatch);
+            }
+
+            _criteria.Add(new CorrectionCriterion(Id, criterion, item with { PlainExplanation = explanation, Example = example }));
         }
     }
 
@@ -249,7 +399,8 @@ public sealed class Correction
         RubricVersion rubric,
         IReadOnlyList<GradedMark> marks,
         Dictionary<int, string> textByLine,
-        IReadOnlySet<string> ruleCodes)
+        IReadOnlySet<string> ruleCodes,
+        bool learningFieldsRequired)
     {
         // Toda marca é validada, mesmo as que o teto vai cortar: uma posição inventada continua recusando a resposta.
         var valid = new List<(RubricCriterion Criterion, GradedMark Mark)>(marks.Count);
@@ -268,7 +419,7 @@ public sealed class Correction
             var rule = string.IsNullOrWhiteSpace(mark.Rule)
                 ? null
                 : ruleCodes.Contains(mark.Rule.Trim()) ? mark.Rule.Trim() : WritingRulesVersion.OtherCode;
-            valid.Add((criterion, mark with { Rule = rule }));
+            valid.Add((criterion, LearningFields(mark, text[mark.Start..mark.End], learningFieldsRequired) with { Rule = rule }));
         }
 
         // Marca repetida (mesmo critério, tipo e trecho) entra uma vez só. Acima do teto, a correção não é recusada:
@@ -304,6 +455,8 @@ public sealed class CorrectionCriterion
         Justification = graded.Justification;
         Guidance = string.IsNullOrWhiteSpace(graded.Guidance) ? null : graded.Guidance;
         Lines = [.. graded.Lines.Distinct().Order()];
+        PlainExplanation = graded.PlainExplanation;
+        Example = graded.Example;
     }
 
     public Guid Id { get; private set; }
@@ -319,6 +472,12 @@ public sealed class CorrectionCriterion
     /// <summary>O que corrigir, sempre como afirmação; nulo quando o nível é o máximo.</summary>
     public string? Guidance { get; private set; }
     public int[] Lines { get; private set; } = [];
+
+    /// <summary>O que muda para o próximo nível neste texto; nulo no nível máximo e nas correções antigas.</summary>
+    public string? PlainExplanation { get; private set; }
+
+    /// <summary>Um trecho reescrito, nos critérios 1 a 3 abaixo do nível máximo; opcional.</summary>
+    public CriterionExample? Example { get; private set; }
 }
 
 public sealed class CorrectionMark
@@ -339,8 +498,16 @@ public sealed class CorrectionMark
         Note = string.IsNullOrWhiteSpace(mark.Note) ? null : mark.Note;
         RuleCode = string.IsNullOrWhiteSpace(mark.Rule) ? null : mark.Rule;
 
-        // A forma correta só existe para desvio de escrita; fora disso o que a IA mandar é descartado.
-        Fix = Kind == MarkKind.Issue && RuleCode is not null && !string.IsNullOrWhiteSpace(mark.Fix) ? mark.Fix : null;
+        // Os campos de aprendizado só existem nos desvios: a validação já descartou os dos acertos.
+        Why = mark.Why;
+        Answer = mark.Answer;
+        AskLabel = mark.AskLabel;
+        AnswerKind = Answer is null
+            ? null
+            : criterion.Position == Correction.WritingCriterion ? Grading.AnswerKind.Exact : Grading.AnswerKind.Example;
+
+        // A forma correta continua no contrato antigo: é a resposta, quando ela é exata.
+        Fix = AnswerKind == Grading.AnswerKind.Exact ? Answer : null;
     }
 
     public Guid Id { get; private set; }
@@ -361,8 +528,19 @@ public sealed class CorrectionMark
     /// <summary>Código da regra de escrita (<c>writing_rules</c>), quando a marca é um desvio de escrita.</summary>
     public string? RuleCode { get; private set; }
 
-    /// <summary>A forma correta do trecho, quando a marca é um desvio de escrita.</summary>
+    /// <summary>A forma correta do trecho, nos desvios do critério 4: o mesmo valor da resposta exata.</summary>
     public string? Fix { get; private set; }
+
+    /// <summary>A regra geral por trás do desvio; nulo nos acertos e nas correções antigas.</summary>
+    public string? Why { get; private set; }
+
+    /// <summary>A forma correta (critério 4) ou uma reescrita possível (critérios 1 a 3).</summary>
+    public string? Answer { get; private set; }
+
+    public AnswerKind? AnswerKind { get; private set; }
+
+    /// <summary>O pedido ao aluno antes de ver a resposta; opcional.</summary>
+    public string? AskLabel { get; private set; }
 }
 
 public enum FeedbackRating
@@ -464,6 +642,88 @@ public static class Feedback
 
         // Aspas que não fecham não protegem a pergunta.
         return insideOpenQuote;
+    }
+}
+
+/// <summary>Comparações de texto dos campos de aprendizado.</summary>
+public static class LearningText
+{
+    /// <summary>
+    /// Verdadeiro quando o texto traz a resposta, palavra por palavra, sem contar maiúsculas, aspas e pontuação.
+    /// Resposta de uma palavra só, com até 3 letras ("à", "há"), não conta: ela aparece por acaso em qualquer
+    /// explicação.
+    /// </summary>
+    public static bool Reveals(string? text, string answer)
+    {
+        var answerWords = Words(answer);
+        if (text is null || answerWords.Count == 0 || (answerWords.Count == 1 && answerWords[0].Length <= 3))
+        {
+            return false;
+        }
+
+        var words = Words(text);
+        for (var start = 0; start + answerWords.Count <= words.Count; start++)
+        {
+            if (words.Skip(start).Take(answerWords.Count).SequenceEqual(answerWords, StringComparer.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Verdadeiro quando o texto do aluno no exemplo (os pedaços mantidos e tirados, na ordem) está na redação.
+    /// Espaços e quebras de linha não contam; a palavra partida por hífen no fim da linha vale partida ou inteira.
+    /// </summary>
+    public static bool ExampleMatches(CriterionExample example, IReadOnlyDictionary<int, string> textByLine)
+    {
+        var original = Compact(string.Concat(example.Segments
+            .Where(segment => segment.Kind != ExampleSegmentKind.Add)
+            .Select(segment => segment.Text)));
+        if (original.Length == 0)
+        {
+            return false;
+        }
+
+        var lines = textByLine.OrderBy(line => line.Key).Select(line => line.Value.TrimEnd()).ToList();
+        var asWritten = Compact(string.Concat(lines));
+        var joined = Compact(string.Concat(lines.Select(line => line.EndsWith('-') ? line[..^1] : line)));
+        return asWritten.Contains(original, StringComparison.Ordinal) || joined.Contains(original, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Sem espaços, e com os sinais de menor e maior da forma como a IA os leu (o texto do aluno vai para ela com
+    /// "＜" e "＞", para não fechar a marcação): o exemplo copiado do que ela viu também bate.
+    /// </summary>
+    private static string Compact(string text) =>
+        string.Concat(text.Where(character => !char.IsWhiteSpace(character))).Replace('＜', '<').Replace('＞', '>');
+
+    /// <summary>As palavras do texto em minúsculas; aspas, pontuação e espaços só separam.</summary>
+    private static List<string> Words(string text)
+    {
+        var words = new List<string>();
+        var current = new System.Text.StringBuilder();
+        foreach (var character in text.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                current.Append(character);
+            }
+            else if (current.Length > 0)
+            {
+                words.Add(current.ToString());
+                current.Clear();
+            }
+        }
+
+        if (current.Length > 0)
+        {
+            words.Add(current.ToString());
+        }
+
+        return words;
     }
 }
 
