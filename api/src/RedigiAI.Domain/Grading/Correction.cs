@@ -402,8 +402,9 @@ public sealed class Correction
         IReadOnlySet<string> ruleCodes,
         bool learningFieldsRequired)
     {
-        // Toda marca é validada, mesmo as que o teto vai cortar: uma posição inventada continua recusando a resposta.
-        var valid = new List<(RubricCriterion Criterion, GradedMark Mark)>(marks.Count);
+        // A posição de toda marca é validada, mesmo das que o teto vai cortar: uma posição inventada continua recusando
+        // a resposta. Os campos de aprendizado, que o aluno lê, só são validados nas marcas que ficam.
+        var valid = new List<(RubricCriterion Criterion, GradedMark Mark, string Quote)>(marks.Count);
         foreach (var mark in marks)
         {
             var criterion = rubric.Criteria.FirstOrDefault(c => c.Position == mark.Criterion)
@@ -419,7 +420,7 @@ public sealed class Correction
             var rule = string.IsNullOrWhiteSpace(mark.Rule)
                 ? null
                 : ruleCodes.Contains(mark.Rule.Trim()) ? mark.Rule.Trim() : WritingRulesVersion.OtherCode;
-            valid.Add((criterion, LearningFields(mark, text[mark.Start..mark.End], learningFieldsRequired) with { Rule = rule }));
+            valid.Add((criterion, mark with { Rule = rule }, text[mark.Start..mark.End]));
         }
 
         // Marca repetida (mesmo critério, tipo e trecho) entra uma vez só. Acima do teto, a correção não é recusada:
@@ -431,11 +432,13 @@ public sealed class Correction
             .OrderBy(entry => entry.item.Mark.Kind == MarkKind.Issue ? 0 : 1)
             .ThenBy(entry => entry.index)
             .Take(MaxMarks)
-            .OrderBy(entry => entry.index);
+            .OrderBy(entry => entry.index)
+            .Select(entry => (entry.item.Criterion, Mark: LearningFields(entry.item.Mark, entry.item.Quote, learningFieldsRequired)))
+            .ToList();
 
-        foreach (var (item, _) in kept)
+        foreach (var (criterion, mark) in kept)
         {
-            _marks.Add(new CorrectionMark(Id, item.Criterion, item.Mark));
+            _marks.Add(new CorrectionMark(Id, criterion, mark));
         }
     }
 }
