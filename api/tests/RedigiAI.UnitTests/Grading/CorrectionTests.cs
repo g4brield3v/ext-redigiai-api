@@ -157,6 +157,15 @@ public class CorrectionTests
     public void Mark_beyond_the_cap_with_a_made_up_position_still_rejects_the_response() =>
         AssertRejected(3, Output(marks: [.. DistinctMarks(Correction.MaxMarks, MarkKind.Issue), new GradedMark(1, MarkKind.Good, 9, 0, 3, null, null)]));
 
+    [Fact]
+    public void Mark_beyond_the_cap_without_learning_fields_does_not_reject_the_response()
+    {
+        var correction = Grade(Output(marks: [.. DistinctMarks(Correction.MaxMarks, MarkKind.Issue), Issue(4, 2, 0, 8, why: null)]));
+
+        Assert.Equal(Correction.MaxMarks, correction.Marks.Count);
+        Assert.DoesNotContain(correction.Marks, mark => mark.LineStart == 2);
+    }
+
     /// <summary>Marcas em trechos diferentes: de um em um caractere, revezando os quatro critérios.</summary>
     private static List<GradedMark> DistinctMarks(int count, MarkKind kind, int firstLine = 1) =>
         [.. Enumerable.Range(0, count).Select(i => kind == MarkKind.Issue

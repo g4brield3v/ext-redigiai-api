@@ -62,6 +62,7 @@ dotnet build api/RedigiAI.sln               # também regenera api/openapi.json
 dotnet test api/RedigiAI.sln                # integração precisa do Docker ligado (Testcontainers)
 dotnet run --project api/src/RedigiAI.Api -- migrate  # aplica as migrações
 dotnet run --project api/src/RedigiAI.Api -- seed     # carga inicial do catálogo (idempotente)
+dotnet run --project api/src/RedigiAI.Api -- seed --publish-instructions  # no deploy, depois do migrate: publica instruções e manual novos e troca os perfis ativos (fora de Development)
 dotnet run --project api/src/RedigiAI.Api -- private-prompt-images  # torna privadas as imagens de proposta antigas (uma vez por ambiente)
 dotnet run --project api/src/RedigiAI.Api -- import-prompts --admin <clerk_user_id>  # publica as propostas de Content/Prompts (Fuvest 2016–2025); pode rodar de novo
 dotnet run --project api/src/RedigiAI.Api -- api      # API em http://localhost:5080; Swagger em /swagger (só em desenvolvimento)

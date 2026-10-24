@@ -76,9 +76,21 @@ internal static class DatabaseCommands
         return 0;
     }
 
+    /// <summary>
+    /// Carga inicial do catálogo. Com <c>--publish-instructions</c>, também fora de Development: se as instruções de
+    /// correção ou o manual do programa mudaram, publica a versão seguinte e troca os perfis ativos (roda no deploy,
+    /// depois do <c>migrate</c>).
+    /// </summary>
     public static async Task<int> SeedAsync(string[] args)
     {
-        using var host = WorkerHost.CreateBuilder(args).Build();
+        const string PublishInstructions = "--publish-instructions";
+        var builder = WorkerHost.CreateBuilder([.. args.Where(arg => arg != PublishInstructions)]);
+        if (args.Contains(PublishInstructions))
+        {
+            builder.Services.PostConfigure<SeedOptions>(seed => seed.ReplaceOutdatedInstructions = true);
+        }
+
+        using var host = builder.Build();
         await using var scope = host.Services.CreateAsyncScope();
         var seeded = await scope.ServiceProvider.GetRequiredService<ICatalogSeedService>().SeedAsync(CancellationToken.None);
         scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("RedigiAI.Api.Seed")
